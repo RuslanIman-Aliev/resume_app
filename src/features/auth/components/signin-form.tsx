@@ -57,7 +57,6 @@ export function SignInForm() {
           router.push("/");
         },
         onError: (ctx) => {
-          console.error("Sign in error:", ctx.error);
           toast.error(ctx.error.message || "An error occurred during sign in.");
           setIsPending(false);
         },
