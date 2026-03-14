@@ -39,7 +39,6 @@ export function SignUpForm() {
   });
 
   async function onSubmit(data: SignUpFormData) {
-    console.log("Submitting form with data:", data);
     await authClient.signUp.email(
       {
         email: data.email,
@@ -57,7 +56,6 @@ export function SignUpForm() {
           router.push("/");  
         },
         onError: (ctx) => {
-          console.error("Sign up error:", ctx.error);
           toast.error(ctx.error.message || "An error occurred during sign up.");
           setIsPending(false);
         },
