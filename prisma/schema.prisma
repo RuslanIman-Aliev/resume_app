@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. BETTER-AUTH CORE MODELS
+// ==========================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // --- AI-Tailor Custom Fields ---
+  // The transactional token system to prevent unlimited API abuse
+  credits       Int       @default(5) 
+
+  // Relations to your custom tables
+  sessions      Session[]
+  accounts      Account[]
+  resumes       Resume[]
+  applications  JobApplication[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  expiresAt             DateTime?
+  password              String?
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+
+  @@map("verification")
+}
+
+// ==========================================
+// 2. AI-TAILOR BUSINESS LOGIC MODELS
+// ==========================================
+
+model Resume {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fileName       String   // Example: "Aleksei_TS_Resume.pdf"
+  
+  // @db.Text is crucial here because standard strings have length limits.
+  // We need to store the entire parsed content of the PDF.
+  parsedContent  String   @db.Text 
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("resume")
+}
+
+// This enum directly controls the columns on your Kanban board
+enum ApplicationStatus {
+  TO_APPLY
+  APPLIED
+  INTERVIEW
+  REJECTED
+  OFFER
+}
+
+model JobApplication {
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // --- Job Details (The Input) ---
+  companyName      String
+  jobTitle         String
+  jobDescription   String            @db.Text
+  
+  // --- AI Generated Data (The Output) ---
+  matchScore       Int?              // e.g., 85
+  missingSkills    String[]          // A PostgreSQL array to store ["Docker", "tRPC"]
+  coverLetterText  String?           @db.Text
+  
+  // Setting a target language allows the app to generate cover letters in German, English, etc.
+  // This is highly relevant when applying for positions in different countries.
+  targetLanguage   String            @default("English") 
+  
+  // --- CRM / Tracker State ---
+  status           ApplicationStatus @default(TO_APPLY)
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@map("job_application")
+}
