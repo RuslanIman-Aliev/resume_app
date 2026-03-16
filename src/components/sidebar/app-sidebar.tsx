@@ -32,7 +32,7 @@ const data = {
       title: "Dashboard",
       url: "#",
       icon: LayoutDashboard,
-      isActive: true, // This will now highlight beautifully!
+      isActive: true,
     },
     {
       title: "Resume Manager",
