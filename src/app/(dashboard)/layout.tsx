@@ -1,17 +1,10 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AppSidebar } from "@/components/sidebar/app-sidebar";
+import { Header } from "@/components/nav-main";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <main className="w-full">
-          <SidebarTrigger />
-          {children}
-        </main>
-      </SidebarProvider>
-    </TooltipProvider>
+    <main className="w-full">
+      <Header activePage="dashboard" />
+      {children}
+    </main>
   );
 }
