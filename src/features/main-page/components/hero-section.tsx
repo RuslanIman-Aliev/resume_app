@@ -20,12 +20,13 @@ const HeroSection = () => {
         you through every step of your job search journey.
       </p>
       <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-        <Link href="/sign-up">
-          <Button size="lg" className="h-12 px-8 text-base">
+        <Button size="lg" className="h-12 px-8 text-base" asChild>
+          <Link href="/signup">
             Start Free Trial
             <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </Link>
+          </Link>
+        </Button>
+
         <Button variant="outline" size="lg" className="h-12 px-8 text-base">
           <Play className="mr-2 h-4 w-4" />
           Watch Demo
