@@ -1,4 +1,4 @@
-import ResumeCard from "@/features/resumes/components/resume-cart";
+import ResumeCard from "@/features/resumes/components/resume-card";
 import ResumeManager from "@/features/resumes/components/resume-manager";
 
 const ResumesPage = () => {
