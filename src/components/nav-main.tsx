@@ -36,7 +36,7 @@ export function Header({ activePage = "analyzer" }: HeaderProps) {
       icon: LayoutDashboard,
       href: "/dashboard",
     },
-    { id: "analyzer", label: "Analyzer", icon: FileText, href: "/" },
+    { id: "analyzer", label: "Analyzer", icon: FileText, href: "/analyzer" },
     { id: "resumes", label: "Resumes", icon: FolderOpen, href: "/resumes" },
     { id: "tracker", label: "Tracker", icon: ListChecks, href: "/tracker" },
     { id: "coach", label: "AI Coach", icon: BrainCircuit, href: "/ai-coach" },
@@ -61,8 +61,8 @@ export function Header({ activePage = "analyzer" }: HeaderProps) {
                 size="sm"
                 className={
                   activePage === item.id
-                    ? "text-foreground bg-secondary/50"
-                    : "text-muted-foreground  hover:bg-primary!"
+                    ? "text-foreground bg-secondary/50 "
+                    : "text-muted-foreground  hover:bg-primary! cursor-pointer"
                 }
               >
                 <item.icon className="h-4 w-4 mr-2" />

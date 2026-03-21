@@ -66,10 +66,7 @@ const ResumeCard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {mockResumes.map((resume) => (
           <Card key={resume.id} className="max-w-xl w-full ">
-            <CardHeader
-              key={resume.id}
-              className="flex items-center justify-between"
-            >
+            <CardHeader className="flex items-center justify-between">
               <div>
                 <Badge>{resume.status}</Badge>
               </div>
