@@ -1,6 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -80,6 +87,22 @@ const AnalyzerTabs = () => {
           </div>
         </TabsContent>
       </Tabs>
+      <Select>
+        <SelectTrigger className="w-full mt-4 cursor-pointer">
+          <SelectValue placeholder="Select your uploaded resume" />
+        </SelectTrigger>
+
+        <SelectContent >
+          <SelectItem className="cursor-pointer" value="software-engineering">
+            Software Engineering
+          </SelectItem>
+          <SelectItem className="cursor-pointer" value="data-science">Data Science</SelectItem>
+          <SelectItem className="cursor-pointer" value="product-management">Product Management</SelectItem>
+          <SelectItem className="cursor-pointer" value="design">Design</SelectItem>
+          <SelectItem className="cursor-pointer" value="marketing">Marketing</SelectItem>
+        </SelectContent>
+      </Select>
+
       <Button className="mt-4 p-5 w-full font-bold cursor-pointer">
         <SparklesIcon className="size-4 mr-2" />
         Analyze Job Description
