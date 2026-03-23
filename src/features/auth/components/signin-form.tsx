@@ -72,7 +72,9 @@ export function SignInForm() {
           Enter your information below to sign in to your account
         </CardDescription>
         <CardAction>
-          <Button variant="link">Sign Up</Button>
+          <Button variant="link" onClick={() => router.push("/signup")}>
+            Sign Up
+          </Button>
         </CardAction>
       </CardHeader>
       <form id="form-signin" onSubmit={form.handleSubmit(onSubmit)}>
