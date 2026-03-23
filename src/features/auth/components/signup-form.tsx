@@ -46,10 +46,10 @@ export function SignUpForm() {
         name: data.name,
       },
       {
-        onRequest: (ctx) => {
+        onRequest: () => {
           setIsPending(true);
         },
-        onSuccess: (ctx) => {
+        onSuccess: () => {
           setIsPending(false);
           toast.success("Sign up successful!");
           form.reset();

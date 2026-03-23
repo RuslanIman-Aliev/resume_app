@@ -14,6 +14,7 @@ export const resumeRouter = createTRPCRouter({
    const resume = await prisma.resume.create({
       data: {
         fileName: input.fileName,
+        resumeName: input.resumeName,
         postedRole: input.postedRole,
         resumeLink: input.fileUrl,
         userId: ctx.auth.user.id,
@@ -21,7 +22,7 @@ export const resumeRouter = createTRPCRouter({
     });
     return { resume };
   }),
-  
+
   getAll: protectedProcedure.query(async ({ ctx }) => {
     const resumes = await prisma.resume.findMany({
       where: { userId: ctx.auth.user.id },
