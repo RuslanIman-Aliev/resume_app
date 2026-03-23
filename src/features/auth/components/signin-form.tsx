@@ -54,7 +54,7 @@ export function SignInForm() {
           setIsPending(false);
           toast.success("Sign in successful!");
           form.reset();
-          router.push("/");
+          router.push("/dashboard");
         },
         onError: (ctx) => {
           toast.error(ctx.error.message || "An error occurred during sign in.");
@@ -72,7 +72,9 @@ export function SignInForm() {
           Enter your information below to sign in to your account
         </CardDescription>
         <CardAction>
-          <Button variant="link">Sign In</Button>
+          <Button variant="link" onClick={() => router.push("/signup")}>
+            Sign Up
+          </Button>
         </CardAction>
       </CardHeader>
       <form id="form-signin" onSubmit={form.handleSubmit(onSubmit)}>

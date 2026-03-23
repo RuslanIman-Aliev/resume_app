@@ -53,7 +53,7 @@ export function SignUpForm() {
           setIsPending(false);
           toast.success("Sign up successful!");
           form.reset();
-          router.push("/");  
+          router.push("/dashboard");
         },
         onError: (ctx) => {
           toast.error(ctx.error.message || "An error occurred during sign up.");
@@ -156,7 +156,7 @@ export function SignUpForm() {
                     autoComplete="off"
                     type="password"
                   />
-                 {fieldState.invalid && (
+                  {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}
                 </Field>
@@ -173,7 +173,12 @@ export function SignUpForm() {
           >
             {isPending ? "Creating Account..." : "Sign Up"}
           </Button>
-          <Button variant="outline" className="w-full" disabled={isPending} type="button">
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={isPending}
+            type="button"
+          >
             Sign Up with Google
           </Button>
         </CardFooter>

@@ -1,28 +1,27 @@
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { auth } from "./auth"
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "./auth";
 
-export const requireAuth = async() => {
+export const requireAuth = async () => {
   const session = await auth.api.getSession({
-    headers: await headers()
-  })
+    headers: await headers(),
+  });
 
-  if(!session){
-    redirect('/signup')
+  if (!session) {
+    redirect("/signup");
   }
 
-  return session
-}
+  return session;
+};
 
-
-export const requireUnauth = async() => {
+export const requireUnauth = async () => {
   const session = await auth.api.getSession({
-    headers: await headers()
-  })
+    headers: await headers(),
+  });
 
-  if(session){
-    redirect('/dashboard')
+  if (session) {
+    redirect("/dashboard");
   }
 
-  return session
-}
+  return session;
+};
