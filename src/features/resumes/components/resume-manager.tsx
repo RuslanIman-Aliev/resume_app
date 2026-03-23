@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,7 +32,65 @@ import {
   Upload,
 } from "lucide-react";
 
+import { useUploadThing } from "@/lib/utils/uploadthing";
+import { useState } from "react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { useTRPC } from "@/trpc/client";
+import { useMutation } from "@tanstack/react-query";
+
 const ResumeManager = () => {
+  const [file, setFiles] = useState<File | null>(null);
+  const [resumeName, setResumeName] = useState("");
+  const [targetRole, setTargetRole] = useState("");
+  const [open, setOpen] = useState(false);
+  const trpc = useTRPC();
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setFiles(file);
+    }
+  };
+
+  {
+    /* This mutation will be used to save the uploaded resume's metadata to the database after a successful upload */
+  }
+  const createResumeMutation = useMutation(
+    trpc.resume.create.mutationOptions({
+      onSuccess: () => {
+        setOpen(false);
+        setFiles(null);
+        setResumeName("");
+        setTargetRole("");
+        toast("Resume saved successfully!");
+      },
+      onError: (error) => {
+        alert(error.message);
+      },
+    }),
+  );
+
+  {
+    /* This hook from UploadThing will handle the file upload process. We pass in callbacks for when the upload completes or if there is an error. */
+  }
+  const { startUpload, isUploading } = useUploadThing("resumeUploader", {
+    onClientUploadComplete(res) {
+      if (res && res.length > 0) {
+        const uploadedFile = res[0];
+        createResumeMutation.mutate({
+          fileName: uploadedFile.name,
+          fileUrl: uploadedFile.url,
+          resumeName,
+          postedRole: targetRole,
+        });
+      }
+    },
+    onUploadError: () => {
+      toast("Error occurred while uploading, try again later.");
+    },
+  });
+
   return (
     <section className="w-full">
       <h1 className="text-3xl font-bold mb-6">Resume Manager</h1>
@@ -84,13 +144,14 @@ const ResumeManager = () => {
               <List className="h-4 w-4" />
             </Button>
           </div>
-          <Dialog>
+          <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger
               className="hover:bg-primary/80 cursor-pointer"
               asChild
             >
-              <Button>Upload Resume</Button>
+              <Button onClick={() => setOpen(true)}>Upload Resume</Button>
             </DialogTrigger>
+
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle className="text-lg font-semibold">
@@ -102,29 +163,90 @@ const ResumeManager = () => {
                 </DialogDescription>
               </DialogHeader>
 
+              {/* THE FIXED DROPZONE */}
               <div
-                className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors ${"border-primary bg-primary/5"}`}
-                //onDragEnter={handleDrag}
-                //onDragLeave={handleDrag}
-                //onDragOver={handleDrag}
-                //onDrop={handleDrop}
+                className={`relative min-h-40 flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors ${
+                  file
+                    ? "border-primary bg-primary/10"
+                    : "border-muted bg-muted/20 hover:border-primary/50"
+                }`}
               >
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                   <Upload className="h-7 w-7 text-primary" />
                 </div>
-                <p className="mt-4 text-sm font-medium">
-                  Drag and drop your resume here
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  or click to browse (PDF, DOCX)
-                </p>
+
+                {file ? (
+                  <div className="text-center mt-4">
+                    <p className="text-sm font-medium text-primary">
+                      {file.name}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center mt-4">
+                    <p className="text-sm font-medium">
+                      Drag and drop your resume here
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      or click to browse (PDF, DOCX)
+                    </p>
+                  </div>
+                )}
+
                 <input
                   type="file"
                   accept=".pdf,.docx"
-                  //onChange={handleFileSelect}
+                  onChange={handleFileSelect}
                   className="absolute inset-0 cursor-pointer opacity-0"
                 />
               </div>
+
+              {file && (
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="resumeName">Resume Name</Label>
+                    <Input
+                      id="resumeName"
+                      placeholder="e.g., Software Engineer - General"
+                      value={resumeName}
+                      onChange={(e) => setResumeName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="targetRole">Target Role</Label>
+                    <Select value={targetRole} onValueChange={setTargetRole}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select target role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="software-engineer">
+                          Software Engineer
+                        </SelectItem>
+                        <SelectItem value="frontend-developer">
+                          Frontend Developer
+                        </SelectItem>
+                        <SelectItem value="backend-developer">
+                          Backend Developer
+                        </SelectItem>
+                        <SelectItem value="full-stack">
+                          Full Stack Developer
+                        </SelectItem>
+                        <SelectItem value="data-engineer">
+                          Data Engineer
+                        </SelectItem>
+                        <SelectItem value="product-manager">
+                          Product Manager
+                        </SelectItem>
+                        <SelectItem value="ux-designer">UX Designer</SelectItem>
+                        <SelectItem value="devops">DevOps Engineer</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
 
               <DialogFooter>
                 <DialogClose asChild>
@@ -132,9 +254,23 @@ const ResumeManager = () => {
                     Cancel
                   </Button>
                 </DialogClose>
-                <Button className="cursor-pointer">
+                <Button
+                  className="cursor-pointer"
+                  disabled={
+                    !file ||
+                    isUploading ||
+                    !resumeName ||
+                    !targetRole ||
+                    createResumeMutation.isPending
+                  }
+                  onClick={async () => {
+                    if (file) {
+                      await startUpload([file]);
+                    }
+                  }}
+                >
                   <Upload className="h-4 w-4 mr-2" />
-                  Upload Resume
+                  {isUploading ? "Uploading..." : "Upload Resume"}
                 </Button>
               </DialogFooter>
             </DialogContent>

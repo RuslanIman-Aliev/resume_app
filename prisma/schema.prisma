@@ -89,12 +89,11 @@ model Resume {
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  fileName       String   // Example: "Aleksei_TS_Resume.pdf"
-  
-  // @db.Text is crucial here because standard strings have length limits.
-  // We need to store the entire parsed content of the PDF.
-  parsedContent  String   @db.Text 
-  
+  fileName       String   
+  postedRole     String   
+  status         String   @default("draft") 
+  parsedContent  String?   @db.Text 
+  resumeLink     String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
