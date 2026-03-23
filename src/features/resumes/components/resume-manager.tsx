@@ -190,14 +190,14 @@ const ResumeManager = () => {
                       Drag and drop your resume here
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      or click to browse (PDF, DOCX)
+                      or click to browse (PDF)
                     </p>
                   </div>
                 )}
 
                 <input
                   type="file"
-                  accept=".pdf,.docx"
+                  accept=".pdf"
                   onChange={handleFileSelect}
                   className="absolute inset-0 cursor-pointer opacity-0"
                 />
