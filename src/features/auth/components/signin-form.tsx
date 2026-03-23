@@ -47,10 +47,10 @@ export function SignInForm() {
         password: data.password,
       },
       {
-        onRequest: (ctx) => {
+        onRequest: () => {
           setIsPending(true);
         },
-        onSuccess: (ctx) => {
+        onSuccess: () => {
           setIsPending(false);
           toast.success("Sign in successful!");
           form.reset();

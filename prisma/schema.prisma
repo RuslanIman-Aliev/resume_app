@@ -90,6 +90,8 @@ model Resume {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   fileName       String   
+  resumeName     String?   
+
   postedRole     String   
   status         String   @default("draft") 
   parsedContent  String?   @db.Text 
