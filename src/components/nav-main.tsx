@@ -145,8 +145,11 @@ export function Header({ activePage = "analyzer" }: HeaderProps) {
                 <DropdownMenuItem
                   className="text-red-600 cursor-pointer"
                   onClick={async () => {
-                    await authClient.signOut();
-                    window.location.href = "/signup";
+                    try {
+                      await authClient.signOut();
+                    } catch (error) {
+                      console.error("Failed to sign out", error);
+                    }
                   }}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
