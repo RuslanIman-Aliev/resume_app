@@ -72,7 +72,9 @@ const ResumeManager = () => {
         toast.success("Resume uploaded successfully!");
       },
       onError: (error) => {
-        toast.error("Failed to save resume.");
+        toast.error(
+          `Failed to save resume${(error as Error)?.message ? `: ${(error as Error).message}` : "."}`,
+        );
       },
     }),
   );
