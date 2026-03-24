@@ -38,7 +38,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const ResumeManager = () => {
   const [file, setFiles] = useState<File | null>(null);
@@ -46,6 +46,8 @@ const ResumeManager = () => {
   const [targetRole, setTargetRole] = useState("");
   const [open, setOpen] = useState(false);
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -63,10 +65,16 @@ const ResumeManager = () => {
         setFiles(null);
         setResumeName("");
         setTargetRole("");
-        toast("Resume saved successfully!");
+
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getAll.queryKey(),
+        });
+        toast.success("Resume uploaded successfully!");
       },
       onError: (error) => {
-        alert(error.message);
+        toast.error(
+          `Failed to save resume${(error as Error)?.message ? `: ${(error as Error).message}` : "."}`,
+        );
       },
     }),
   );
@@ -83,11 +91,12 @@ const ResumeManager = () => {
           fileUrl: uploadedFile.url,
           resumeName,
           postedRole: targetRole,
+          thumbnailUrl: uploadedFile.serverData?.thumbnailUrl,
         });
       }
     },
     onUploadError: () => {
-      toast("Error occurred while uploading, try again later.");
+      toast.error("Error occurred while uploading, try again later.");
     },
   });
 
@@ -178,7 +187,11 @@ const ResumeManager = () => {
                 {file ? (
                   <div className="text-center mt-4">
                     <p className="text-sm font-medium text-primary">
-                      {file.name}
+                      {file.name.length > 30
+                        ? file.name.substring(0, 15) +
+                          "..." +
+                          file.name.substring(file.name.length - 10)
+                        : file.name}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {(file.size / 1024 / 1024).toFixed(2)} MB
