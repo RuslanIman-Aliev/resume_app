@@ -25,9 +25,9 @@ const ResumeCard = () => {
 
   useEffect(() => {
     if (isError) {
-      toast.error(error?.message ?? "Failed to load resumes");
+      toast.error("Failed to load resumes. Please try again.");
     }
-  }, [isError, error]);
+  }, [isError]);
 
   if (isLoading) {
     return (
@@ -119,10 +119,10 @@ const ResumeCard = () => {
   }
 
   return (
-    <section className="w-full">
+    <section className="w-full  md:px-10">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
         {data?.resumes.map((resume) => (
-          <Card key={resume.id} className=" w-full ">
+          <Card key={resume.id} className=" w-full group">
             <CardHeader className="flex items-center justify-between">
               <div>
                 <Badge>{resume.status}</Badge>
