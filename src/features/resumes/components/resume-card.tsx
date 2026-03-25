@@ -27,7 +27,7 @@ const ResumeCard = () => {
     if (isError) {
       toast.error("Failed to load resumes. Please try again.");
     }
-  }, [isError, error]);
+  }, [isError]);
 
   if (isLoading) {
     return (
