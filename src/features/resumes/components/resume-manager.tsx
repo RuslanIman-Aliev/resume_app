@@ -73,7 +73,7 @@ const ResumeManager = () => {
       },
       onError: (error) => {
         toast.error(
-          `Failed to save resume${(error as Error)?.message ? `: ${(error as Error).message}` : "."}`,
+          `Failed to save resume${error?.message ? `: ${error.message}` : "."}`,
         );
       },
     }),
@@ -101,7 +101,7 @@ const ResumeManager = () => {
   });
 
   return (
-    <section className="w-full">
+    <section className="w-full  md:px-10">
       <h1 className="text-3xl font-bold mb-6">Resume Manager</h1>
 
       <div className="flex items-center w-full justify-between mb-6">
