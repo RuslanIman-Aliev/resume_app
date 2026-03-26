@@ -61,7 +61,9 @@ export function Header() {
                 variant={"ghost"}
                 size="sm"
                 className={
-                  pathname === item.href
+                  pathname &&
+                  (pathname === item.href ||
+                    (item.href !== "/" && pathname.startsWith(item.href + "/")))
                     ? "text-foreground bg-secondary/50 "
                     : "text-muted-foreground  hover:bg-primary! cursor-pointer"
                 }
