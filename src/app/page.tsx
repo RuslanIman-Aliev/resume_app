@@ -11,7 +11,7 @@ import HowItWorksSection from "@/features/main-page/components/works-section";
 const Page = () => {
   return (
     <div>
-      <Header activePage="dashboard" />
+      <Header />
       <HeroSection />
       <StatsSection />
       <FeatureSection />
