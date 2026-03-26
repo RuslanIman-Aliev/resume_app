@@ -22,19 +22,11 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
-interface HeaderProps {
-  activePage?:
-    | "dashboard"
-    | "analyzer"
-    | "resumes"
-    | "tracker"
-    | "coach"
-    | "settings";
-}
 
-export function Header({ activePage = "analyzer" }: HeaderProps) {
+export function Header() {
   const navItems = [
     {
       id: "dashboard",
@@ -49,7 +41,8 @@ export function Header({ activePage = "analyzer" }: HeaderProps) {
   ];
 
   const { data: session, isPending } = authClient.useSession();
-
+  const pathname = usePathname();
+  console.log("Current pathname:", pathname);
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between ">
@@ -68,7 +61,7 @@ export function Header({ activePage = "analyzer" }: HeaderProps) {
                 variant={"ghost"}
                 size="sm"
                 className={
-                  activePage === item.id
+                  pathname === item.href
                     ? "text-foreground bg-secondary/50 "
                     : "text-muted-foreground  hover:bg-primary! cursor-pointer"
                 }

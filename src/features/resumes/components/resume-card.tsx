@@ -3,6 +3,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -12,9 +18,10 @@ import {
   Loader2,
   RefreshCcw,
   Target,
+  X,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const ResumeCard = () => {
@@ -133,38 +140,40 @@ const ResumeCard = () => {
               </div> */}
             </CardHeader>
             <CardContent className="">
-              <div className="flex flex-col pb-5">
-                <div>
-                  <div className="w-full aspect-[1/1.4]  bg-muted border-b relative overflow-hidden">
-                    {resume.resumePreviewLink ? (
-                      <Image
-                        src={resume.resumePreviewLink}
-                        alt={`${resume.resumeName} preview`}
-                        fill
-                        
-                        className="object-cover object-top transition-transform group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <FileText className="h-12 w-12 text-muted-foreground/50" />
+              <div className="flex flex-col pb-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <div className="cursor-pointer">
+                      <div>
+                        <div className="w-full aspect-[1/1.4]  bg-muted border-b relative overflow-hidden">
+                          {resume.resumePreviewLink ? (
+                            <Image
+                              src={resume.resumePreviewLink}
+                              alt={`${resume.resumeName} preview`}
+                              fill
+                              className="object-cover object-top transition-transform group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <FileText className="h-12 w-12 text-muted-foreground/50" />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-lg truncate">
-                      {resume.resumeName}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
-                      <Target className="h-3.5 w-3.5" />
-                      {resume.postedRole}
-                    </p>
-                  </div>
+                      <div className="pt-2">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-lg truncate">
+                            {resume.resumeName}
+                          </h3>
+                          <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
+                            <Target className="h-3.5 w-3.5" />
+                            {resume.postedRole}
+                          </p>
+                        </div>
 
-                  <div className="mt-3 flex  justify-between">
-                    <div className="flex flex-wrap gap-1.5">
-                      {/* {resume.tags.slice(0, 2).map((tag) => (
+                        <div className=" flex  justify-between">
+                          <div className="flex flex-wrap gap-1.5">
+                            {/* {resume.tags.slice(0, 2).map((tag) => (
                         <Badge key={tag} variant="outline" className="text-xs">
                           {tag}
                         </Badge>
@@ -174,20 +183,48 @@ const ResumeCard = () => {
                           +{resume.tags.length - 2}
                         </Badge>
                       )} */}
+                          </div>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(resume.createdAt).toLocaleDateString(
+                              undefined,
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {new Date(resume.createdAt).toLocaleDateString(
-                        undefined,
-                        {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        },
-                      )}
-                    </span>
-                  </div>
-                </div>
+                  </DialogTrigger>
+
+                  <DialogContent className="max-w-2xl! w-[100vw] h-[95vh] p-0 overflow-hidden">
+                    <DialogTitle className="sr-only">
+                      {resume.resumeName} Document Viewer
+                    </DialogTitle>
+                    {resume.resumePreviewLink && (
+                      <div className="relative w-full aspect-[1/1.4] bg-muted my-7">
+                        <Image
+                          src={resume.resumePreviewLink}
+                          fill
+                          className="object-contain p-0"
+                          alt={`${resume.resumeName} full preview`}
+                        />
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div className="flex justify-end ">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="ml-2 cursor-pointer"
+                >
+                  Analyze Resume
+                </Button>
               </div>
             </CardContent>
           </Card>
