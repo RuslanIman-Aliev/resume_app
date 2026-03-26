@@ -204,16 +204,20 @@ const ResumeCard = () => {
                     <DialogTitle className="sr-only">
                       {resume.resumeName} Document Viewer
                     </DialogTitle>
-                    {resume.resumePreviewLink && (
-                      <div className="relative w-full aspect-[1/1.4] bg-muted my-7">
+                    <div className="relative w-full aspect-[1/1.4] bg-muted my-7">
+                      {resume.resumePreviewLink ? (
                         <Image
                           src={resume.resumePreviewLink}
                           fill
                           className="object-contain p-0"
                           alt={`${resume.resumeName} full preview`}
                         />
-                      </div>
-                    )}
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <FileText className="h-12 w-12 text-muted-foreground/50" />
+                        </div>
+                      )}
+                    </div>
                   </DialogContent>
                 </Dialog>
               </div>
