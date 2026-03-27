@@ -18,15 +18,14 @@ import {
   Loader2,
   RefreshCcw,
   Target,
-  X,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 
 const ResumeCard = () => {
   const trpc = useTRPC();
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery(
+  const { data, isLoading, isError, refetch, isFetching } = useQuery(
     trpc.resume.getAll.queryOptions(),
   );
 
@@ -64,7 +63,7 @@ const ResumeCard = () => {
 
   if (isError) {
     return (
-      <div className="relative overflow-hidden rounded-2xl border border-destructive/40 bg-gradient-to-br from-destructive/10 via-card to-secondary/40 p-10">
+      <div className="relative overflow-hidden rounded-2xl border border-destructive/40 bg-linear-to-br from-destructive/10 via-card to-secondary/40 p-10">
         <div className="pointer-events-none absolute -top-16 left-8 h-44 w-44 rounded-full bg-destructive/20 blur-3xl" />
 
         <div className="relative flex min-h-56 flex-col items-center justify-center gap-5 text-center">
@@ -98,7 +97,7 @@ const ResumeCard = () => {
 
   if (!data?.resumes || data.resumes.length === 0) {
     return (
-      <div className="relative overflow-hidden rounded-2xl border border-primary/35 bg-gradient-to-br from-primary/10 via-card to-chart-2/10 p-10">
+      <div className="relative overflow-hidden rounded-2xl border border-primary/35 bg-linear-to-br from-primary/10 via-card to-chart-2/10 p-10">
         <div className="pointer-events-none absolute -top-20 -left-16 h-56 w-56 rounded-full bg-primary/20 blur-3xl" />
         <div className="pointer-events-none absolute right-6 bottom-2 h-40 w-40 rounded-full bg-chart-2/20 blur-3xl" />
 
@@ -200,7 +199,7 @@ const ResumeCard = () => {
                     </div>
                   </DialogTrigger>
 
-                  <DialogContent className="max-w-2xl! w-[100vw] h-[95vh] p-0 overflow-hidden">
+                  <DialogContent className="max-w-2xl! w-screen h-[95vh] p-0 overflow-hidden">
                     <DialogTitle className="sr-only">
                       {resume.resumeName} Document Viewer
                     </DialogTitle>

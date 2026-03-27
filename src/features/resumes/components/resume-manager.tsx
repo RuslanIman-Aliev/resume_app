@@ -1,5 +1,4 @@
 "use client";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -92,6 +91,7 @@ const ResumeManager = () => {
           resumeName,
           postedRole: targetRole,
           thumbnailUrl: uploadedFile.serverData?.thumbnailUrl,
+          parsedContent: uploadedFile.serverData?.extractedText,
         });
       }
     },
