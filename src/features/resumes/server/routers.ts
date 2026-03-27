@@ -11,6 +11,7 @@ export const resumeRouter = createTRPCRouter({
         resumeName: z.string(),
         postedRole: z.string(),
         thumbnailUrl: z.string().optional().nullable(),
+        parsedContent: z.string().optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -22,6 +23,7 @@ export const resumeRouter = createTRPCRouter({
           resumeLink: input.fileUrl,
           userId: ctx.auth.user.id,
           resumePreviewLink: input.thumbnailUrl,
+          parsedContent: input.parsedContent,
         },
       });
       return { resume };

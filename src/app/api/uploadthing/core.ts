@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { createUploadthing, type FileRouter } from "uploadthing/next";
-import { UploadThingError } from "uploadthing/server";
-import { UTApi } from "uploadthing/server";
+import { UploadThingError, UTApi } from "uploadthing/server";
+import { extractText } from "unpdf";
 
 const f = createUploadthing();
 const utapi = new UTApi();
@@ -25,7 +25,8 @@ export const ourFileRouter = {
     })
     .onUploadComplete(async ({ metadata, file }) => {
       try {
-        // 1. Ask ConvertAPI to turn the first page of the PDF into a JPG
+        const pdfUrl = file.ufsUrl;
+        // Ask ConvertAPI to turn the first page of the PDF into a JPG
         const convertResponse = await fetch(
           `https://v2.convertapi.com/convert/pdf/to/jpg?Secret=${process.env.CONVERT_API_SECRET}`,
           {
@@ -56,14 +57,23 @@ export const ourFileRouter = {
         const temporaryImageUrl = convertData.Files[0].Url;
         const uploadResult = await utapi.uploadFilesFromUrl(temporaryImageUrl);
 
+        const pdfFileResponse = await fetch(pdfUrl);
+        const pdfBuffer = await pdfFileResponse.arrayBuffer();
+
+        const { text: extractedText } = await extractText(
+          new Uint8Array(pdfBuffer),
+          {
+            mergePages: true,
+          },
+        );
         return {
           uploadedBy: metadata.userId,
           thumbnailUrl: uploadResult.data?.url,
+          extractedText,
         };
-      } catch (error) {
-        console.error("Thumbnail generation failed:", error);
-        // Fallback: return null so the app doesn't crash if the API fails
-        return { uploadedBy: metadata.userId, thumbnailUrl: null };
+      } catch {
+        await utapi.deleteFiles(file.key);
+        throw new Error("Failed to process uploaded file.");
       }
     }),
 } satisfies FileRouter;
