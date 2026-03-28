@@ -1,12 +1,12 @@
 import { z } from "zod";
 
 export const resumeAnalysisSchema = z.object({
-  overallScore: z.number().min(0).max(100),
+  overallScore: z.number().int().min(0).max(100),
   categoryScores: z.object({
-    contentQuality: z.number().min(0).max(100),
-    atsOptimization: z.number().min(0).max(100),
-    experience: z.number().min(0).max(100),
-    skillsMatch: z.number().min(0).max(100),
+    contentQuality: z.number().int().min(0).max(100),
+    atsOptimization: z.number().int().min(0).max(100),
+    experience: z.number().int().min(0).max(100),
+    skillsMatch: z.number().int().min(0).max(100),
   }),
   strengths: z.array(z.string()),
   quickWins: z.array(
