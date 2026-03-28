@@ -38,6 +38,7 @@ const ResumeCard = () => {
       },
       onError: (error) => {
         toast.error(error.message || "Failed to start analysis");
+        setAnalyzingId(null);
       },
     }),
   );
