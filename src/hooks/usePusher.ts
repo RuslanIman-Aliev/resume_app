@@ -23,6 +23,7 @@ export const useResumePusher = (
     return () => {
       channel.unbind(`analyzed-${analyzingId}`);
       pusher.unsubscribe("resume-updates");
+      pusher.disconnect();
     };
   }, [analyzingId, onSuccess]);
 };
