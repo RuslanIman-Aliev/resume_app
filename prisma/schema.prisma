@@ -100,7 +100,27 @@ model Resume {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  analysis          ResumeAnalysis?
   @@map("resume")
+}
+
+model ResumeAnalysis {
+  id              String   @id @default(cuid())
+  
+  resumeId        String   @unique
+  resume          Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  overallScore    Int
+  contentQuality  Int
+  atsOptimization Int
+  experience      Int
+  skillsMatch     Int
+
+  strengths       Json
+  quickWins       Json
+  improvements    Json
+
+  createdAt       DateTime @default(now())
 }
 
 // This enum directly controls the columns on your Kanban board

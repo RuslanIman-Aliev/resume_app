@@ -9,8 +9,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useResumePusher } from "@/hooks/usePusher";
 import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Clock,
@@ -20,14 +21,32 @@ import {
   Target,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const ResumeCard = () => {
   const trpc = useTRPC();
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
     trpc.resume.getAll.queryOptions(),
   );
+
+  const { mutate: analyzeResume, isPending } = useMutation(
+    trpc.resume.triggerAnalysis.mutationOptions({
+      onSuccess: () => {
+        toast.success("Analysis started! This will take about 20 seconds.");
+      },
+      onError: (error) => {
+        toast.error(error.message || "Failed to start analysis");
+        setAnalyzingId(null);
+      },
+    }),
+  );
+
+  useResumePusher(analyzingId, () => {
+    setAnalyzingId(null);
+    refetch();
+  });
 
   useEffect(() => {
     if (isError) {
@@ -122,6 +141,11 @@ const ResumeCard = () => {
         </div>
       </div>
     );
+  }
+
+  function handleClick(resumeId: string): void {
+    setAnalyzingId(resumeId);
+    analyzeResume({ resumeId });
   }
 
   return (
@@ -225,6 +249,8 @@ const ResumeCard = () => {
                   variant="outline"
                   size="lg"
                   className="ml-2 cursor-pointer"
+                  onClick={() => handleClick(resume.id)}
+                  disabled={isPending || analyzingId === resume.id}
                 >
                   Analyze Resume
                 </Button>
