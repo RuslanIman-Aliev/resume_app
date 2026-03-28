@@ -1,6 +1,7 @@
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 export const resumeRouter = createTRPCRouter({
@@ -56,7 +57,7 @@ export const resumeRouter = createTRPCRouter({
         select: { parsedContent: true, resumeName: true, postedRole: true },
       });
       if (!resume) {
-        throw new Error("Resume not found");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Resume not found" });
       }
       return { resume };
     }),
@@ -68,7 +69,7 @@ export const resumeRouter = createTRPCRouter({
         select: { parsedContent: true, resumeName: true, postedRole: true },
       });
       if (!resume) {
-        throw new Error("Resume not found");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Resume not found" });
       }
 
       await inngest.send({
