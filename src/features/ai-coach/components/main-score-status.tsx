@@ -123,19 +123,11 @@ export const MainScorePending = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="secondary"
-              className="gap-2"
-              //onClick={() => refetch()}
-              //disabled={isFetching}
-            >
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Check again
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              We will refresh automatically when analysis is done.
-            </span>
+              <span>We will refresh automatically when analysis is done.</span>
+            </div>
           </div>
         </div>
 
