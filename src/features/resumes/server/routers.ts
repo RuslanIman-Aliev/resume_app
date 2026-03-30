@@ -84,4 +84,29 @@ export const resumeRouter = createTRPCRouter({
       });
       return { success: true };
     }),
+    
+  getAnalysisResult: protectedProcedure
+    .input(z.object({ resumeId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const analysis = await prisma.resumeAnalysis.findFirst({
+        where: {
+          resumeId: input.resumeId,
+          resume: { userId: ctx.auth.user.id },
+        },
+      });
+      if (!analysis) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Analysis not found",
+        });
+      }
+      return { analysis: {
+          ...analysis,
+          strengths: analysis.strengths as string[],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          quickWins: analysis.quickWins as any[],  
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          improvements: analysis.improvements as any[], 
+        } };
+    }),
 });
