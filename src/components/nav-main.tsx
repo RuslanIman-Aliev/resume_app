@@ -25,7 +25,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
-
 export function Header() {
   const navItems = [
     {
@@ -42,7 +41,7 @@ export function Header() {
 
   const { data: session, isPending } = authClient.useSession();
   const pathname = usePathname();
-  console.log("Current pathname:", pathname);
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between ">

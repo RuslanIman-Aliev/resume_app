@@ -1,12 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CoachScoreCard } from "@/features/ai-coach/components/coach-score-card";
 import MainScoreCard from "@/features/ai-coach/components/main-score-card";
 import {
-  Briefcase,
   CheckCircle2,
-  Code,
-  FileText,
-  GraduationCap,
   MessageSquare,
   Sparkles,
   Target,
@@ -27,8 +22,8 @@ const AiCoachPage = () => {
           Get personalized AI-powered suggestions to improve your resume,
           prepare for interviews, and land your dream job faster.
         </p>
-        <Tabs className=" text-white flex flex-col gap-1! mt-4">
-          <TabsList className="bg-background p-1">
+        <Tabs className=" text-white flex flex-col gap-1! mt-4" defaultValue="overview">
+          <TabsList className="bg-background p-1" >
             <TabsTrigger
               value="overview"
               className="text-white! cursor-pointer py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
@@ -61,32 +56,6 @@ const AiCoachPage = () => {
 
           <TabsContent value="overview" className="mt-4">
             <MainScoreCard />
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">
-              <CoachScoreCard
-                icon={FileText}
-                title="Content Quality"
-                score={78}
-                description="Clear and relevant content"
-              />
-              <CoachScoreCard
-                icon={Code}
-                title="ATS Optimization"
-                score={65}
-                description="Keyword matching"
-              />
-              <CoachScoreCard
-                icon={Briefcase}
-                title="Experience"
-                score={82}
-                description="Impact and achievements"
-              />
-              <CoachScoreCard
-                icon={GraduationCap}
-                title="Skills Match"
-                score={71}
-                description="Industry relevance"
-              />
-            </div>
           </TabsContent>
         </Tabs>
       </div>
