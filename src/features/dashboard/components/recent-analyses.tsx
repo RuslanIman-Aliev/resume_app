@@ -11,6 +11,8 @@ import { AlertTriangle, FileText, RefreshCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
 function getRelativeTime(date: Date | string): string {
   const now = Date.now();
   const then = new Date(date).getTime();
@@ -21,8 +23,6 @@ function getRelativeTime(date: Date | string): string {
   const diffDays = Math.round(diffHours / 24);
   const diffMonths = Math.round(diffDays / 30);
   const diffYears = Math.round(diffDays / 365);
-
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
   if (Math.abs(diffSecs) < 60) return rtf.format(diffSecs, "second");
   if (Math.abs(diffMins) < 60) return rtf.format(diffMins, "minute");
