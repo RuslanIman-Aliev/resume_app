@@ -11,6 +11,27 @@ import { AlertTriangle, FileText, RefreshCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+function getRelativeTime(date: Date | string): string {
+  const now = Date.now();
+  const then = new Date(date).getTime();
+  const diffMs = then - now;
+  const diffSecs = Math.round(diffMs / 1000);
+  const diffMins = Math.round(diffSecs / 60);
+  const diffHours = Math.round(diffMins / 60);
+  const diffDays = Math.round(diffHours / 24);
+  const diffMonths = Math.round(diffDays / 30);
+  const diffYears = Math.round(diffDays / 365);
+
+  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+  if (Math.abs(diffSecs) < 60) return rtf.format(diffSecs, "second");
+  if (Math.abs(diffMins) < 60) return rtf.format(diffMins, "minute");
+  if (Math.abs(diffHours) < 24) return rtf.format(diffHours, "hour");
+  if (Math.abs(diffDays) < 30) return rtf.format(diffDays, "day");
+  if (Math.abs(diffMonths) < 12) return rtf.format(diffMonths, "month");
+  return rtf.format(diffYears, "year");
+}
+
 function getScoreColor(score: number) {
   if (score >= 85) return "text-success";
   if (score >= 70) return "text-chart-4";
@@ -188,7 +209,7 @@ const RecentAnalyses = () => {
                       </div>
 
                       <div className="flex items-center gap-1 truncate">
-                        <span className="truncate">{createdAt}</span>
+                        <span className="truncate">{getRelativeTime(createdAt)}</span>
                       </div>
                     </div>
 
