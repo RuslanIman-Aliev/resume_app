@@ -50,7 +50,7 @@ export const analyzeResume = inngest.createFunction(
                 atsOptimization: validatedData.categoryScores.atsOptimization,
                 experience: validatedData.categoryScores.experience,
                 skillsMatch: validatedData.categoryScores.skillsMatch,
-
+                keywords: validatedData.keywords,
                 strengths: validatedData.strengths,
                 quickWins: validatedData.quickWins,
                 improvements: validatedData.improvements,
@@ -62,6 +62,7 @@ export const analyzeResume = inngest.createFunction(
                 experience: validatedData.categoryScores.experience,
                 skillsMatch: validatedData.categoryScores.skillsMatch,
                 strengths: validatedData.strengths,
+                keywords: validatedData.keywords,
                 quickWins: validatedData.quickWins,
                 improvements: validatedData.improvements,
               },

@@ -1,49 +1,36 @@
+"use client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { FileText, Sparkles } from "lucide-react";
+import { useTRPC } from "@/trpc/client";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, FileText, RefreshCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-const recentAnalyses = [
-  {
-    id: 1,
-    jobTitle: "Senior Frontend Engineer",
-    company: "TechCorp Inc.",
-    analyzedAt: "2 hours ago",
-    matchScore: 92,
-    keySkills: ["React", "TypeScript", "Next.js"],
-    status: "tailored",
-  },
-  {
-    id: 2,
-    jobTitle: "Full Stack Developer",
-    company: "StartupXYZ",
-    analyzedAt: "Yesterday",
-    matchScore: 85,
-    keySkills: ["Node.js", "PostgreSQL", "AWS"],
-    status: "analyzed",
-  },
-  {
-    id: 3,
-    jobTitle: "React Developer",
-    company: "DataFlow",
-    analyzedAt: "2 days ago",
-    matchScore: 78,
-    keySkills: ["React", "Redux", "GraphQL"],
-    status: "analyzed",
-  },
-  {
-    id: 4,
-    jobTitle: "UI Engineer",
-    company: "DesignStudio",
-    analyzedAt: "3 days ago",
-    matchScore: 71,
-    keySkills: ["CSS", "Figma", "React"],
-    status: "reviewed",
-  },
-];
+const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+function getRelativeTime(date: Date | string): string {
+  const now = Date.now();
+  const then = new Date(date).getTime();
+  const diffMs = then - now;
+  const diffSecs = Math.round(diffMs / 1000);
+  const diffMins = Math.round(diffSecs / 60);
+  const diffHours = Math.round(diffMins / 60);
+  const diffDays = Math.round(diffHours / 24);
+  const diffMonths = Math.round(diffDays / 30);
+  const diffYears = Math.round(diffDays / 365);
+
+  if (Math.abs(diffSecs) < 60) return rtf.format(diffSecs, "second");
+  if (Math.abs(diffMins) < 60) return rtf.format(diffMins, "minute");
+  if (Math.abs(diffHours) < 24) return rtf.format(diffHours, "hour");
+  if (Math.abs(diffDays) < 30) return rtf.format(diffDays, "day");
+  if (Math.abs(diffMonths) < 12) return rtf.format(diffMonths, "month");
+  return rtf.format(diffYears, "year");
+}
 
 function getScoreColor(score: number) {
   if (score >= 85) return "text-success";
@@ -59,7 +46,7 @@ function getStatusBadge(status: string) {
           Resume Tailored
         </Badge>
       );
-    case "analyzed":
+    case "ANALYZED":
       return (
         <Badge className="bg-primary/10 text-primary border-0">Analyzed</Badge>
       );
@@ -75,21 +62,98 @@ function getStatusBadge(status: string) {
 }
 
 const RecentAnalyses = () => {
+  const trpc = useTRPC();
+  const router = useRouter();
+  const { data, isLoading, isError, refetch, isFetching } = useQuery(
+    trpc.resume.getLatest4Analyses.queryOptions(),
+  );
+
+  if (isLoading) {
+    return (
+      <section>
+        <Card className="p-6">
+          <div className="mb-4">
+            <Skeleton className="h-5 w-36" />
+          </div>
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={`recent-analysis-skeleton-${index}`}
+                className="flex items-center gap-3 rounded-lg border border-border/50 bg-secondary/30 p-4"
+              >
+                <Skeleton className="h-11 w-11 rounded-lg" />
+                <div className="flex-1 space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-5 w-12 rounded-full" />
+                      <Skeleton className="h-7 w-12" />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </section>
+    );
+  }
+
+  if (isError) {
+    return (
+      <section>
+        <Card className="p-6">
+          <div className="flex flex-col items-center justify-center gap-3 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-destructive/40 bg-destructive/10">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+            </div>
+            <div>
+              <p className="text-base font-semibold">
+                Unable to load recent analyses
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Please try again in a moment.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              className="gap-2"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCcw
+                className={cn("h-4 w-4", isFetching && "animate-spin")}
+              />
+              Retry
+            </Button>
+          </div>
+        </Card>
+      </section>
+    );
+  }
   return (
     <section>
       <Card className="p-6">
         <h1 className="text-lg font-bold mb-2">Recent Analyses</h1>
-        {recentAnalyses.map(
+        {data?.analyses.map(
           ({
-            id,
-            company,
-            jobTitle,
-            analyzedAt,
-            matchScore,
-            keySkills,
-            status,
+            resume: { id, resumeName, postedRole, status },
+            overallScore,
+            createdAt,
+            keywords,
           }) => (
-            <div key={id} className="">
+            <div
+              key={id}
+              className="cursor-pointer"
+              onClick={() => router.push(`/ai-coach/${id}`)}
+            >
               <div className="flex  mb-4  items-center gap-3 w-full rounded-lg border border-border/50 bg-secondary/30 p-4 transition-all hover:border-border hover:bg-secondary/50">
                 <Avatar className="flex  items-center justify-center rounded-lg bg-primary/10 h-11 w-11 text-sm font-bold text-primary">
                   <AvatarFallback className="text-primary h-11 w-11 shrink-0 rounded-lg bg-primary/10 text-sm">
@@ -101,12 +165,15 @@ const RecentAnalyses = () => {
                   <div className="flex justify-between">
                     <div className="gap-2 flex items-center">
                       <span className="truncate font-medium text-sm">
-                        {jobTitle}
+                        {postedRole
+                          ? postedRole.charAt(0).toUpperCase() +
+                            postedRole.slice(1).toLowerCase()
+                          : ""}
                       </span>
                       {getStatusBadge(status)}
                     </div>
                     <div className="flex items-center gap-4">
-                      {keySkills.slice(0, 2).map((skill) => (
+                      {keywords.slice(0, 2).map((skill) => (
                         <Badge
                           key={skill}
                           variant="outline"
@@ -115,17 +182,17 @@ const RecentAnalyses = () => {
                           {skill}
                         </Badge>
                       ))}
-                      {keySkills.length > 2 && (
+                      {keywords.length > 2 && (
                         <Badge variant="outline" className="text-xs">
-                          +{keySkills.length - 2}
+                          +{keywords.length - 2}
                         </Badge>
                       )}
                       <div
                         className={cn(
-                          `${getScoreColor(matchScore)} text-2xl font-bold`,
+                          `${getScoreColor(overallScore)} text-2xl font-bold`,
                         )}
                       >
-                        {matchScore}%
+                        {overallScore}%
                       </div>
                     </div>
                   </div>
@@ -133,11 +200,16 @@ const RecentAnalyses = () => {
                   <div className="flex items-center justify-between text-xs text-muted-foreground ">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="flex items-center gap-1 truncate">
-                        <span className="truncate ">{company}</span>
+                        <span className="truncate ">
+                          {resumeName
+                            ? resumeName.charAt(0).toUpperCase() +
+                              resumeName.slice(1).toLowerCase()
+                            : ""}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1 truncate">
-                        <span className="truncate">{analyzedAt}</span>
+                        <span className="truncate">{getRelativeTime(createdAt)}</span>
                       </div>
                     </div>
 

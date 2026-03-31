@@ -84,7 +84,7 @@ export const resumeRouter = createTRPCRouter({
       });
       return { success: true };
     }),
-    
+
   getAnalysisResult: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -100,13 +100,36 @@ export const resumeRouter = createTRPCRouter({
           message: "Analysis not found",
         });
       }
-      return { analysis: {
+      return {
+        analysis: {
           ...analysis,
           strengths: analysis.strengths as string[],
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          quickWins: analysis.quickWins as any[],  
+          quickWins: analysis.quickWins as any[],
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          improvements: analysis.improvements as any[], 
-        } };
+          improvements: analysis.improvements as any[],
+        },
+      };
     }),
+  getLatest4Analyses: protectedProcedure.query(async ({ ctx }) => {
+    const analyses = await prisma.resumeAnalysis.findMany({
+      where: { resume: { userId: ctx.auth.user.id } },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+      select: {
+        overallScore: true,
+        keywords: true,
+        createdAt: true,
+        resume: {
+          select: {
+            id: true,
+            resumeName: true,
+            postedRole: true,
+            status: true,
+          },
+        },
+      },
+    });
+    return { analyses };
+  }),
 });
