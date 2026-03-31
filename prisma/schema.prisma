@@ -119,7 +119,7 @@ model ResumeAnalysis {
   strengths       Json
   quickWins       Json
   improvements    Json
-
+  keywords        String[] 
   createdAt       DateTime @default(now())
 }
 

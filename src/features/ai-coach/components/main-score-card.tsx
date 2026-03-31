@@ -1,15 +1,12 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useResumePusher } from "@/hooks/usePusher";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle,
   Briefcase,
   CheckCircle2,
   CloudLightning,
@@ -17,10 +14,8 @@ import {
   Dot,
   FileText,
   GraduationCap,
-  Loader2,
   LucideMessageCircleWarning,
-  RefreshCcw,
-  Star,
+  Star
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback } from "react";
@@ -53,7 +48,7 @@ const MainScoreCard = () => {
   const trpc = useTRPC();
   const params = useParams();
   const resumeId = params.id as string;
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     ...trpc.resume.getAnalysisResult.queryOptions({ resumeId }),
     retry: (failureCount, queryError) => {
       const errorCode = (queryError as { data?: { code?: string } } | null)

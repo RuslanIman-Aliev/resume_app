@@ -24,6 +24,9 @@ export function getPrompt(resumeText: string, targetRole: string) {
     "strengths": [
       // Array of 3 to 5 short strings highlighting what is currently good
     ],
+    "keywords": [
+      // Array of 3 to 5 keywords that are relevant to the target role and should be included in the resume
+    ],
     "quickWins": [
       // Array of 2 to 3 objects for fast fixes
       {

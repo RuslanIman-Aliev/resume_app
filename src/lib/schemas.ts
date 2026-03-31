@@ -8,24 +8,31 @@ export const resumeAnalysisSchema = z.object({
     experience: z.number().int().min(0).max(100),
     skillsMatch: z.number().int().min(0).max(100),
   }),
+  keywords: z.array(z.string()),
   strengths: z.array(z.string()),
   quickWins: z.array(
     z.object({
       title: z.string(),
       impact: z.enum(["High", "Medium", "Low"]),
       timeEstimate: z.string(),
-    })
+    }),
   ),
   improvements: z.array(
     z.object({
-      category: z.enum(["Content", "Skills", "Keywords", "Format", "Experience"]),
+      category: z.enum([
+        "Content",
+        "Skills",
+        "Keywords",
+        "Format",
+        "Experience",
+      ]),
       impact: z.enum(["High Impact", "Medium Impact", "Low Impact"]),
       title: z.string(),
       description: z.string(),
       currentText: z.string().nullable(),
       suggestedText: z.string().nullable(),
       tips: z.array(z.string()),
-    })
+    }),
   ),
 });
 
