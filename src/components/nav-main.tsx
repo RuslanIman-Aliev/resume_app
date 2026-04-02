@@ -64,7 +64,7 @@ export function Header() {
                   (pathname === item.href ||
                     (item.href !== "/" && pathname.startsWith(item.href + "/")))
                     ? "text-foreground bg-secondary/50 "
-                    : "text-muted-foreground  hover:bg-primary! cursor-pointer"
+                    : "text-muted-foreground  hover:bg-primary!"
                 }
               >
                 <item.icon className="h-4 w-4 mr-2" />

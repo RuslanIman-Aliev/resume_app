@@ -100,14 +100,14 @@ model Resume {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  analysis          ResumeAnalysis?
+  analysis          ResumeAnalysis[]
   @@map("resume")
 }
 
 model ResumeAnalysis {
   id              String   @id @default(cuid())
   
-  resumeId        String   @unique
+  resumeId        String 
   resume          Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
 
   overallScore    Int

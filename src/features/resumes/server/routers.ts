@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 export const resumeRouter = createTRPCRouter({
+  // For uploading resume - we will save the resume info in database and trigger the analysis workflow in background using inngest, which will update the database once done. This is done to offload the analysis work from the main request thread and provide a better user experience.
   create: protectedProcedure
     .input(
       z.object({
@@ -30,25 +31,49 @@ export const resumeRouter = createTRPCRouter({
       });
       return { resume };
     }),
-
-  getAll: protectedProcedure.query(async ({ ctx }) => {
-    const resumes = await prisma.resume.findMany({
-      where: { userId: ctx.auth.user.id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        fileName: true,
-        resumeName: true,
-        postedRole: true,
-        resumeLink: true,
-        resumePreviewLink: true,
-        createdAt: true,
-        status: true,
-      },
-    });
-    return { resumes };
-  }),
-
+  // For listing resumes in dashboard with pagination - we will fetch 6 resumes at a time and also return total count for pagination calculation on client side
+  getAll: protectedProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().min(1).max(50).default(6),
+          page: z.number().min(1).default(1),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 6;
+      const page = input?.page ?? 1;
+      const skip = (page - 1) * limit;
+      const resumes = await prisma.resume.findMany({
+        where: { userId: ctx.auth.user.id },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip,
+        select: {
+          id: true,
+          fileName: true,
+          resumeName: true,
+          postedRole: true,
+          resumeLink: true,
+          resumePreviewLink: true,
+          createdAt: true,
+          status: true,
+        },
+      });
+      const totalCount = await prisma.resume.count({
+        where: { userId: ctx.auth.user.id },
+      });
+      return {
+        resumes,
+        pagination: {
+          totalCount,
+          pageCount: Math.ceil(totalCount / limit),
+          currentPage: page,
+        },
+      };
+    }),
+  // For resume details page - get parsed content and other resume info
   getParsedContent: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -61,6 +86,7 @@ export const resumeRouter = createTRPCRouter({
       }
       return { resume };
     }),
+  // Trigger resume analysis by sending data to inngest function, which will then trigger the analysis workflow and update the database once done. This is done to offload the analysis work from the main request thread and provide a better user experience.
   triggerAnalysis: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -84,14 +110,24 @@ export const resumeRouter = createTRPCRouter({
       });
       return { success: true };
     }),
-
+  // For results page - get analysis result for a resume
   getAnalysisResult: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .query(async ({ ctx, input }) => {
+      
       const analysis = await prisma.resumeAnalysis.findFirst({
         where: {
           resumeId: input.resumeId,
           resume: { userId: ctx.auth.user.id },
+        },
+        orderBy: { createdAt: "desc" },
+        include: {
+          resume: {
+            select: {
+              resumeName: true,
+              postedRole: true,
+            },
+          },
         },
       });
       if (!analysis) {
@@ -111,6 +147,7 @@ export const resumeRouter = createTRPCRouter({
         },
       };
     }),
+  // For dashboard - get latest 4 analyses with resume info
   getLatest4Analyses: protectedProcedure.query(async ({ ctx }) => {
     const analyses = await prisma.resumeAnalysis.findMany({
       where: { resume: { userId: ctx.auth.user.id } },
@@ -132,4 +169,36 @@ export const resumeRouter = createTRPCRouter({
     });
     return { analyses };
   }),
+  // For dashboard - get total count of analyses
+  getAnalysesCount: protectedProcedure.query(async ({ ctx }) => {
+    const count = await prisma.resumeAnalysis.count({
+      where: { resume: { userId: ctx.auth.user.id } },
+    });
+    return { count };
+  }),
+  // For improvements section - get all improvements for a resume
+  getImprovements: protectedProcedure
+    .input(z.object({ resumeId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const analysis = await prisma.resumeAnalysis.findFirst({
+        where: {
+          resumeId: input.resumeId,
+          resume: { userId: ctx.auth.user.id },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { improvements: true },
+      });
+
+      if (!analysis) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Analysis not found",
+        });
+      }
+
+      return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        improvements: analysis.improvements as any[],
+      };
+    }),
 });

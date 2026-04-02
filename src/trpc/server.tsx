@@ -1,24 +1,20 @@
-import 'server-only';
- 
-import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
-import { createTRPCClient, httpLink } from '@trpc/client';
-import { cache } from 'react';
-import { createTRPCContext } from './init';
-import { makeQueryClient } from './query-client';
-import { appRouter } from './routers/_app';
-import type { AppRouter } from './routers/_app';
- 
+import "server-only";
+import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import { createTRPCClient, httpLink } from "@trpc/client";
+import { cache } from "react";
+import { createTRPCContext } from "./init";
+import { makeQueryClient } from "./query-client";
+import { appRouter } from "./routers/_app";
+import type { AppRouter } from "./routers/_app";
 export const getQueryClient = cache(makeQueryClient);
- 
 export const trpc = createTRPCOptionsProxy({
   ctx: createTRPCContext,
   router: appRouter,
   queryClient: getQueryClient,
 });
- 
 createTRPCOptionsProxy<AppRouter>({
   client: createTRPCClient<AppRouter>({
-    links: [httpLink({ url: '...' })],
+    links: [httpLink({ url: "..." })],
   }),
   queryClient: getQueryClient,
 });

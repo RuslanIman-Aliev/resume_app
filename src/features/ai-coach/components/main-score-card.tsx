@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { useResumePusher } from "@/hooks/usePusher";
 import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Briefcase,
   CheckCircle2,
@@ -15,10 +15,15 @@ import {
   FileText,
   GraduationCap,
   LucideMessageCircleWarning,
-  Star
+  Star,
 } from "lucide-react";
-import { useParams } from "next/navigation";
-import { useCallback } from "react";
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import {
   Label,
   PolarAngleAxis,
@@ -46,8 +51,15 @@ const chartConfig = {
 
 const MainScoreCard = () => {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const resumeId = params.id as string;
+  const analysisParam = searchParams.get("analysis");
+  const analysisStartedAt = Number(searchParams.get("ts")) || 0;
+
   const { data, isLoading, isError, error, refetch } = useQuery({
     ...trpc.resume.getAnalysisResult.queryOptions({ resumeId }),
     retry: (failureCount, queryError) => {
@@ -62,25 +74,55 @@ const MainScoreCard = () => {
         query.state.error as { data?: { code?: string } } | null
       )?.data?.code;
 
-      return errorCode === "NOT_FOUND" ? 4000 : false;
+      if (errorCode === "NOT_FOUND") return 4000;
+
+      return analysisParam === "1" ? 4000 : false;
     },
   });
 
   const errorCode = (error as { data?: { code?: string } } | null)?.data?.code;
   const isPendingAnalysis = errorCode === "NOT_FOUND";
+
+  const isAwaitingAnalysis = isPendingAnalysis || analysisParam === "1";
+
+  const clearAnalysisParams = useCallback(() => {
+    if (analysisParam !== "1") return;
+    const paramsToUpdate = new URLSearchParams(searchParams);
+    paramsToUpdate.delete("analysis");
+    paramsToUpdate.delete("ts");
+    const nextUrl = paramsToUpdate.toString()
+      ? `${pathname}?${paramsToUpdate.toString()}`
+      : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [analysisParam, pathname, router, searchParams]);
+
   const handleAnalysisReady = useCallback(() => {
     refetch();
-  }, [refetch]);
+    clearAnalysisParams();
+  }, [clearAnalysisParams, refetch]);
 
-  useResumePusher(isPendingAnalysis ? resumeId : null, handleAnalysisReady);
+  useEffect(() => {
+    if (!isAwaitingAnalysis || !analysisStartedAt) return;
+    const createdAt = data?.analysis?.createdAt
+      ? new Date(data.analysis.createdAt).getTime()
+      : 0;
+    if (createdAt && createdAt >= analysisStartedAt) {
+      clearAnalysisParams();
+    }
+  }, [
+    analysisStartedAt,
+    isAwaitingAnalysis,
+    clearAnalysisParams,
+    data?.analysis?.createdAt,
+  ]);
 
-  console.log("Analysis data:", data);
+  useResumePusher(isAwaitingAnalysis ? resumeId : null, handleAnalysisReady);
 
   if (isLoading) {
     return <MainScoreSkeleton />;
   }
 
-  if (isPendingAnalysis) {
+  if (isAwaitingAnalysis) {
     return <MainScorePending />;
   }
 
@@ -95,6 +137,10 @@ const MainScoreCard = () => {
   const displayScore = Math.round(overallScore);
 
   const strengths = (data?.analysis?.strengths as string[]) || [];
+
+  queryClient.invalidateQueries({
+    queryKey: trpc.resume.getAll.queryKey(),
+  });
   return (
     <>
       <div className="grid grid-cols-3 gap-4">
@@ -102,7 +148,8 @@ const MainScoreCard = () => {
           <CardHeader>
             <h3 className="text-xl font-semibold">Resume Score</h3>
             <p className="text-sm text-muted-foreground">
-              Based on your latest resume: Software_Engineer_Resume.pdf
+              Based on your latest resume:{" "}
+              {data?.analysis?.resume?.resumeName || "Untitled Resume"}
             </p>
           </CardHeader>
           <CardContent className="flex gap-4 items-center justify-center">

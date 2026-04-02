@@ -27,7 +27,8 @@ const AnalyzerRequirements = () => {
             </span>
             Required
           </h4>
-          {/* Render later a list of required qualifications */}
+          {/* TODO */}
+          {/* Render later a list of required qualifications  */}
           <div className="flex flex-col gap-1">
             <div className="flex gap-2">
               <CircleDot className="h-4 w-4 mt-0.5 text-primary shrink-0" />

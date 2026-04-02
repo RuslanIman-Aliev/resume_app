@@ -33,15 +33,15 @@ const AnalyzerTabs = () => {
 
       <Tabs defaultValue="paste-text" className="flex flex-col gap-6">
         <TabsList>
-          <TabsTrigger value="paste-text" className="gap-2 cursor-pointer">
+          <TabsTrigger value="paste-text" className="gap-2">
             <FileTextIcon />
             Paste Text
           </TabsTrigger>
-          <TabsTrigger value="upload-file" className="gap-2 cursor-pointer">
+          <TabsTrigger value="upload-file" className="gap-2">
             <UploadIcon />
             Upload File
           </TabsTrigger>
-          <TabsTrigger value="from-url" className="gap-2 cursor-pointer">
+          <TabsTrigger value="from-url" className="gap-2">
             <Link2Icon />
             From URL
           </TabsTrigger>
@@ -60,7 +60,7 @@ const AnalyzerTabs = () => {
             >
               <Upload className="h-10 w-10 text-muted-foreground" />
               <p className="mt-4 text-sm font-medium">
-                Drag and drop your resume here
+                Drag and drop your job description here
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 or click to browse (PDF, DOCX)
@@ -88,22 +88,21 @@ const AnalyzerTabs = () => {
         </TabsContent>
       </Tabs>
       <Select>
-        <SelectTrigger className="w-full mt-4 cursor-pointer">
-          <SelectValue placeholder="Select your uploaded resume" />
+        <SelectTrigger className="w-full mt-4 ">
+          <SelectValue placeholder="Select your job position " />
         </SelectTrigger>
-
-        <SelectContent >
-          <SelectItem className="cursor-pointer" value="software-engineering">
+        <SelectContent>
+          <SelectItem value="software-engineering">
             Software Engineering
           </SelectItem>
-          <SelectItem className="cursor-pointer" value="data-science">Data Science</SelectItem>
-          <SelectItem className="cursor-pointer" value="product-management">Product Management</SelectItem>
-          <SelectItem className="cursor-pointer" value="design">Design</SelectItem>
-          <SelectItem className="cursor-pointer" value="marketing">Marketing</SelectItem>
+          <SelectItem value="data-science">Data Science</SelectItem>
+          <SelectItem value="product-management">Product Management</SelectItem>
+          <SelectItem value="design">Design</SelectItem>
+          <SelectItem value="marketing">Marketing</SelectItem>
         </SelectContent>
       </Select>
 
-      <Button className="mt-4 p-5 w-full font-bold cursor-pointer">
+      <Button className="mt-4 p-5 w-full font-bold ">
         <SparklesIcon className="size-4 mr-2" />
         Analyze Job Description
       </Button>

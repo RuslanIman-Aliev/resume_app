@@ -104,7 +104,7 @@ const PricingSection = () => {
                 <div className="mt-auto">
                   <Link href="/sign-up" className="block">
                     <Button
-                      className="w-full cursor-pointer"
+                      className="w-full"
                       variant={plan.highlighted ? "default" : "outline"}
                     >
                       {plan.cta}

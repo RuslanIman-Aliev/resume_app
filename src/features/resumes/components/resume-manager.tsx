@@ -263,12 +263,11 @@ const ResumeManager = () => {
 
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button variant="outline" className="cursor-pointer">
+                  <Button variant="outline">
                     Cancel
                   </Button>
                 </DialogClose>
                 <Button
-                  className="cursor-pointer"
                   disabled={
                     !file ||
                     isUploading ||

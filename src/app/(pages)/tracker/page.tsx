@@ -194,7 +194,7 @@ const TrackerPage = () => {
                 //variant={viewMode === "kanban" ? "secondary" : "ghost"}
                 size="sm"
                 //onClick={() => setViewMode("kanban")}
-                className="h-8 cursor-pointer"
+                className="h-8 "
               >
                 <LayoutGrid className="h-4 w-4 mr-1.5" />
                 Board
@@ -204,7 +204,7 @@ const TrackerPage = () => {
                 //variant={viewMode === "list" ? "secondary" : "ghost"}
                 size="sm"
                 // onClick={() => setViewMode("list")}
-                className="h-8 cursor-pointer"
+                className="h-8"
               >
                 <List className="h-4 w-4 mr-1.5" />
                 List
