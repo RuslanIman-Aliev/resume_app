@@ -196,9 +196,10 @@ export const resumeRouter = createTRPCRouter({
         });
       }
 
+      const improvements = z.array(z.unknown()).parse(analysis.improvements);
+
       return {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        improvements: analysis.improvements as any[],
+        improvements,
       };
     }),
 });
