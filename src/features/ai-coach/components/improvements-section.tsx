@@ -27,7 +27,6 @@ const ImprovementsSection = () => {
   const { data, isLoading, isError, isFetching, refetch } = useQuery(
     trpc.resume.getImprovements.queryOptions({ resumeId }),
   );
-  console.log("Improvements data:", data);
 
   if (isLoading) {
     return <ImprovementsSkeleton />;
