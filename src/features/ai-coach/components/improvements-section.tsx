@@ -61,16 +61,17 @@ const ImprovementsSection = () => {
       </div>
       <div>
         <Accordion type="multiple" className="mt-4 space-y-6">
-          {data?.improvements.map((improvement) => {
+          {data?.improvements.map((improvement, index) => {
             const category = getCategoryConfig(improvement.category);
             const priority = getPriorityConfig(improvement.impact);
+            const accordionItemValue = `${improvement.description}-${index}`;
 
             const CategoryIcon = category.icon;
 
             return (
               <AccordionItem
-                key={improvement.description}
-                value={improvement.description}
+                key={accordionItemValue}
+                value={accordionItemValue}
                 className="rounded-2xl border border-border/50 bg-card/50"
               >
                 <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
