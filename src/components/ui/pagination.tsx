@@ -33,30 +33,55 @@ function PaginationItem({ ...props }: React.ComponentProps<"li">) {
   return <li data-slot="pagination-item" {...props} />
 }
 
-type PaginationLinkProps = {
+type PaginationLinkBaseProps = {
   isActive?: boolean
-} & Pick<React.ComponentProps<typeof Button>, "size"> &
-  React.ComponentProps<"a">
+} & Pick<React.ComponentProps<typeof Button>, "size">
+
+type PaginationLinkAsAnchor = PaginationLinkBaseProps &
+  React.ComponentProps<"a"> & { href: string }
+
+type PaginationLinkAsButton = PaginationLinkBaseProps &
+  Omit<React.ComponentProps<"button">, "type"> & { href?: undefined }
+
+type PaginationLinkProps = PaginationLinkAsAnchor | PaginationLinkAsButton
 
 function PaginationLink({
   className,
   isActive,
   size = "icon",
+  href,
+  children,
   ...props
 }: PaginationLinkProps) {
+  const sharedAttrs = {
+    "aria-current": isActive ? ("page" as const) : undefined,
+    "data-slot": "pagination-link" as const,
+    "data-active": isActive,
+  }
+  const buttonVariantProps = {
+    variant: (isActive ? "outline" : "ghost") as React.ComponentProps<typeof Button>["variant"],
+    size,
+    className: cn(className),
+  }
+
+  if (href !== undefined) {
+    return (
+      <Button asChild {...buttonVariantProps}>
+        <a href={href} {...sharedAttrs} {...(props as React.ComponentProps<"a">)}>
+          {children}
+        </a>
+      </Button>
+    )
+  }
+
   return (
     <Button
-      asChild
-      variant={isActive ? "outline" : "ghost"}
-      size={size}
-      className={cn(className)}
+      type="button"
+      {...buttonVariantProps}
+      {...sharedAttrs}
+      {...(props as Omit<React.ComponentProps<"button">, "type">)}
     >
-      <a
-        aria-current={isActive ? "page" : undefined}
-        data-slot="pagination-link"
-        data-active={isActive}
-        {...props}
-      />
+      {children}
     </Button>
   )
 }
