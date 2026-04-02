@@ -32,7 +32,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, FileText, Loader2, Target } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ResumeEmpty, ResumeError, ResumeLoading } from "./resume-states";
 
@@ -47,15 +47,28 @@ const ResumeCard = () => {
   const [modalResumeId, setModalResumeId] = useState<string | null>(null);
   const currentPage = Number(searchParams.get("page")) || 1;
 
-  const handlePageChange = (pageNumber: number) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("page", pageNumber.toString());
-    replace(`${pathname}?${params.toString()}`, { scroll: true });
-  };
+  const handlePageChange = useCallback(
+    (pageNumber: number) => {
+      const params = new URLSearchParams(searchParams);
+      params.set("page", pageNumber.toString());
+      replace(`${pathname}?${params.toString()}`, { scroll: true });
+    },
+    [searchParams, pathname, replace],
+  );
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
     trpc.resume.getAll.queryOptions({ page: currentPage }),
   );
+
+  // When the server clamps an out-of-range page, redirect the URL to match
+  useEffect(() => {
+    if (
+      data?.pagination?.currentPage &&
+      data.pagination.currentPage !== currentPage
+    ) {
+      handlePageChange(data.pagination.currentPage);
+    }
+  }, [data?.pagination?.currentPage, currentPage, handlePageChange]);
 
   const { mutate: analyzeResume, isPending } = useMutation(
     trpc.resume.triggerAnalysis.mutationOptions({
@@ -87,7 +100,7 @@ const ResumeCard = () => {
     }),
   );
 
-  const pageCount = data?.pagination?.pageCount || 1;
+  const pageCount = data?.pagination?.pageCount ?? 1;
 
   if (isLoading) {
     return <ResumeLoading />;
@@ -97,7 +110,7 @@ const ResumeCard = () => {
     return <ResumeError onRetry={refetch} isRetrying={isFetching} />;
   }
 
-  if (!data?.resumes || data.resumes.length === 0) {
+  if (data?.pagination?.totalCount === 0) {
     return <ResumeEmpty />;
   }
 

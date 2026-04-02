@@ -43,8 +43,23 @@ export const resumeRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 6;
-      const page = input?.page ?? 1;
+      const requestedPage = input?.page ?? 1;
+
+      const totalCount = await prisma.resume.count({
+        where: { userId: ctx.auth.user.id },
+      });
+
+      if (totalCount === 0) {
+        return {
+          resumes: [],
+          pagination: { totalCount: 0, pageCount: 1, currentPage: 1 },
+        };
+      }
+
+      const pageCount = Math.max(1, Math.ceil(totalCount / limit));
+      const page = Math.min(Math.max(requestedPage, 1), pageCount);
       const skip = (page - 1) * limit;
+
       const resumes = await prisma.resume.findMany({
         where: { userId: ctx.auth.user.id },
         orderBy: { createdAt: "desc" },
@@ -61,14 +76,12 @@ export const resumeRouter = createTRPCRouter({
           status: true,
         },
       });
-      const totalCount = await prisma.resume.count({
-        where: { userId: ctx.auth.user.id },
-      });
+
       return {
         resumes,
         pagination: {
           totalCount,
-          pageCount: Math.ceil(totalCount / limit),
+          pageCount,
           currentPage: page,
         },
       };
