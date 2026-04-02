@@ -4,62 +4,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import {
+  cn,
+  getRelativeTime,
+  getScoreColor,
+  getStatusBadge,
+} from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, FileText, RefreshCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-function getRelativeTime(date: Date | string): string {
-  const now = Date.now();
-  const then = new Date(date).getTime();
-  const diffMs = then - now;
-  const diffSecs = Math.round(diffMs / 1000);
-  const diffMins = Math.round(diffSecs / 60);
-  const diffHours = Math.round(diffMins / 60);
-  const diffDays = Math.round(diffHours / 24);
-  const diffMonths = Math.round(diffDays / 30);
-  const diffYears = Math.round(diffDays / 365);
-
-  if (Math.abs(diffSecs) < 60) return rtf.format(diffSecs, "second");
-  if (Math.abs(diffMins) < 60) return rtf.format(diffMins, "minute");
-  if (Math.abs(diffHours) < 24) return rtf.format(diffHours, "hour");
-  if (Math.abs(diffDays) < 30) return rtf.format(diffDays, "day");
-  if (Math.abs(diffMonths) < 12) return rtf.format(diffMonths, "month");
-  return rtf.format(diffYears, "year");
-}
-
-function getScoreColor(score: number) {
-  if (score >= 85) return "text-success";
-  if (score >= 70) return "text-chart-4";
-  return "text-chart-5";
-}
-
-function getStatusBadge(status: string) {
-  switch (status) {
-    case "tailored":
-      return (
-        <Badge className="bg-success/10 text-success border-0">
-          Resume Tailored
-        </Badge>
-      );
-    case "ANALYZED":
-      return (
-        <Badge className="bg-primary/10 text-primary border-0">Analyzed</Badge>
-      );
-    case "reviewed":
-      return (
-        <Badge className="bg-muted text-muted-foreground border-0">
-          Reviewed
-        </Badge>
-      );
-    default:
-      return null;
-  }
-}
 
 const RecentAnalyses = () => {
   const trpc = useTRPC();
@@ -209,7 +164,9 @@ const RecentAnalyses = () => {
                       </div>
 
                       <div className="flex items-center gap-1 truncate">
-                        <span className="truncate">{getRelativeTime(createdAt)}</span>
+                        <span className="truncate">
+                          {getRelativeTime(createdAt)}
+                        </span>
                       </div>
                     </div>
 
@@ -227,11 +184,11 @@ const RecentAnalyses = () => {
           <span className="text-sm">
             Analyze more jobs to improve your match accuracy
           </span>
-          <Link href="/">
+          <Link href="/resumes">
             <Button
               size="sm"
               variant="link"
-              className="text-primary px-0 cursor-pointer hover:text-primary/80"
+              className="text-primary px-0 hover:text-primary/80"
             >
               Analyze Now
             </Button>

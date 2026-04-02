@@ -3,8 +3,9 @@ import { Progress } from "@/components/ui/progress";
 import { Briefcase, Building2, Target, TrendingUp } from "lucide-react";
 
 const AnalyzerResults = () => {
-  return ( <>
-  <div className="grid max-md:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 ">
+  return (
+    <>
+      <div className="grid max-md:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 ">
         <Card className="border-border/50 bg-card/50 backdrop-blur ">
           <CardContent className="py-3">
             <div className="flex items-start gap-4">
@@ -101,7 +102,8 @@ const AnalyzerResults = () => {
           </div>
         </CardContent>
       </Card>
-  </> );
-}
- 
+    </>
+  );
+};
+
 export default AnalyzerResults;

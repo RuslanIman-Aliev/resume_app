@@ -93,7 +93,7 @@ const UpcomingInterviews = () => {
         })}
         <Button
           variant="outline"
-          className="w-full bg-black! py-4  mt-2 hover:bg-primary! hover:text-primary-foreground! cursor-pointer"
+          className="w-full bg-black! py-4  mt-2 hover:bg-primary! hover:text-primary-foreground!"
           size="sm"
         >
           <CalendarPlus className="h-4 w-4 mr-2" />
