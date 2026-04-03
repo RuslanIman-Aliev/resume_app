@@ -52,7 +52,16 @@ const AnalyzerTabs = () => {
   }, [data?.resumes, selectedResumeId]);
 
   const { mutate } = useMutation(
-    trpc.resume.triggerJobMatchAnalysis.mutationOptions({}),
+    trpc.resume.triggerJobMatchAnalysis.mutationOptions({
+      onSuccess: () => {
+        toast.success(
+          "Analysis triggered successfully! It may take a few moments to complete.",
+        );
+      },
+      onError: (error) => {
+        toast.error(error.message || "Failed to trigger analysis. Please try again.");
+      },
+    }),
   );
 
   const handleClick = () => {
@@ -60,7 +69,6 @@ const AnalyzerTabs = () => {
       resumeId: selectedResumeId!,
       jobDescription: inputJobDescription!,
     });
-    toast.success("Analysis triggered successfully! It may take a few moments to complete.");
   };
 
   return (
