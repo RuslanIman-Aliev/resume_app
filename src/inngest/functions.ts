@@ -144,7 +144,7 @@ export const analyzeJobMatched = inngest.createFunction(
       );
     });
     return {
-      message: `Job Match Analysis for job ${event.data.jobDescription} complete`,
+      message: `Job Match Analysis complete for application ${event.data.applicationId}`,
       data: validatedData,
     };
   },
