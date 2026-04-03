@@ -191,15 +191,14 @@ const RecentAnalyses = () => {
             <span className="text-sm">
               Analyze more jobs to improve your match accuracy
             </span>
-            <Link href="/resumes">
-              <Button
-                size="sm"
-                variant="link"
-                className="text-primary px-0 hover:text-primary/80"
-              >
-                Analyze Now
-              </Button>
-            </Link>
+            <Button
+              asChild
+              size="sm"
+              variant="link"
+              className="text-primary px-0 hover:text-primary/80"
+            >
+              <Link href="/resumes">Analyze Now</Link>
+            </Button>
           </div>
       </Card>
     </section>
