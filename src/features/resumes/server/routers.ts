@@ -86,6 +86,31 @@ export const resumeRouter = createTRPCRouter({
         },
       };
     }),
+  // For listing resumes in analyzer page - we will fetch all resumes without pagination as we want to show all resumes in the dropdown
+  getResumesAndAnalyses: protectedProcedure.query(async ({ ctx }) => {
+    const resumes = await prisma.resume.findMany({
+      where: { userId: ctx.auth.user.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        fileName: true,
+        resumeName: true,
+        postedRole: true,
+        createdAt: true,
+        status: true,
+        analysis: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            overallScore: true,
+            keywords: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    return { resumes };
+  }),
   // For resume details page - get parsed content and other resume info
   getParsedContent: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
@@ -127,7 +152,6 @@ export const resumeRouter = createTRPCRouter({
   getAnalysisResult: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .query(async ({ ctx, input }) => {
-      
       const analysis = await prisma.resumeAnalysis.findFirst({
         where: {
           resumeId: input.resumeId,
@@ -160,7 +184,7 @@ export const resumeRouter = createTRPCRouter({
         },
       };
     }),
-  // For dashboard - get latest 4 analyses with resume info
+  // For dashboard - get latest analyses with resume info to show in recent analyses section on dashboard
   getLatest4Analyses: protectedProcedure.query(async ({ ctx }) => {
     const analyses = await prisma.resumeAnalysis.findMany({
       where: { resume: { userId: ctx.auth.user.id } },
@@ -210,8 +234,54 @@ export const resumeRouter = createTRPCRouter({
       }
 
       return {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          improvements: analysis.improvements as any[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        improvements: analysis.improvements as any[],
       };
+    }),
+  triggerJobMatchAnalysis: protectedProcedure
+    .input(
+      z.object({
+        resumeId: z.string(),
+        jobDescription: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const application = await prisma.jobApplication.create({
+        data: {
+          userId: ctx.auth.user.id,
+          resumeId: input.resumeId,
+          jobDescription: input.jobDescription,
+          status: "TO_APPLY",
+        },
+        include: {
+          resume: {
+            select: {
+              parsedContent: true,
+            },
+          },
+        },
+      });
+
+      const parsedContent = application.resume.parsedContent;
+
+      if (!parsedContent?.trim()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Resume parsed content is required before triggering job match analysis",
+        });
+      }
+
+      await inngest.send({
+        name: "app/job-matched.analyzed",
+        data: {
+          applicationId: application.id,
+          resumeId: input.resumeId,
+          jobDescription: input.jobDescription,
+          parsedContent,
+        },
+      });
+
+      return { applicationId: application.id };
     }),
 });

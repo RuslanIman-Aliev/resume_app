@@ -1,24 +1,76 @@
+"use client";
+
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  cn,
+  getRelativeTime,
+  getScoreColor,
+  getStatusBadge,
+} from "@/lib/utils";
+import { useTRPC } from "@/trpc/client";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
   FileTextIcon,
-  Link2Icon,
+  RefreshCcw,
   SparklesIcon,
-  Upload,
-  UploadIcon,
 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 const AnalyzerTabs = () => {
+  const trpc = useTRPC();
+  const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
+  const [inputJobDescription, setInputJobDescription] = useState("");
+  const { data, isLoading, isError, refetch, isFetching } = useQuery(
+    trpc.resume.getResumesAndAnalyses.queryOptions(),
+  );
+
+  const orderedResumes = useMemo(() => {
+    const resumes = data?.resumes ?? [];
+    if (!selectedResumeId) {
+      return resumes;
+    }
+
+    const selectedIndex = resumes.findIndex(
+      (resume) => resume.id === selectedResumeId,
+    );
+    if (selectedIndex === -1) {
+      return resumes;
+    }
+
+    const selected = resumes[selectedIndex];
+    return [selected, ...resumes.filter((_, index) => index !== selectedIndex)];
+  }, [data?.resumes, selectedResumeId]);
+
+  const { mutate } = useMutation(
+    trpc.resume.triggerJobMatchAnalysis.mutationOptions({
+      onSuccess: () => {
+        toast.success(
+          "Analysis triggered successfully! It may take a few moments to complete.",
+        );
+      },
+      onError: (error) => {
+        toast.error(error.message || "Failed to trigger analysis. Please try again.");
+      },
+    }),
+  );
+
+  const handleClick = () => {
+    mutate({
+      resumeId: selectedResumeId!,
+      jobDescription: inputJobDescription!,
+    });
+  };
+
   return (
     <Card className="w-full p-6">
       <CardHeader className="p-0">
@@ -27,82 +79,180 @@ const AnalyzerTabs = () => {
           <span className="text-lg font-semibold ">Job Description Input</span>
         </div>
         <div className="mt-2 text-muted-foreground">
-          Paste the job description you want to analyze, or upload a file
+          Paste the job description you want to analyze
         </div>
       </CardHeader>
 
-      <Tabs defaultValue="paste-text" className="flex flex-col gap-6">
-        <TabsList>
-          <TabsTrigger value="paste-text" className="gap-2">
-            <FileTextIcon />
-            Paste Text
-          </TabsTrigger>
-          <TabsTrigger value="upload-file" className="gap-2">
-            <UploadIcon />
-            Upload File
-          </TabsTrigger>
-          <TabsTrigger value="from-url" className="gap-2">
-            <Link2Icon />
-            From URL
-          </TabsTrigger>
-        </TabsList>
+      <Textarea
+        placeholder="Paste the job description here..."
+        className="min-h-75 max-h-100 resize-none bg-secondary/30 border-border/50 focus:border-primary/50"
+        value={inputJobDescription}
 
-        <TabsContent value="paste-text">
-          <Textarea
-            placeholder="Paste the job description here..."
-            className="min-h-75 resize-none bg-secondary/30 border-border/50 focus:border-primary/50"
-          />
-        </TabsContent>
-        <TabsContent value="upload-file">
-          <Card className="p-0">
-            <div
-              className={`relative flex flex-col items-center justify-center rounded-xl  p-15 transition-colors bg-input/5`}
-            >
-              <Upload className="h-10 w-10 text-muted-foreground" />
-              <p className="mt-4 text-sm font-medium">
-                Drag and drop your job description here
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                or click to browse (PDF, DOCX)
-              </p>
-              <input
-                type="file"
-                accept=".pdf,.docx"
-                className="absolute inset-0 cursor-pointer opacity-0"
-              />
+        onChange={(e) => setInputJobDescription(e.target.value)}
+      />
+
+      <div className="mt-6 space-y-3">
+        <h3 className="font-medium">Select your resume to compare</h3>
+
+        <ScrollArea className="h-100 w-full rounded-md border border-border/50 bg-secondary/10 p-4">
+          {isLoading ? (
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={`resume-skeleton-${index}`}
+                  className="flex items-center gap-3 rounded-lg border border-border/50 bg-secondary/30 p-4"
+                >
+                  <Skeleton className="h-12 w-12 rounded-lg" />
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-5 w-14 rounded-full" />
+                        <Skeleton className="h-7 w-12" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-3 w-28" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </Card>
-        </TabsContent>
-        <TabsContent value="from-url">
-          <div className="space-y-2">
-            <Input
-              type="url"
-              placeholder="https://careers.company.com/job/..."
-              className="w-full rounded-md border border-border/50 bg-secondary/30 p-5 placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <p className="text-xs text-muted-foreground">
-              Paste a link to a job posting from LinkedIn, Indeed, Glassdoor, or
-              company career pages
-            </p>
-          </div>
-        </TabsContent>
-      </Tabs>
-      <Select>
-        <SelectTrigger className="w-full mt-4 ">
-          <SelectValue placeholder="Select your job position " />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="software-engineering">
-            Software Engineering
-          </SelectItem>
-          <SelectItem value="data-science">Data Science</SelectItem>
-          <SelectItem value="product-management">Product Management</SelectItem>
-          <SelectItem value="design">Design</SelectItem>
-          <SelectItem value="marketing">Marketing</SelectItem>
-        </SelectContent>
-      </Select>
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-destructive/40 bg-destructive/10">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              <div>
+                <p className="text-base font-semibold">
+                  Unable to load resumes
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Please try again in a moment.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                className="gap-2"
+                onClick={() => refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCcw
+                  className={cn("h-4 w-4", isFetching && "animate-spin")}
+                />
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {orderedResumes.map((resume) => {
+                const latestAnalysis = resume.analysis?.[0];
+                const isSelected = selectedResumeId === resume.id;
 
-      <Button className="mt-4 p-5 w-full font-bold ">
+                return (
+                  <div
+                    key={resume.id}
+                    onClick={() => setSelectedResumeId(resume.id)}
+                    className={cn(
+                      "relative cursor-pointer rounded-lg border p-4 transition-all hover:bg-secondary/50",
+                      isSelected
+                        ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-sm"
+                        : "border-border/50 bg-secondary/30",
+                    )}
+                  >
+                    {isSelected && (
+                      <div className="absolute right-4 top-4 text-primary">
+                        <CheckCircle2 className="size-5" />
+                      </div>
+                    )}
+
+                    <div className="flex flex-1 items-center gap-4 w-full">
+                      <Avatar className="flex items-center justify-center rounded-lg bg-primary/10 h-12 w-12 text-sm font-bold text-primary">
+                        <AvatarFallback className="text-primary h-12 w-12 shrink-0 rounded-lg bg-primary/10 text-sm">
+                          <FileText className="h-5 w-5" />
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1 w-full min-w-0 pr-6">
+                        <div className="flex justify-between items-center mb-1">
+                          <div className="gap-2 flex items-center">
+                            <span className="truncate font-semibold text-base">
+                              {resume.postedRole
+                                ? resume.postedRole.charAt(0).toUpperCase() +
+                                  resume.postedRole.slice(1).toLowerCase()
+                                : "Untitled Role"}
+                            </span>
+                            {getStatusBadge(resume.status)}
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {latestAnalysis?.keywords
+                              ?.slice(0, 2)
+                              .map((skill, index) => (
+                                <Badge
+                                  key={`keyword-${skill}-${index}`}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  {skill}
+                                </Badge>
+                              ))}
+
+                            {(latestAnalysis?.keywords?.length ?? 0) > 2 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{(latestAnalysis?.keywords?.length ?? 0) - 2}
+                              </Badge>
+                            )}
+
+                            {latestAnalysis?.overallScore !== undefined && (
+                              <div
+                                className={cn(
+                                  `${getScoreColor(latestAnalysis?.overallScore)} text-xl font-bold ml-2`,
+                                )}
+                              >
+                                {latestAnalysis?.overallScore}%
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex items-center gap-1 truncate max-w-50">
+                              <span className="truncate">
+                                {resume.resumeName
+                                  ? resume.resumeName.charAt(0).toUpperCase() +
+                                    resume.resumeName.slice(1).toLowerCase()
+                                  : "Unnamed File"}
+                              </span>
+                            </div>
+                            <span className="text-border">•</span>
+                            <div className="flex items-center gap-1 truncate">
+                              <span className="truncate">
+                                Updated {getRelativeTime(resume.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+
+      <Button
+        className="mt-4 p-5 w-full font-bold "
+        disabled={!selectedResumeId || !inputJobDescription.trim()}
+        onClick={handleClick}
+      >
         <SparklesIcon className="size-4 mr-2" />
         Analyze Job Description
       </Button>
