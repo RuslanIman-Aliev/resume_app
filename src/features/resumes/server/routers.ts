@@ -261,13 +261,23 @@ export const resumeRouter = createTRPCRouter({
         },
       });
 
+      const parsedContent = application.resume?.parsedContent;
+
+      if (!parsedContent?.trim()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Resume parsed content is required before triggering job match analysis",
+        });
+      }
+
       await inngest.send({
         name: "app/job-matched.analyzed",
         data: {
           applicationId: application.id,
           resumeId: input.resumeId,
           jobDescription: input.jobDescription,
-          parsedContent: application.resume?.parsedContent,
+          parsedContent,
         },
       });
 
