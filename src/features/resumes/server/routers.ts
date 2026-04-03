@@ -185,10 +185,11 @@ export const resumeRouter = createTRPCRouter({
       };
     }),
   // For dashboard - get latest analyses with resume info to show in recent analyses section on dashboard
-  getLatestAnalyses: protectedProcedure.query(async ({ ctx }) => {
+  getLatest4Analyses: protectedProcedure.query(async ({ ctx }) => {
     const analyses = await prisma.resumeAnalysis.findMany({
       where: { resume: { userId: ctx.auth.user.id } },
       orderBy: { createdAt: "desc" },
+      take: 4,
       select: {
         overallScore: true,
         keywords: true,
@@ -261,7 +262,7 @@ export const resumeRouter = createTRPCRouter({
         },
       });
 
-      const parsedContent = application.resume?.parsedContent;
+      const parsedContent = application.resume.parsedContent;
 
       if (!parsedContent?.trim()) {
         throw new TRPCError({

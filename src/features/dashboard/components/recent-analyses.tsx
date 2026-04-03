@@ -21,7 +21,7 @@ const RecentAnalyses = () => {
   const trpc = useTRPC();
   const router = useRouter();
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
-    trpc.resume.getLatestAnalyses.queryOptions(),
+    trpc.resume.getLatest4Analyses.queryOptions(),
   );
 
   if (isLoading) {
