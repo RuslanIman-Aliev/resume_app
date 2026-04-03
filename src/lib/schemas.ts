@@ -36,4 +36,29 @@ export const resumeAnalysisSchema = z.object({
   ),
 });
 
+export const jobMatchAnalysisSchema = z.object({
+  matchScore: z.number().int().min(0).max(100),
+  matchingSkills: z.array(
+    z.object({
+      skill: z.string(),
+      importance: z.enum(["High", "Medium", "Low"]),
+    })
+  ),
+  missingSkills: z.array(
+    z.object({
+      skill: z.string(),
+      impact: z.enum(["High", "Medium", "Low"]),
+    })
+  ),
+  tailoringTips: z.array(
+    z.object({
+      jobRequirement: z.string(),
+      currentResumeText: z.string(),
+      suggestedRewrite: z.string(),
+    })
+  ),
+  coverLetterText: z.string(),
+});
+
+export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;
 export type ResumeAnalysis = z.infer<typeof resumeAnalysisSchema>;

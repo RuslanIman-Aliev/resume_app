@@ -27,11 +27,9 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  // --- AI-Tailor Custom Fields ---
-  // The transactional token system to prevent unlimited API abuse
+
   credits       Int       @default(5) 
 
-  // Relations to your custom tables
   sessions      Session[]
   accounts      Account[]
   resumes       Resume[]
@@ -101,7 +99,40 @@ model Resume {
   updatedAt      DateTime @updatedAt
 
   analysis          ResumeAnalysis[]
+
+  applications      JobApplication[]
   @@map("resume")
+}
+
+model JobApplication {
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  resumeId         String
+  resume           Resume            @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  
+  companyName      String?           
+  jobTitle         String?
+  jobDescription   String            @db.Text
+  url              String?          
+  
+  matchScore       Int?             
+
+  missingSkills    Json?             
+  matchingSkills   Json?
+  
+  tailoringTips    Json?             
+  
+  coverLetterText  String?           @db.Text
+  targetLanguage   String            @default("English") 
+  
+  status           String @default("Draft")
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@map("job_application")
 }
 
 model ResumeAnalysis {
@@ -123,39 +154,10 @@ model ResumeAnalysis {
   createdAt       DateTime @default(now())
 }
 
-// This enum directly controls the columns on your Kanban board
 enum ApplicationStatus {
   TO_APPLY
   APPLIED
   INTERVIEW
   REJECTED
   OFFER
-}
-
-model JobApplication {
-  id               String            @id @default(cuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // --- Job Details (The Input) ---
-  companyName      String
-  jobTitle         String
-  jobDescription   String            @db.Text
-  
-  // --- AI Generated Data (The Output) ---
-  matchScore       Int?              // e.g., 85
-  missingSkills    String[]          // A PostgreSQL array to store ["Docker", "tRPC"]
-  coverLetterText  String?           @db.Text
-  
-  // Setting a target language allows the app to generate cover letters in German, English, etc.
-  // This is highly relevant when applying for positions in different countries.
-  targetLanguage   String            @default("English") 
-  
-  // --- CRM / Tracker State ---
-  status           ApplicationStatus @default(TO_APPLY)
-  
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-
-  @@map("job_application")
 }

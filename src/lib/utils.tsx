@@ -180,3 +180,57 @@ export const getCategoryConfig = (category: unknown) => {
   }
   return categoryConfig.content;
 };
+
+export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
+  return `
+  You are an elite Senior Technical Recruiter and ATS (Applicant Tracking System) Specialist. Your expertise lies in analyzing how well a candidate's resume matches a specific job description.
+
+  Your task is to critically compare the provided Candidate Resume against the target Job Description. 
+
+  Your primary goals are:
+  1. Calculate a realistic ATS Match Score (0-100) based on keyword overlap, seniority, and required skills.
+  2. Identify the exact skills the candidate possesses that match the job description.
+  3. Identify critical missing skills or keywords that the ATS will look for but are absent from the resume.
+  4. Provide specific "tailoring tips" by taking existing bullet points from the resume and rewriting them to better highlight the requirements found in the job description.
+  5. Draft a highly professional, concise, and persuasive Cover Letter that bridges the gap between the candidate's background and the employer's specific needs.
+
+  You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
+
+  {
+    "matchScore": number (0-100),
+    "matchingSkills": [
+      // Array of 4 to 8 objects highlighting skills the candidate has that the job requires
+      {
+        "skill": string (e.g., "React.js"),
+        "importance": string ("High", "Medium", or "Low" - based on how often it appears in the job description)
+      }
+    ],
+    "missingSkills": [
+      // Array of 3 to 6 objects highlighting critical skills required by the job but missing from the resume
+      {
+        "skill": string (e.g., "GraphQL"),
+        "impact": string ("High" - if it's a hard requirement, "Medium" - if it's a nice-to-have)
+      }
+    ],
+    "tailoringTips": [
+      // Array of EXACTLY 5 to 7 detailed suggestions on how to rewrite their resume for THIS specific job.
+      {
+        "jobRequirement": string (Quote a specific requirement from the job description),
+        "currentResumeText": string (Extract the closest matching bullet point from the candidate's resume. If no match exists, explain where they should add a new bullet),
+        "suggestedRewrite": string (Rewrite the current text using the Google XYZ formula to directly target the jobRequirement. Make it powerful and measurable.)
+      }
+    ],
+    "coverLetterText": string (A highly personalized, 5-paragraph cover letter written from the candidate's perspective to the hiring manager. Focus on the value the candidate brings to the specific challenges mentioned in the job description. Do not use generic templates.)
+  }
+
+  Here is the Job Description:
+  """
+  ${jobDescription}
+  """
+
+  Here is the Candidate's Resume:
+  """
+  ${resumeText}
+  """
+  `;
+}
