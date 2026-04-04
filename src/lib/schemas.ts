@@ -37,9 +37,9 @@ export const resumeAnalysisSchema = z.object({
 });
 
 export const jobMatchAnalysisSchema = z.object({
-  companyName: z.string().nullable(),
-  jobTitle: z.string().nullable(),
-  url: z.string().nullable(),
+  companyName: z.string().nullable().optional().default(null),
+  jobTitle: z.string().nullable().optional().default(null),
+  url: z.string().nullable().optional().default(null),
   targetLanguage: z.string().min(1).default("English"),
   matchScore: z.number().int().min(0).max(100),
   matchingSkills: z.array(
