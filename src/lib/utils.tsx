@@ -188,15 +188,21 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   Your task is to critically compare the provided Candidate Resume against the target Job Description. 
 
   Your primary goals are:
-  1. Calculate a realistic ATS Match Score (0-100) based on keyword overlap, seniority, and required skills.
-  2. Identify the exact skills the candidate possesses that match the job description.
-  3. Identify critical missing skills or keywords that the ATS will look for but are absent from the resume.
-  4. Provide specific "tailoring tips" by taking existing bullet points from the resume and rewriting them to better highlight the requirements found in the job description.
-  5. Draft a highly professional, concise, and persuasive Cover Letter that bridges the gap between the candidate's background and the employer's specific needs.
+  1. Extract the company name, job title, and job post URL from the job description if they are present.
+  2. Detect the language of the job description and return it as targetLanguage (use "English" if unsure).
+  3. Calculate a realistic ATS Match Score (0-100) based on keyword overlap, seniority, and required skills.
+  4. Identify the exact skills the candidate possesses that match the job description.
+  5. Identify critical missing skills or keywords that the ATS will look for but are absent from the resume.
+  6. Provide specific "tailoring tips" by taking existing bullet points from the resume and rewriting them to better highlight the requirements found in the job description.
+  7. Draft a highly professional, concise, and persuasive Cover Letter that bridges the gap between the candidate's background and the employer's specific needs.
 
   You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
 
   {
+    "companyName": string or null (Extract from the job description; use null if not present),
+    "jobTitle": string or null (Extract from the job description; use null if not present),
+    "url": string or null (Extract the job post URL if present; use null if not present),
+    "targetLanguage": string (e.g., "English", "Russian"; must match the job description language),
     "matchScore": number (0-100),
     "matchingSkills": [
       // Array of 4 to 8 objects highlighting skills the candidate has that the job requires
@@ -220,7 +226,7 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
         "suggestedRewrite": string (Rewrite the current text using the Google XYZ formula to directly target the jobRequirement. Make it powerful and measurable.)
       }
     ],
-    "coverLetterText": string (A highly personalized, 5-paragraph cover letter written from the candidate's perspective to the hiring manager. Focus on the value the candidate brings to the specific challenges mentioned in the job description. Do not use generic templates.)
+    "coverLetterText": string (A highly personalized, 5-paragraph cover letter written from the candidate's perspective to the hiring manager. Focus on the value the candidate brings to the specific challenges mentioned in the job description. Do not use generic templates. Write the cover letter in targetLanguage.)
   }
 
   Here is the Job Description:

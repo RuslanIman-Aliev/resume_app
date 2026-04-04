@@ -116,6 +116,10 @@ export const analyzeJobMatched = inngest.createFunction(
       await prisma.jobApplication.update({
         where: { id: event.data.applicationId },
         data: {
+          companyName: validatedData.companyName,
+          jobTitle: validatedData.jobTitle,
+          url: validatedData.url,
+          targetLanguage: validatedData.targetLanguage,
           matchScore: validatedData.matchScore,
           matchingSkills: validatedData.matchingSkills,
           missingSkills: validatedData.missingSkills,
