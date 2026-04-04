@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   cn,
@@ -16,15 +15,14 @@ import {
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle,
   CheckCircle2,
   FileText,
   FileTextIcon,
-  RefreshCcw,
-  SparklesIcon,
+  SparklesIcon
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AnalyzerError, AnalyzerLoading } from "./analyzer-states";
 
 const AnalyzerTabs = () => {
   const trpc = useTRPC();
@@ -59,7 +57,9 @@ const AnalyzerTabs = () => {
         );
       },
       onError: (error) => {
-        toast.error(error.message || "Failed to trigger analysis. Please try again.");
+        toast.error(
+          error.message || "Failed to trigger analysis. Please try again.",
+        );
       },
     }),
   );
@@ -87,7 +87,6 @@ const AnalyzerTabs = () => {
         placeholder="Paste the job description here..."
         className="min-h-75 max-h-100 resize-none bg-secondary/30 border-border/50 focus:border-primary/50"
         value={inputJobDescription}
-
         onChange={(e) => setInputJobDescription(e.target.value)}
       />
 
@@ -96,57 +95,9 @@ const AnalyzerTabs = () => {
 
         <ScrollArea className="h-100 w-full rounded-md border border-border/50 bg-secondary/10 p-4">
           {isLoading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={`resume-skeleton-${index}`}
-                  className="flex items-center gap-3 rounded-lg border border-border/50 bg-secondary/30 p-4"
-                >
-                  <Skeleton className="h-12 w-12 rounded-lg" />
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-5 w-20 rounded-full" />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-5 w-14 rounded-full" />
-                        <Skeleton className="h-7 w-12" />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-3 w-28" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <AnalyzerLoading />
           ) : isError ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-destructive/40 bg-destructive/10">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
-              </div>
-              <div>
-                <p className="text-base font-semibold">
-                  Unable to load resumes
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Please try again in a moment.
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                className="gap-2"
-                onClick={() => refetch()}
-                disabled={isFetching}
-              >
-                <RefreshCcw
-                  className={cn("h-4 w-4", isFetching && "animate-spin")}
-                />
-                Retry
-              </Button>
-            </div>
+            <AnalyzerError onRetry={refetch} isRetrying={isFetching} />
           ) : (
             <div className="flex flex-col gap-3">
               {orderedResumes.map((resume) => {
