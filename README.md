@@ -265,7 +265,7 @@ GITHUB_CLIENT_SECRET="..."
 
 Requirements:
 
-- Node.js 18+ (check Next.js requirements for your environment)
+- Node.js 20+ (check Next.js requirements for your environment)
 - PostgreSQL 14+
 
 Steps:
