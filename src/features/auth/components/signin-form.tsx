@@ -61,10 +61,10 @@ export function SignInForm() {
   }
 
   return (
-    <Card className="relative w-full max-w-md gap-0 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/10 to-white/5 py-0 shadow-2xl shadow-cyan-500/10 backdrop-blur motion-safe:animate-[fade-up_600ms_ease-out]">
+    <Card className="relative w-full max-w-md gap-0 overflow-hidden rounded-2xl border border-white/10 bg-linear-to-b from-white/10 to-white/5 py-0 shadow-2xl shadow-cyan-500/10 backdrop-blur motion-safe:animate-[fade-up_600ms_ease-out]">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(500px_220px_at_top,_rgba(56,189,248,0.25),_transparent_70%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(500px_220px_at_top,rgba(56,189,248,0.25),transparent_70%)]"
       />
       <CardHeader className="relative z-10 gap-2 border-b border-white/10 px-6 pb-6 pt-6">
         <CardTitle className="text-2xl font-semibold tracking-tight">
@@ -144,7 +144,7 @@ export function SignInForm() {
         <CardFooter className="relative z-10 flex-col gap-3 border-t border-white/10 bg-white/5 px-6 pb-6 pt-5">
           <Button
             type="submit"
-            className="relative h-11 w-full overflow-hidden rounded-lg bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400 text-slate-950 shadow-lg shadow-cyan-500/20 hover:from-cyan-300 hover:via-sky-300 hover:to-emerald-300"
+            className="relative h-11 w-full overflow-hidden rounded-lg bg-linear-to-r from-cyan-400 via-sky-400 to-emerald-400 text-slate-950 shadow-lg shadow-cyan-500/20 hover:from-cyan-300 hover:via-sky-300 hover:to-emerald-300"
             form="form-signin"
             disabled={isPending}
           >
