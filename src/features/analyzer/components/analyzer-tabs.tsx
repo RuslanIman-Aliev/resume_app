@@ -18,11 +18,12 @@ import {
   CheckCircle2,
   FileText,
   FileTextIcon,
-  SparklesIcon
+  SparklesIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnalyzerError, AnalyzerLoading } from "./analyzer-states";
+import { useRouter } from "next/navigation";
 
 const AnalyzerTabs = () => {
   const trpc = useTRPC();
@@ -31,6 +32,7 @@ const AnalyzerTabs = () => {
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
     trpc.resume.getResumesAndAnalyses.queryOptions(),
   );
+  const router = useRouter();
 
   const orderedResumes = useMemo(() => {
     const resumes = data?.resumes ?? [];
@@ -51,10 +53,11 @@ const AnalyzerTabs = () => {
 
   const { mutate } = useMutation(
     trpc.resume.triggerJobMatchAnalysis.mutationOptions({
-      onSuccess: () => {
-        toast.success(
+      onSuccess: (data) => {
+        toast.info(
           "Analysis triggered successfully! It may take a few moments to complete.",
         );
+          router.push(`/analyzer/${data.applicationId}`);
       },
       onError: (error) => {
         toast.error(
@@ -69,6 +72,7 @@ const AnalyzerTabs = () => {
       resumeId: selectedResumeId!,
       jobDescription: inputJobDescription!,
     });
+
   };
 
   return (
