@@ -1,9 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import AnalyzerRequirements from "@/features/analyzer/components/analyzer-requirements";
-import AnalyzerResults from "@/features/analyzer/components/analyzer-results";
-import AnalyzerSkills from "@/features/analyzer/components/analyzer-skills";
-import AnalyzerSuggestions from "@/features/analyzer/components/analyzer-suggestions";
+import { AnalyzeResumeClient } from "@/features/analyzer/components/analyze-resume-client";
 
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -21,16 +18,7 @@ const AnalyzeResume = () => {
         </Link>
       </Button>
 
-      <AnalyzerResults />
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        <AnalyzerRequirements />
-
-        {/* Second card */}
-        <AnalyzerSkills />
-      </div>
-
-      <AnalyzerSuggestions />
+      <AnalyzeResumeClient />
 
       {/* CTA */}
       <Card className="border-border/50 bg-card/50 backdrop-blur">

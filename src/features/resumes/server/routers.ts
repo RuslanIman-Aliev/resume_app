@@ -284,4 +284,23 @@ export const resumeRouter = createTRPCRouter({
 
       return { applicationId: application.id };
     }),
+
+  getJobMatchResult: protectedProcedure
+    .input(z.object({ applicationId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const application = await prisma.jobApplication.findFirst({
+        where: {
+          id: input.applicationId,
+          userId: ctx.auth.user.id,
+          status: "ANALYZED",
+        },
+      });
+      if (!application) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Job application not found",
+        });
+      }
+      return { application };
+    }),
 });
