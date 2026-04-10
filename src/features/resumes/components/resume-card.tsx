@@ -155,6 +155,8 @@ const ResumeCard = () => {
                                   src={resume.resumePreviewLink}
                                   alt={`${resume.resumeName} preview`}
                                   fill
+                                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                                  loading="lazy"
                                   className="object-cover object-top transition-transform group-hover:scale-105"
                                 />
                               ) : (

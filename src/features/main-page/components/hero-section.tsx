@@ -11,10 +11,10 @@ const HeroSection = () => {
           Now with GPT-5 Integration
         </Badge>
       </div>
-      <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-foreground mt-6">
+      <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-foreground mt-6">
         Land your dream <br /> job{" "}
         <span className="text-primary">3x faster</span> with AI
-      </h2>
+      </h1>
       <p className="text-lg md:text-xl text-muted-foreground text-pretty mt-6 max-w-xl  mx-auto">
         AI-Tailor analyzes job descriptions, tailors your resume, and coaches
         you through every step of your job search journey.

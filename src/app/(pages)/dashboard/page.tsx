@@ -3,6 +3,13 @@ import MainInfo from "@/features/dashboard/components/main-info";
 import QuickActions from "@/features/dashboard/components/quick-actions";
 import RecentAnalyses from "@/features/dashboard/components/recent-analyses";
 import UpcomingInterviews from "@/features/dashboard/components/upcoming-interviews";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Dashboard | AI-Tailor",
+  description:
+    "See your job search overview, recent analyses, and upcoming interviews.",
+};
 
 const Page = () => {
   return (
