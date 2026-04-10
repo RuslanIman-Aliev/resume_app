@@ -9,6 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { requireAuth } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 
@@ -16,14 +17,18 @@ type PageProps = {
   params: { id: string };
 };
 
+const getResumeMetadata = cache(async (id: string) => {
+  const session = await requireAuth();
+  return prisma.resume.findFirst({
+    where: { id, userId: session.user.id },
+    select: { resumeName: true, postedRole: true },
+  });
+});
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const session = await requireAuth();
-  const resume = await prisma.resume.findFirst({
-    where: { id: params.id, userId: session.user.id },
-    select: { resumeName: true, postedRole: true },
-  });
+  const resume = await getResumeMetadata(params.id);
 
   if (!resume) {
     return {

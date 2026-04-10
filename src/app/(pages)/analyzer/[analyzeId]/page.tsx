@@ -5,6 +5,7 @@ import { AnalyzeResumeClient } from "@/features/analyzer/components/analyze-resu
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { requireAuth } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 
@@ -12,12 +13,10 @@ type PageProps = {
   params: { analyzeId: string };
 };
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
+const getApplicationMetadata = cache(async (analyzeId: string) => {
   const session = await requireAuth();
-  const application = await prisma.jobApplication.findFirst({
-    where: { id: params.analyzeId, userId: session.user.id },
+  return prisma.jobApplication.findFirst({
+    where: { id: analyzeId, userId: session.user.id },
     select: {
       jobTitle: true,
       companyName: true,
@@ -29,6 +28,12 @@ export async function generateMetadata({
       },
     },
   });
+});
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const application = await getApplicationMetadata(params.analyzeId);
 
   if (!application) {
     return {
