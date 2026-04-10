@@ -1,5 +1,11 @@
 import AnalyzerInfo from "@/features/analyzer/components/analyzer-info";
 import AnalyzerTabs from "@/features/analyzer/components/analyzer-tabs";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Analyzer | AI-Tailor",
+  description: "Analyze job descriptions and match them with your resume.",
+};
 
 const AnalyzerPage = () => {
   return (

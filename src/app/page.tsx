@@ -7,18 +7,65 @@ import PricingSection from "@/features/main-page/components/pricing-section";
 import StatsSection from "@/features/main-page/components/stats-section";
 import TestimonialsSection from "@/features/main-page/components/testimonials-section";
 import HowItWorksSection from "@/features/main-page/components/works-section";
+import type { Metadata } from "next";
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-tailor.app";
+const pageTitle = "AI-Tailor — AI Resume Tailoring & Job Tracker";
+const pageDescription =
+  "AI-Tailor analyzes job descriptions, tailors your resume, and tracks applications with AI coaching.";
+
+export const metadata: Metadata = {
+  title: pageTitle,
+  description: pageDescription,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: pageTitle,
+    description: pageDescription,
+    url: "/",
+  },
+  twitter: {
+    card: "summary",
+    title: pageTitle,
+    description: pageDescription,
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      name: "AI-Tailor",
+      url: siteUrl,
+    },
+    {
+      "@type": "WebSite",
+      name: "AI-Tailor",
+      url: siteUrl,
+      description: pageDescription,
+    },
+  ],
+};
 
 const Page = () => {
   return (
     <div>
       <Header />
-      <HeroSection />
-      <StatsSection />
-      <FeatureSection />
-      <HowItWorksSection />
-      <TestimonialsSection />
-      <PricingSection />
-      <CTASection />
+      <main>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <HeroSection />
+        <StatsSection />
+        <FeatureSection />
+        <HowItWorksSection />
+        <TestimonialsSection />
+        <PricingSection />
+        <CTASection />
+      </main>
       <Footer />
     </div>
   );

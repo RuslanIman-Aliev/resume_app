@@ -4,6 +4,58 @@ import { AnalyzeResumeClient } from "@/features/analyzer/components/analyze-resu
 
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import type { Metadata } from "next";
+import { cache } from "react";
+import { requireAuth } from "@/lib/auth-utils";
+import prisma from "@/lib/db";
+
+type PageProps = {
+  params: { analyzeId: string };
+};
+
+const getApplicationMetadata = cache(async (analyzeId: string) => {
+  const session = await requireAuth();
+  return prisma.jobApplication.findFirst({
+    where: { id: analyzeId, userId: session.user.id },
+    select: {
+      jobTitle: true,
+      companyName: true,
+      resume: {
+        select: {
+          resumeName: true,
+          postedRole: true,
+        },
+      },
+    },
+  });
+});
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const application = await getApplicationMetadata(params.analyzeId);
+
+  if (!application) {
+    return {
+      title: "Resume Analysis | AI-Tailor",
+      description: "Review AI insights and suggestions for your resume.",
+    };
+  }
+
+  const resumeName = application.resume.resumeName?.trim() || "Resume";
+  const role =
+    application.jobTitle?.trim() || application.resume.postedRole?.trim();
+  const company = application.companyName?.trim();
+  const roleLabel = role ? (company ? `${role} at ${company}` : role) : null;
+  const title = roleLabel
+    ? `Resume Analysis for ${resumeName} — ${roleLabel} | AI-Tailor`
+    : `Resume Analysis for ${resumeName} | AI-Tailor`;
+  const description = roleLabel
+    ? `AI insights for ${resumeName} targeting ${roleLabel}.`
+    : `AI insights and suggestions for ${resumeName}.`;
+
+  return { title, description };
+}
 
 const AnalyzeResume = () => {
   return (

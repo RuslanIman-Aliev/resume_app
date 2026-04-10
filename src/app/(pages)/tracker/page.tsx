@@ -10,6 +10,12 @@ import {
   Plus,
   Search,
 } from "lucide-react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Application Tracker | AI-Tailor",
+  description: "Track your applications, interviews, and offers in one place.",
+};
 
 const mockApplications = [
   {

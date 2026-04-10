@@ -6,8 +6,49 @@ import {
   MessageSquare,
   Sparkles,
   Target,
-  TrendingUp
+  TrendingUp,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { cache } from "react";
+import { requireAuth } from "@/lib/auth-utils";
+import prisma from "@/lib/db";
+
+type PageProps = {
+  params: { id: string };
+};
+
+const getResumeMetadata = cache(async (id: string) => {
+  const session = await requireAuth();
+  return prisma.resume.findFirst({
+    where: { id, userId: session.user.id },
+    select: { resumeName: true, postedRole: true },
+  });
+});
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const resume = await getResumeMetadata(params.id);
+
+  if (!resume) {
+    return {
+      title: "AI Career Coach | AI-Tailor",
+      description:
+        "Get personalized AI guidance and improvement plans for your resume.",
+    };
+  }
+
+  const resumeName = resume.resumeName?.trim() || "Resume";
+  const role = resume.postedRole?.trim();
+  const title = role
+    ? `AI Coach for ${resumeName} — ${role} | AI-Tailor`
+    : `AI Coach for ${resumeName} | AI-Tailor`;
+  const description = role
+    ? `Personalized AI coaching for ${resumeName} targeting ${role}.`
+    : `Personalized AI coaching for ${resumeName}.`;
+
+  return { title, description };
+}
 
 const AiCoachPage = () => {
   return (
@@ -23,8 +64,11 @@ const AiCoachPage = () => {
           Get personalized AI-powered suggestions to improve your resume,
           prepare for interviews, and land your dream job faster.
         </p>
-        <Tabs className=" text-white flex flex-col gap-1! mt-4" defaultValue="overview">
-          <TabsList className="bg-background p-1" >
+        <Tabs
+          className=" text-white flex flex-col gap-1! mt-4"
+          defaultValue="overview"
+        >
+          <TabsList className="bg-background p-1">
             <TabsTrigger
               value="overview"
               className="text-white!  py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"

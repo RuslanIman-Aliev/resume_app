@@ -42,7 +42,10 @@ const features = [
 
 const FeatureSection = () => {
   return (
-    <section className=" max-w-7xl mx-auto container bg-background  text-center  ">
+    <section
+      id="features"
+      className=" max-w-7xl mx-auto container bg-background  text-center  "
+    >
       <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold  tracking-tight text-foreground mt-6">
         Everything you need to land your next role
       </h2>
