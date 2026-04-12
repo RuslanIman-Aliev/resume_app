@@ -59,7 +59,9 @@ export const AnalyzeResumeClient = () => {
 
   const appData = data?.application;
 
-  if (!appData) return null;
+  if (!appData) {
+    return <AnalyzeResumeError onRetry={refetch} isRetrying={isFetching} />;
+  }
   console.log("Application data:", appData);
 
   return (
