@@ -18,7 +18,7 @@ export const AnalyzeResumeClient = () => {
   const params = useParams();
   const analyzeId = params?.analyzeId as string | undefined;
   const trpc = useTRPC();
-  console.log("Analyzing ID:", analyzeId);
+
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     ...trpc.resume.getJobMatchResult.queryOptions({
       applicationId: analyzeId ?? "",
@@ -41,7 +41,6 @@ export const AnalyzeResumeClient = () => {
     },
   });
 
-
   const errorCode = (error as { data?: { code?: string } } | null)?.data?.code;
   const isPendingAnalysis = errorCode === "NOT_FOUND";
 
@@ -50,7 +49,6 @@ export const AnalyzeResumeClient = () => {
   }, [refetch]);
   useJobMatchPusher(analyzeId ?? "", handleAnalysisReady);
 
-  console.log("Analysis result:", data, "Error:", error, "Is pending:", isPendingAnalysis);
   if (isLoading || isPendingAnalysis) {
     return <AnalyzeResumeLoading />;
   }
@@ -59,9 +57,20 @@ export const AnalyzeResumeClient = () => {
     return <AnalyzeResumeError onRetry={refetch} isRetrying={isFetching} />;
   }
 
+  const appData = data?.application;
+
+  if (!appData) return null;
+  console.log("Application data:", appData);
+
   return (
     <>
-      <AnalyzerResults />
+      <AnalyzerResults
+        position={appData.jobTitle ?? ""}
+        company={appData.companyName ?? ""}
+        experience={appData.experience ?? ""}
+        salaryRange={appData.salaryRange ?? ""}
+        matchScore={appData.matchScore ?? 0}
+      />
 
       <div className="grid lg:grid-cols-2 gap-6">
         <AnalyzerRequirements />

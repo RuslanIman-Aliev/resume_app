@@ -116,6 +116,8 @@ model JobApplication {
   jobTitle         String?
   jobDescription   String            @db.Text
   url              String?          
+  experience       String?
+  salaryRange      String?
   
   matchScore       Int?             
 
