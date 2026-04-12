@@ -29,7 +29,7 @@ export default async function globalSetup(config: FullConfig) {
 
     await page.getByLabel("Name").fill(testUser.name);
     await page.getByLabel("Email").fill(testUser.email);
-    await page.getByLabel("Password").fill(testUser.password);
+    await page.getByLabel("Password", { exact: true }).fill(testUser.password);
     await page.getByLabel("Confirm Password").fill(testUser.password);
 
     await Promise.all([
