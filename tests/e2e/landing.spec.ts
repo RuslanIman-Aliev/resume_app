@@ -32,21 +32,27 @@ test.describe("landing page", () => {
     await page.goto("/");
     await waitForClientReady(page);
 
-    const signUpTitle = page.getByText("Sign up for an account", {
-      exact: true,
+    const signUpHeading = page.getByRole("heading", {
+      name: "Create your account",
     });
 
-    if (await signUpTitle.isVisible()) {
-      await expect(signUpTitle).toBeVisible({ timeout: 15_000 });
+    if (await signUpHeading.isVisible()) {
+      await expect(signUpHeading).toBeVisible({ timeout: 15_000 });
       return;
     }
 
-    await page
-      .locator('a[href="/signup"]', { hasText: "Start Free Trial" })
-      .first()
-      .click();
+    const startFreeTrialLink = page
+      .locator('main a[href="/signup"]', { hasText: "Start Free Trial" })
+      .first();
 
-    await expect(signUpTitle).toBeVisible({ timeout: 15_000 });
+    await expect(startFreeTrialLink).toBeVisible({ timeout: 15_000 });
+
+    await Promise.all([
+      page.waitForURL(/\/signup$/, { timeout: 30_000 }),
+      startFreeTrialLink.click(),
+    ]);
+
+    await expect(signUpHeading).toBeVisible({ timeout: 30_000 });
   });
 
   test("try analyzer redirects to signup", async ({ page }) => {
