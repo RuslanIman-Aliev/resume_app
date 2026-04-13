@@ -6,6 +6,7 @@ export default defineConfig({
     environment: "node",
     clearMocks: true,
     restoreMocks: true,
+    exclude: ['**/node_modules/**', '**/tests/e2e/**'],
   },
   resolve: {
     alias: {

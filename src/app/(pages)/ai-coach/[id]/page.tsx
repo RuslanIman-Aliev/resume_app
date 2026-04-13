@@ -28,7 +28,8 @@ const getResumeMetadata = cache(async (id: string) => {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const resume = await getResumeMetadata(params.id);
+  const resolvedParams = await params;
+  const resume = await getResumeMetadata(resolvedParams.id);
 
   if (!resume) {
     return {

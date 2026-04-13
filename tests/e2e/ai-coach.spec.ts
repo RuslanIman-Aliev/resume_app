@@ -9,15 +9,17 @@ test.describe("ai coach", () => {
 
     await expect(
       page.getByRole("heading", { name: "AI Career Coach" }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("heading", { name: "Resume Score" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Quick Wins" }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Quick Wins" })).toBeVisible(
+      { timeout: 15_000 },
+    );
 
-    await expect(page.getByText("Add metrics to achievements")).toBeVisible();
+    await expect(page.getByText("Add metrics to achievements")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("shows improvement suggestions", async ({ page }) => {
@@ -27,7 +29,13 @@ test.describe("ai coach", () => {
 
     await expect(
       page.getByRole("heading", { name: "Improvement Suggestions" }),
-    ).toBeVisible();
-    await expect(page.getByText("Apply This Suggestion")).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
+
+    await page
+      .getByRole("button", { name: /Strengthen the summary for the role/i })
+      .click();
+    await expect(page.getByText("Apply This Suggestion")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });

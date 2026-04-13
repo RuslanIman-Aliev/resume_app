@@ -201,6 +201,8 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   {
     "companyName": string or null (Extract from the job description; use null if not present),
     "jobTitle": string or null (Extract from the job description; use null if not present),
+    "experience": string or null (Extract the seniority level if mentioned, e.g., "Senior (5-8 years)"; use null if not present),
+    "salaryRange": string or null (Extract the salary range if mentioned, e.g., "$150,000 - $200,000"; use null if not present),
     "url": string or null (Extract the job post URL if present; use null if not present),
     "targetLanguage": string (e.g., "English", "Russian"; must match the job description language),
     "matchScore": number (0-100),

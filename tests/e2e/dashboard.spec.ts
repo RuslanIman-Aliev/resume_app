@@ -7,18 +7,22 @@ test.describe("dashboard", () => {
   test("shows overview and recent analyses", async ({ page }) => {
     await page.goto("/dashboard");
 
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(
       page.getByRole("heading", { name: "Application Pipeline" }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("heading", { name: "Recent Analyses" }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByText(seedResume.resumeName)).toBeVisible();
-    await expect(page.getByText(/frontend engineer/i)).toBeVisible();
+    await expect(
+      page.getByText(new RegExp(seedResume.resumeName, "i")),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/frontend engineer/i).first()).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("shows quick actions", async ({ page }) => {

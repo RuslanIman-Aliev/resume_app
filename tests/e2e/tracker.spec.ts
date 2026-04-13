@@ -10,7 +10,7 @@ test.describe("tracker", () => {
       page.getByRole("heading", { name: "Application Tracker" }),
     ).toBeVisible();
     await expect(page.getByText("Total")).toBeVisible();
-    await expect(page.getByText("Saved")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /saved/i })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Add Application" }),
     ).toBeVisible();

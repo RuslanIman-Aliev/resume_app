@@ -102,7 +102,7 @@ const PricingSection = () => {
                   ))}
                 </ul>
                 <div className="mt-auto">
-                  <Link href="/sign-up" className="block">
+                  <Link href="/signup" className="block">
                     <Button
                       className="w-full"
                       variant={plan.highlighted ? "default" : "outline"}

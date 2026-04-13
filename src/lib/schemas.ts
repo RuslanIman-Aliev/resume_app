@@ -38,6 +38,8 @@ export const resumeAnalysisSchema = z.object({
 
 export const jobMatchAnalysisSchema = z.object({
   companyName: z.string().nullable().optional().default(null),
+  experience: z.string().nullable().optional().default(null),
+  salaryRange: z.string().nullable().optional().default(null),
   jobTitle: z.string().nullable().optional().default(null),
   url: z.string().nullable().optional().default(null),
   targetLanguage: z.string().min(1).default("English"),
