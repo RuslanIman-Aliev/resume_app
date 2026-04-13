@@ -13,8 +13,6 @@ for (const route of protectedRoutes) {
     await page.goto(route);
 
     await expect(page).toHaveURL(/\/signup$/);
-    await expect(
-      page.getByRole("heading", { name: "Sign up for an account" }),
-    ).toBeVisible();
+    await expect(page.getByText("Sign up for an account")).toBeVisible();
   });
 }

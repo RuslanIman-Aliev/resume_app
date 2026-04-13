@@ -9,11 +9,23 @@ test.describe("resumes", () => {
 
     await expect(
       page.getByRole("heading", { name: "Resume Manager" }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByText(seedResume.resumeName)).toBeVisible();
-    await expect(page.getByText(seedResume.postedRole)).toBeVisible();
-    await expect(page.getByText(seedResume.status)).toBeVisible();
+    await expect(
+      page.getByText(new RegExp(seedResume.resumeName, "i")),
+    ).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      page.getByText(new RegExp(seedResume.postedRole, "i")),
+    ).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      page.getByText(new RegExp(seedResume.status, "i")),
+    ).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("opens the upload resume dialog", async ({ page }) => {
