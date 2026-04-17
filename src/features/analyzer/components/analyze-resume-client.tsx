@@ -1,18 +1,19 @@
 "use client";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useJobMatchPusher } from "@/hooks/usePusher";
+import { useTRPC } from "@/trpc/client";
+import { useQuery } from "@tanstack/react-query";
+import { Sparkles, Target, TrendingUp, Zap } from "lucide-react";
 import { useParams } from "next/navigation";
-import AnalyzerRequirements from "./analyzer-requirements";
-import AnalyzerResults from "./analyzer-results";
-import AnalyzerSkills from "./analyzer-skills";
-import AnalyzerSuggestions from "./analyzer-suggestions";
+import { useCallback } from "react";
+import AnalyzeResumeImprovements from "./analyze-resume-improvements";
 import {
   AnalyzeResumeError,
   AnalyzeResumeLoading,
 } from "./analyze-resume-states";
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
-import { useCallback } from "react";
-import { useJobMatchPusher } from "@/hooks/usePusher";
+import AnalyzerResults from "./analyzer-results";
+import { ApplicationData } from "@/lib/types";
 
 export const AnalyzeResumeClient = () => {
   const params = useParams();
@@ -74,14 +75,59 @@ export const AnalyzeResumeClient = () => {
         matchScore={appData.matchScore ?? 0}
       />
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <Tabs
+        className=" text-white flex flex-col gap-1! mt-4"
+        defaultValue="overview"
+      >
+        <TabsList className="bg-background p-1">
+          <TabsTrigger
+            value="overview"
+            className="text-white!  py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+          >
+            <Target className="h-4 w-4 mr-2" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="improvements"
+            className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+          >
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Improvements
+          </TabsTrigger>
+          <TabsTrigger
+            value="action-plan"
+            className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+          >
+            <Zap className="h-4 w-4 mr-2" />
+            Skills Gap
+          </TabsTrigger>
+          <TabsTrigger
+            value="chat"
+            className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Keywords
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-4">
+          {/* <MainScoreCard /> */}
+        </TabsContent>
+
+        <TabsContent value="improvements" className="mt-4">
+          <AnalyzeResumeImprovements
+            data={appData as unknown as ApplicationData}
+          />{" "}
+        </TabsContent>
+      </Tabs>
+      {/* <div className="grid lg:grid-cols-2 gap-6">
         <AnalyzerRequirements />
 
-        {/* Second card */}
+       
         <AnalyzerSkills />
       </div>
 
-      <AnalyzerSuggestions />
+      <AnalyzerSuggestions /> */}
     </>
   );
 };

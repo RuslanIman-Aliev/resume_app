@@ -1,16 +1,13 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { AnalyzeResumeClient } from "@/features/analyzer/components/analyze-resume-client";
-
-import { Sparkles } from "lucide-react";
-import Link from "next/link";
-import type { Metadata } from "next";
-import { cache } from "react";
 import { requireAuth } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { cache } from "react";
 
 type PageProps = {
-  params: { analyzeId: string };
+  params: Promise<{ analyzeId: string }>;
 };
 
 const getApplicationMetadata = cache(async (analyzeId: string) => {
@@ -33,7 +30,8 @@ const getApplicationMetadata = cache(async (analyzeId: string) => {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const application = await getApplicationMetadata(params.analyzeId);
+  const resolvedParams = await params;
+  const application = await getApplicationMetadata(resolvedParams.analyzeId);
 
   if (!application) {
     return {
@@ -72,7 +70,7 @@ const AnalyzeResume = () => {
 
       <AnalyzeResumeClient />
 
-      {/* CTA */}
+      {/* CTA
       <Card className="border-border/50 bg-card/50 backdrop-blur">
         <CardContent className="pt-2">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -90,7 +88,7 @@ const AnalyzeResume = () => {
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 };

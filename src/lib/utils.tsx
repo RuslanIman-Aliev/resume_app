@@ -189,20 +189,40 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
 
   Your primary goals are:
   1. Extract the company name, job title, and job post URL from the job description if they are present.
-  2. Detect the language of the job description and return it as targetLanguage (use "English" if unsure).
-  3. Calculate a realistic ATS Match Score (0-100) based on keyword overlap, seniority, and required skills.
-  4. Identify the exact skills the candidate possesses that match the job description.
-  5. Identify critical missing skills or keywords that the ATS will look for but are absent from the resume.
-  6. Provide specific "tailoring tips" by taking existing bullet points from the resume and rewriting them to better highlight the requirements found in the job description.
-  7. Draft a highly professional, concise, and persuasive Cover Letter that bridges the gap between the candidate's background and the employer's specific needs.
+    2. Extract experience requirement and salaryRange exactly from the job description text when present.
+    3. Detect the language of the job description and return it as targetLanguage (use "English" if unsure).
+    4. Calculate a realistic ATS Match Score (0-100) based on keyword overlap, seniority, and required skills.
+    5. Identify the exact skills the candidate possesses that match the job description.
+    6. Identify critical missing skills or keywords that the ATS will look for but are absent from the resume.
+    7. Provide specific "tailoring tips" by taking existing bullet points from the resume and rewriting them to better highlight the requirements found in the job description.
+    8. Return additional structured fields for UI cards:
+     - requirementsMatch (required + preferred with matched status)
+     - skillsGap (technical + soft with matched status + missingCriticalSkills)
+     - keywordsGap (found + missing)
+     - summary counters and estimated score after applying all improvements
+    9. Draft a highly professional, concise, and persuasive Cover Letter that bridges the gap between the candidate's background and the employer's specific needs.
+
+  Data quality rules for the additional structured fields:
+  - Use only evidence from the provided resume and job description.
+  - Never invent companies, projects, tools, or achievements that do not appear in the input.
+    - experience and salaryRange are required when evidence exists in the job description. NEVER return null if relevant text is present.
+    - Experience evidence examples include: "5+ years", "3-5 years", "at least 4 years", "Senior", "Lead", "Principal", "3+ years of experience", "3+ лет опыта".
+    - Salary evidence examples include: "$120,000 - $150,000", "120k-150k", "up to $180k", "from 90,000 to 120,000", "salary: ...", "compensation: ...".
+    - Preserve numeric values and currency exactly as written in the job description.
+  - evidence must be a direct quote from resume text when matched=true; otherwise use null.
+  - tailoringTips.currentResumeText and tailoringTips.suggestedRewrite MUST always be strings. NEVER return null.
+  - improvements.beforeText and improvements.afterText MUST always be strings. NEVER return null.
+  - Each improvement card must be independently renderable in UI using only its own fields.
+  - If there is no close matching bullet in the resume, currentResumeText must be exactly: "No direct match found in the resume. Add a new bullet aligned with this requirement."
+  - Keep wording concise and ATS-friendly.
 
   You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
 
   {
     "companyName": string or null (Extract from the job description; use null if not present),
     "jobTitle": string or null (Extract from the job description; use null if not present),
-    "experience": string or null (Extract the seniority level if mentioned, e.g., "Senior (5-8 years)"; use null if not present),
-    "salaryRange": string or null (Extract the salary range if mentioned, e.g., "$150,000 - $200,000"; use null if not present),
+    "experience": string or null (Extract experience/seniority exactly from job text. If job text includes experience evidence, this MUST be a non-null string),
+    "salaryRange": string or null (Extract salary exactly from job text. If job text includes salary evidence, this MUST be a non-null string),
     "url": string or null (Extract the job post URL if present; use null if not present),
     "targetLanguage": string (e.g., "English", "Russian"; must match the job description language),
     "matchScore": number (0-100),
@@ -211,6 +231,22 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
       {
         "skill": string (e.g., "React.js"),
         "importance": string ("High", "Medium", or "Low" - based on how often it appears in the job description)
+      }
+    ],
+    "improvements": [
+      // Array of 3 to 6 improvement cards for UI (split by fields, not one combined string)
+      {
+        "priority": string ("high", "medium", or "low"),
+        "title": string (short action title, e.g., "Add Testing Experience"),
+        "description": string (1 sentence why this gap affects ATS matching),
+        "matchScoreBoost": number (integer boost estimate, e.g., 8),
+        "suggestions": [
+          string,
+          string,
+          string
+        ],
+        "beforeText": string (current weak or missing resume text),
+        "afterText": string (improved rewritten version aligned with job requirement)
       }
     ],
     "missingSkills": [
@@ -224,10 +260,56 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
       // Array of EXACTLY 5 to 7 detailed suggestions on how to rewrite their resume for THIS specific job.
       {
         "jobRequirement": string (Quote a specific requirement from the job description),
-        "currentResumeText": string (Extract the closest matching bullet point from the candidate's resume. If no match exists, explain where they should add a new bullet),
-        "suggestedRewrite": string (Rewrite the current text using the Google XYZ formula to directly target the jobRequirement. Make it powerful and measurable.)
+        "currentResumeText": string (Extract the closest matching bullet point from the candidate's resume. MUST be a string and NEVER null. If no match exists, use exactly: "No direct match found in the resume. Add a new bullet aligned with this requirement."),
+        "suggestedRewrite": string (Rewrite the current text using the Google XYZ formula to directly target the jobRequirement. MUST be a string and NEVER null.)
       }
     ],
+    "requirementsMatch": {
+      "required": [
+        {
+          "requirement": string,
+          "matched": boolean,
+          "importance": string ("Critical", "High", "Medium", or "Low"),
+          "evidence": string or null (direct quote from resume when matched=true)
+        }
+      ],
+      "preferred": [
+        {
+          "requirement": string,
+          "matched": boolean,
+          "importance": string ("Critical", "High", "Medium", or "Low"),
+          "evidence": string or null (direct quote from resume when matched=true)
+        }
+      ]
+    },
+    "skillsGap": {
+      "technical": [
+        {
+          "skill": string,
+          "importance": string ("Critical", "High", "Medium", or "Low"),
+          "matched": boolean
+        }
+      ],
+      "soft": [
+        {
+          "skill": string,
+          "importance": string ("Critical", "High", "Medium", or "Low"),
+          "matched": boolean
+        }
+      ],
+      "missingCriticalSkills": [string]
+    },
+    "keywordsGap": {
+      "found": [string],
+      "missing": [string]
+    },
+    "summary": {
+      "requiredMatched": number,
+      "requiredTotal": number,
+      "preferredMatched": number,
+      "preferredTotal": number,
+      "estimatedScoreWithAllImprovements": number (0-100)
+    },
     "coverLetterText": string (A highly personalized, 5-paragraph cover letter written from the candidate's perspective to the hiring manager. Focus on the value the candidate brings to the specific challenges mentioned in the job description. Do not use generic templates. Write the cover letter in targetLanguage.)
   }
 

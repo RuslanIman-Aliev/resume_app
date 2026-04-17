@@ -11,15 +11,15 @@ const heroContent = {
     items: [
       {
         text: "Smart resume analysis and feedback",
-        dotClass: "bg-emerald-400",
+        dotClass: "bg-zinc-200",
       },
       {
         text: "AI coaching sessions tailored to your goals",
-        dotClass: "bg-cyan-400",
+        dotClass: "bg-zinc-400",
       },
       {
         text: "Track every application in one focused workspace",
-        dotClass: "bg-sky-400",
+        dotClass: "bg-zinc-600",
       },
     ],
   },
@@ -30,15 +30,15 @@ const heroContent = {
     items: [
       {
         text: "Personalized resume and application dashboards",
-        dotClass: "bg-emerald-400",
+        dotClass: "bg-zinc-200",
       },
       {
         text: "AI coach plans for interviews and outreach",
-        dotClass: "bg-cyan-400",
+        dotClass: "bg-zinc-400",
       },
       {
         text: "Keep every opportunity organized and visible",
-        dotClass: "bg-sky-400",
+        dotClass: "bg-zinc-600",
       },
     ],
   },
@@ -51,11 +51,15 @@ export function AuthHero() {
     : heroContent.signIn;
 
   return (
-    <div className="hidden lg:block">
-      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100/80">
+    <div className="relative hidden lg:block">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-8 top-8 h-36 w-36 rounded-full bg-white/8 blur-3xl"
+      />
+      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-200/85 shadow-[0_10px_30px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur">
         AI Tailor
       </div>
-      <h1 className="mt-6 text-4xl font-semibold tracking-tight text-foreground">
+      <h1 className="mt-6 bg-linear-to-r from-zinc-100 via-white to-zinc-400 bg-clip-text text-4xl font-semibold tracking-tight text-transparent">
         {content.title}
       </h1>
       <p className="mt-3 text-base text-muted-foreground">
@@ -66,10 +70,10 @@ export function AuthHero() {
           <div key={item.text} className="flex items-center gap-3">
             <span
               className={cn(
-                "h-2 w-2 rounded-full",
+                "h-2 w-2 rounded-full ring-1 ring-white/15",
                 item.dotClass,
                 index === 0 &&
-                  "motion-safe:animate-[glow_5s_ease-in-out_infinite]",
+                  "shadow-[0_0_14px_rgba(255,255,255,0.35)] motion-safe:animate-[glow_5s_ease-in-out_infinite]",
               )}
             />
             {item.text}

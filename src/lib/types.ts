@@ -1,4 +1,6 @@
 import z from "zod";
+import { inferRouterOutputs } from "@trpc/server";
+import { AppRouter } from "@/trpc/routers/_app";
 
 export const signUpFormSchema = z
   .object({
@@ -21,6 +23,7 @@ export const signUpFormSchema = z
 export type SignUpFormData = z.infer<typeof signUpFormSchema>;
 
 export const signInFormSchema = z.object({
+  name: z.string().max(50, "Name must be at most 50 characters.").optional(),
   email: z.string().email("Please enter a valid email address."),
   password: z
     .string()
@@ -29,3 +32,21 @@ export const signInFormSchema = z.object({
 });
 
 export type SignInFormData = z.infer<typeof signInFormSchema>;
+
+export interface ImprovementTip {
+  title: string;
+  priority: string;
+  afterText: string;
+  beforeText: string;
+  description: string;
+  suggestions: string[];
+  matchScoreBoost: number;
+  category?: string;
+}
+type RouterOutput = inferRouterOutputs<AppRouter>;
+
+type RawApplicationData =
+  RouterOutput["resume"]["getJobMatchResult"]["application"];
+export type ApplicationData = Omit<RawApplicationData, "improvements"> & {
+  improvements: ImprovementTip[] | null;
+};
