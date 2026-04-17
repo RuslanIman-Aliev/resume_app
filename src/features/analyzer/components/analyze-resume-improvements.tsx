@@ -19,13 +19,18 @@ import {
 const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
 
   const improvementsList = data.improvements || [];
+  const currentScore = data.matchScore;
+  const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
+  const scoreImprovementText =
+    typeof currentScore === "number" && typeof improvedScore === "number"
+      ? `Apply these suggestions to improve your resume match from ${currentScore}% to ${improvedScore}%`
+      : "Apply these suggestions to improve your resume match";
+
   return (
     <section>
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <p className="text-muted-foreground">
-            Apply these suggestions to improve your resume match from 72% to 92%
-          </p>
+          <p className="text-muted-foreground">{scoreImprovementText}</p>
         </div>
       </div>
       <div>
