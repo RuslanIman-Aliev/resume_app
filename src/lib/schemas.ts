@@ -41,7 +41,12 @@ const analysisSummarySchema = z
     requiredTotal: z.number().int().min(0).default(0),
     preferredMatched: z.number().int().min(0).default(0),
     preferredTotal: z.number().int().min(0).default(0),
-    estimatedScoreWithAllImprovements: z.number().int().min(0).max(100),
+    estimatedScoreWithAllImprovements: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .default(0),
   })
   .default({
     requiredMatched: 0,
