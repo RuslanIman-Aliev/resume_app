@@ -196,5 +196,3 @@ export const jobMatchAnalysisSchema = z.object({
   coverLetterText: z.string(),
 });
 
-export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;
-export type ResumeAnalysis = z.infer<typeof resumeAnalysisSchema>;

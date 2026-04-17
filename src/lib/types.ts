@@ -1,6 +1,7 @@
 import z from "zod";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/trpc/routers/_app";
+import { jobMatchAnalysisSchema, resumeAnalysisSchema } from "./schemas";
 
 export const signUpFormSchema = z
   .object({
@@ -44,9 +45,17 @@ export interface ImprovementTip {
   category?: string;
 }
 type RouterOutput = inferRouterOutputs<AppRouter>;
-
+interface ApplicationSummary {
+  estimatedScoreWithAllImprovements: number;
+}
 type RawApplicationData =
   RouterOutput["resume"]["getJobMatchResult"]["application"];
-export type ApplicationData = Omit<RawApplicationData, "improvements"> & {
+
+export type ApplicationData = Omit<RawApplicationData, "improvements" | "summary"> & {
   improvements: ImprovementTip[] | null;
+  summary: ApplicationSummary | null;
 };
+
+
+export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;
+export type ResumeAnalysis = z.infer<typeof resumeAnalysisSchema>;

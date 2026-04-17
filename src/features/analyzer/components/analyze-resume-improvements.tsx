@@ -9,15 +9,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ApplicationData } from "@/lib/types";
-import {
-  ArrowRight,
-  CheckIcon,
-  Lightbulb,
-  XIcon
-} from "lucide-react";
+import { ArrowRight, CheckIcon, Lightbulb, XIcon } from "lucide-react";
 
 const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
-
   const improvementsList = data.improvements || [];
   const currentScore = data.matchScore;
   const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
@@ -76,12 +70,14 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
                         Tips
                       </h4>
                       <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                        {improvement.suggestions.map((tip: string, index: number) => (
-                          <li className="flex gap-2" key={index}>
-                            <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                            {tip}
-                          </li>
-                        ))}
+                        {improvement.suggestions.map(
+                          (tip: string, index: number) => (
+                            <li className="flex gap-2" key={index}>
+                              <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                              {tip}
+                            </li>
+                          ),
+                        )}
                       </ul>
                     </div>
                     <div className="my-3 grid gap-4 md:grid-cols-2">
