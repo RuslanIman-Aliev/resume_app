@@ -1,5 +1,93 @@
 import { z } from "zod";
 
+const requirementMatchItemSchema = z.object({
+  requirement: z.string(),
+  matched: z.boolean(),
+  importance: z.enum(["Critical", "High", "Medium", "Low"]),
+  evidence: z.string().nullable().optional().default(null),
+});
+
+const skillGapItemSchema = z.object({
+  skill: z.string(),
+  importance: z.enum(["Critical", "High", "Medium", "Low"]),
+  matched: z.boolean(),
+});
+
+const requirementsMatchSchema = z
+  .object({
+    required: z.array(requirementMatchItemSchema).default([]),
+    preferred: z.array(requirementMatchItemSchema).default([]),
+  })
+  .default({ required: [], preferred: [] });
+
+const skillsGapSchema = z
+  .object({
+    technical: z.array(skillGapItemSchema).default([]),
+    soft: z.array(skillGapItemSchema).default([]),
+    missingCriticalSkills: z.array(z.string()).default([]),
+  })
+  .default({ technical: [], soft: [], missingCriticalSkills: [] });
+
+const keywordsGapSchema = z
+  .object({
+    found: z.array(z.string()).default([]),
+    missing: z.array(z.string()).default([]),
+  })
+  .default({ found: [], missing: [] });
+
+const analysisSummarySchema = z
+  .object({
+    requiredMatched: z.number().int().min(0).default(0),
+    requiredTotal: z.number().int().min(0).default(0),
+    preferredMatched: z.number().int().min(0).default(0),
+    preferredTotal: z.number().int().min(0).default(0),
+    estimatedScoreWithAllImprovements: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .default(0),
+  })
+  .default({
+    requiredMatched: 0,
+    requiredTotal: 0,
+    preferredMatched: 0,
+    preferredTotal: 0,
+    estimatedScoreWithAllImprovements: 0,
+  });
+
+const jobMatchImprovementSchema = z.object({
+  priority: z.enum(["high", "medium", "low"]).default("medium"),
+  title: z.string(),
+  description: z.string(),
+  matchScoreBoost: z.number().int().min(0).max(100).default(0),
+  suggestions: z.array(z.string()).default([]),
+  beforeText: z
+    .string()
+    .nullish()
+    .transform((value) =>
+      safeString(value, "Current resume text is missing for this requirement."),
+    ),
+  afterText: z
+    .string()
+    .nullish()
+    .transform((value) =>
+      safeString(
+        value,
+        "Add a measurable bullet aligned with this requirement using the XYZ formula.",
+      ),
+    ),
+});
+
+const safeString = (value: string | null | undefined, fallback: string) => {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+};
+
 export const resumeAnalysisSchema = z.object({
   overallScore: z.number().int().min(0).max(100),
   categoryScores: z.object({
@@ -50,6 +138,7 @@ export const jobMatchAnalysisSchema = z.object({
       importance: z.enum(["High", "Medium", "Low"]),
     }),
   ),
+  improvements: z.array(jobMatchImprovementSchema).default([]),
   missingSkills: z.array(
     z.object({
       skill: z.string(),
@@ -58,13 +147,52 @@ export const jobMatchAnalysisSchema = z.object({
   ),
   tailoringTips: z.array(
     z.object({
-      jobRequirement: z.string(),
-      currentResumeText: z.string(),
-      suggestedRewrite: z.string(),
+      jobRequirement: z
+        .string()
+        .nullish()
+        .transform((value) =>
+          safeString(value, "Requirement from job description"),
+        ),
+      currentResumeText: z
+        .string()
+        .nullish()
+        .transform((value) =>
+          safeString(
+            value,
+            "No direct match found in the resume. Add a new bullet aligned with this requirement.",
+          ),
+        ),
+      suggestedRewrite: z
+        .string()
+        .nullish()
+        .transform((value) =>
+          safeString(
+            value,
+            "Add a new, metrics-driven bullet aligned with this requirement using the XYZ formula.",
+          ),
+        ),
     }),
   ),
+  requirementsMatch: requirementsMatchSchema.optional().default({
+    required: [],
+    preferred: [],
+  }),
+  skillsGap: skillsGapSchema.optional().default({
+    technical: [],
+    soft: [],
+    missingCriticalSkills: [],
+  }),
+  keywordsGap: keywordsGapSchema.optional().default({
+    found: [],
+    missing: [],
+  }),
+  summary: analysisSummarySchema.optional().default({
+    requiredMatched: 0,
+    requiredTotal: 0,
+    preferredMatched: 0,
+    preferredTotal: 0,
+    estimatedScoreWithAllImprovements: 0,
+  }),
   coverLetterText: z.string(),
 });
 
-export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;
-export type ResumeAnalysis = z.infer<typeof resumeAnalysisSchema>;

@@ -121,8 +121,13 @@ model JobApplication {
   
   matchScore       Int?             
 
+  improvements     Json?
   missingSkills    Json?             
   matchingSkills   Json?
+  requirementsMatch Json?
+  skillsGap        Json?
+  keywordsGap      Json?
+  summary          Json?
   
   tailoringTips    Json?             
   

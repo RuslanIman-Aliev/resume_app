@@ -17,6 +17,7 @@ This README is intentionally ASCII-only.
 - Environment variables
 - Local development
 - Scripts
+- Testing
 - Database and Prisma workflow
 - Upload and parsing pipeline
 - Real-time updates with Pusher
@@ -224,6 +225,7 @@ Required for core features:
 - OPENAI_API_KEY
 - CONVERT_API_SECRET
 - NEXT_PUBLIC_AUTH_URL
+- NEXT_PUBLIC_SITE_URL
 - NEXT_PUBLIC_PUSHER_KEY
 - NEXT_PUBLIC_PUSHER_CLUSTER
 - PUSHER_APP_ID
@@ -251,6 +253,7 @@ DATABASE_URL="postgresql://user:password@localhost:5432/resume_app"
 OPENAI_API_KEY="sk-..."
 CONVERT_API_SECRET="..."
 NEXT_PUBLIC_AUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
 NEXT_PUBLIC_PUSHER_KEY="..."
 NEXT_PUBLIC_PUSHER_CLUSTER="..."
 PUSHER_APP_ID="..."
@@ -287,10 +290,16 @@ npm install
 npx prisma migrate dev
 ```
 
-4. Run the dev server
+4. Run the app dev server
 
 ```
 npm run dev
+```
+
+5. Run Inngest locally (second terminal)
+
+```
+npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
 ```
 
 The app should be available at http://localhost:3000.
@@ -301,7 +310,26 @@ The app should be available at http://localhost:3000.
 - npm run build - Build for production.
 - npm run start - Run the production build.
 - npm run lint - Lint the codebase.
+- npm run test - Run unit/integration tests with Vitest.
+- npm run test:watch - Run Vitest in watch mode.
+- npm run test:e2e - Run Playwright end-to-end tests.
 - npm run postinstall - Prisma generate.
+
+## Testing
+
+Unit and integration tests:
+
+```
+npm run test
+```
+
+End-to-end tests:
+
+```
+npm run test:e2e
+```
+
+Playwright starts the app automatically using the configured webServer command.
 
 ## Database and Prisma workflow
 
