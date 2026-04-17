@@ -19,13 +19,18 @@ import {
 const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
 
   const improvementsList = data.improvements || [];
+  const currentScore = data.matchScore;
+  const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
+  const scoreImprovementText =
+    typeof currentScore === "number" && typeof improvedScore === "number"
+      ? `Apply these suggestions to improve your resume match from ${currentScore}% to ${improvedScore}%`
+      : "Apply these suggestions to improve your resume match";
+
   return (
     <section>
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <p className="text-muted-foreground">
-            Apply these suggestions to improve your resume match from 72% to 92%
-          </p>
+          <p className="text-muted-foreground">{scoreImprovementText}</p>
         </div>
       </div>
       <div>
@@ -48,8 +53,8 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
                 <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
                   <div className="flex items-start gap-5 text-left">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                      <Badge className="h-5 w-5 text-muted-foreground">
-                        high
+                      <Badge className="text-muted-foreground">
+                        {improvement.priority}
                       </Badge>
                     </div>
                     <div className="flex flex-col gap-1 ">
