@@ -9,22 +9,39 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ApplicationData } from "@/lib/types";
+import { getPriorityConfig, getScoreColor } from "@/lib/utils";
 import { ArrowRight, CheckIcon, Lightbulb, XIcon } from "lucide-react";
 
 const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
   const improvementsList = data.improvements || [];
   const currentScore = data.matchScore;
   const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
-  const scoreImprovementText =
-    typeof currentScore === "number" && typeof improvedScore === "number"
-      ? `Apply these suggestions to improve your resume match from ${currentScore}% to ${improvedScore}%`
-      : "Apply these suggestions to improve your resume match";
+  const hasImprovedScore = improvedScore != null;
 
   return (
     <section>
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <p className="text-muted-foreground">{scoreImprovementText}</p>
+          <p className="text-muted-foreground">
+            Apply these suggestions to improve your resume match from{" "}
+            <span
+              className={`font-bold ${getScoreColor(currentScore || 0)}`}
+            >
+              {currentScore}%
+            </span>
+            {hasImprovedScore ? (
+              <>
+                {" "}to{" "}
+                <span
+                  className={`font-bold ${getScoreColor(improvedScore || 0)}`}
+                >
+                  {improvedScore}%
+                </span>
+              </>
+            ) : (
+              <>. Estimated improved score is not available yet.</>
+            )}
+          </p>
         </div>
       </div>
       <div>
@@ -37,7 +54,7 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
           )}
           {improvementsList.map((improvement, index) => {
             const accordionItemValue = `${improvement.description}-${index}`;
-
+            const bgBageColor = getPriorityConfig(improvement.priority)?.color || "bg-gray-500";
             return (
               <AccordionItem
                 key={accordionItemValue}
@@ -46,8 +63,8 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
               >
                 <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
                   <div className="flex items-start gap-5 text-left">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                      <Badge className="text-muted-foreground">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ">
+                      <Badge className={`text-muted-foreground ${bgBageColor}`}>
                         {improvement.priority}
                       </Badge>
                     </div>
@@ -105,7 +122,7 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
                         <p className="text-sm">{improvement.afterText}</p>
                       </div>
                     </div>
-                    <div className="mt-4 pt-4 border-t border-border/30">
+                    <div className="mt-4 pt-4 border-t border-border/30 text-end">
                       <Button>
                         Apply This Suggestion
                         <ArrowRight className="h-4 w-4 ml-2" />

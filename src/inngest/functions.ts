@@ -5,9 +5,13 @@ import OpenAI from "openai";
 import { jobMatchAnalysisSchema, resumeAnalysisSchema } from "@/lib/schemas";
 import prisma from "@/lib/db";
 import Pusher from "pusher";
+import * as Sentry from "@sentry/nextjs";
 
 const openai = new OpenAI();
-
+const client = Sentry.instrumentOpenAiClient(openai, {
+  recordInputs: true,
+  recordOutputs: true,
+});
 export const analyzeResume = inngest.createFunction(
   { id: "analyze-resume", triggers: { event: "app/resume.analyzed" } },
   // The function receives the parsed resume content and the target role, then generates a prompt for the OpenAI API to analyze the resume against the target role. The result is returned after a brief pause.
@@ -17,7 +21,7 @@ export const analyzeResume = inngest.createFunction(
       event.data.postedRole,
     );
     const result = await step.run("handle-task", async () => {
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4o",
         messages: [
           {
@@ -94,7 +98,7 @@ export const analyzeJobMatched = inngest.createFunction(
       event.data.jobDescription,
     );
     const result = await step.run("handle-task", async () => {
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4o",
         messages: [
           {
@@ -130,7 +134,7 @@ export const analyzeJobMatched = inngest.createFunction(
           skillsGap: validatedData.skillsGap,
           keywordsGap: validatedData.keywordsGap,
           summary: validatedData.summary,
-          tailoringTips: validatedData.tailoringTips,
+          //tailoringTips: validatedData.tailoringTips,
           coverLetterText: validatedData.coverLetterText,
           status: "ANALYZED",
         },

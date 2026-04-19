@@ -67,6 +67,15 @@ export function getPrompt(resumeText: string, targetRole: string) {
   `;
 }
 
+export const getImportanceStyles = (importance: string) => {
+  const imp = importance?.toLowerCase();
+  if (imp === "critical")
+    return "border-red-500/30 text-red-500 bg-transparent";
+  if (imp === "high")
+    return "border-yellow-500/30 text-yellow-500 bg-transparent";
+  return "border-muted text-muted-foreground bg-transparent";
+};
+
 export function getStatusBadge(status: string) {
   switch (status) {
     case "tailored":
@@ -181,6 +190,18 @@ export const getCategoryConfig = (category: unknown) => {
   return categoryConfig.content;
 };
 
+{
+  /*
+    - tailoringTips.currentResumeText and tailoringTips.suggestedRewrite MUST always be strings. NEVER return null.
+  "tailoringTips": [
+      // Array of EXACTLY 5 to 7 detailed suggestions on how to rewrite their resume for THIS specific job.
+      {
+        "jobRequirement": string (Quote a specific requirement from the job description),
+        "currentResumeText": string (Extract the closest matching bullet point from the candidate's resume. MUST be a string and NEVER null. If no match exists, use exactly: "No direct match found in the resume. Add a new bullet aligned with this requirement."),
+        "suggestedRewrite": string (Rewrite the current text using the Google XYZ formula to directly target the jobRequirement. MUST be a string and NEVER null.)
+      }
+    ], */
+}
 export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   return `
   You are an elite Senior Technical Recruiter and ATS (Applicant Tracking System) Specialist. Your expertise lies in analyzing how well a candidate's resume matches a specific job description.
@@ -210,7 +231,6 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
     - Salary evidence examples include: "$120,000 - $150,000", "120k-150k", "up to $180k", "from 90,000 to 120,000", "salary: ...", "compensation: ...".
     - Preserve numeric values and currency exactly as written in the job description.
   - evidence must be a direct quote from resume text when matched=true; otherwise use null.
-  - tailoringTips.currentResumeText and tailoringTips.suggestedRewrite MUST always be strings. NEVER return null.
   - improvements.beforeText and improvements.afterText MUST always be strings. NEVER return null.
   - Each improvement card must be independently renderable in UI using only its own fields.
   - If there is no close matching bullet in the resume, currentResumeText must be exactly: "No direct match found in the resume. Add a new bullet aligned with this requirement."
@@ -256,14 +276,7 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
         "impact": string ("High" - if it's a hard requirement, "Medium" - if it's a nice-to-have)
       }
     ],
-    "tailoringTips": [
-      // Array of EXACTLY 5 to 7 detailed suggestions on how to rewrite their resume for THIS specific job.
-      {
-        "jobRequirement": string (Quote a specific requirement from the job description),
-        "currentResumeText": string (Extract the closest matching bullet point from the candidate's resume. MUST be a string and NEVER null. If no match exists, use exactly: "No direct match found in the resume. Add a new bullet aligned with this requirement."),
-        "suggestedRewrite": string (Rewrite the current text using the Google XYZ formula to directly target the jobRequirement. MUST be a string and NEVER null.)
-      }
-    ],
+    
     "requirementsMatch": {
       "required": [
         {

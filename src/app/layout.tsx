@@ -1,9 +1,11 @@
-import type { Metadata } from "next";
-import { JetBrains_Mono, Manrope } from "next/font/google";
 import "@/app/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TRPCReactProvider } from "@/trpc/client";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import type { Metadata } from "next";
+import { JetBrains_Mono, Manrope } from "next/font/google";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ai-tailor.app";
 const siteTitle = "AI-Tailor — AI Resume Tailoring & Job Tracker";
@@ -80,6 +82,8 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <SpeedInsights />
+          <Analytics />
           <TRPCReactProvider>{children}</TRPCReactProvider>
           <Toaster />
         </ThemeProvider>

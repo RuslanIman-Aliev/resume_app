@@ -145,34 +145,34 @@ export const jobMatchAnalysisSchema = z.object({
       impact: z.enum(["High", "Medium", "Low"]),
     }),
   ),
-  tailoringTips: z.array(
-    z.object({
-      jobRequirement: z
-        .string()
-        .nullish()
-        .transform((value) =>
-          safeString(value, "Requirement from job description"),
-        ),
-      currentResumeText: z
-        .string()
-        .nullish()
-        .transform((value) =>
-          safeString(
-            value,
-            "No direct match found in the resume. Add a new bullet aligned with this requirement.",
-          ),
-        ),
-      suggestedRewrite: z
-        .string()
-        .nullish()
-        .transform((value) =>
-          safeString(
-            value,
-            "Add a new, metrics-driven bullet aligned with this requirement using the XYZ formula.",
-          ),
-        ),
-    }),
-  ),
+  // tailoringTips: z.array(
+  //   z.object({
+  //     jobRequirement: z
+  //       .string()
+  //       .nullish()
+  //       .transform((value) =>
+  //         safeString(value, "Requirement from job description"),
+  //       ),
+  //     currentResumeText: z
+  //       .string()
+  //       .nullish()
+  //       .transform((value) =>
+  //         safeString(
+  //           value,
+  //           "No direct match found in the resume. Add a new bullet aligned with this requirement.",
+  //         ),
+  //       ),
+  //     suggestedRewrite: z
+  //       .string()
+  //       .nullish()
+  //       .transform((value) =>
+  //         safeString(
+  //           value,
+  //           "Add a new, metrics-driven bullet aligned with this requirement using the XYZ formula.",
+  //         ),
+  //       ),
+  //   }),
+  // ),
   requirementsMatch: requirementsMatchSchema.optional().default({
     required: [],
     preferred: [],
