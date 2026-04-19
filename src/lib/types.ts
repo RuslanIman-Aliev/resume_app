@@ -60,7 +60,7 @@ export type ApplicationData = Omit<RawApplicationData, "improvements" | "summary
 export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;
 export type ResumeAnalysis = z.infer<typeof resumeAnalysisSchema>;
 
-export type SkillImportance = "Critical" | "High" | "Medium";
+export type SkillImportance = "Critical" | "High" | "Medium" | "Low";
 
 export type SkillGapItem = {
   skill: string;
