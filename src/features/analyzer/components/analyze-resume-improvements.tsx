@@ -16,26 +16,31 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
   const improvementsList = data.improvements || [];
   const currentScore = data.matchScore;
   const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
-   
+  const hasImprovedScore = improvedScore != null;
+
   return (
     <section>
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <p className="text-muted-foreground">Apply these suggestions to improve your resume match from
-            {" "}
+          <p className="text-muted-foreground">
+            Apply these suggestions to improve your resume match from{" "}
             <span
               className={`font-bold ${getScoreColor(currentScore || 0)}`}
             >
               {currentScore}%
             </span>
-            {" "}
-            to
-            {" "}
-            <span
-              className={`font-bold ${getScoreColor(improvedScore || 0)}`}
-            >
-              {improvedScore}%
-            </span>
+            {hasImprovedScore ? (
+              <>
+                {" "}to{" "}
+                <span
+                  className={`font-bold ${getScoreColor(improvedScore || 0)}`}
+                >
+                  {improvedScore}%
+                </span>
+              </>
+            ) : (
+              <>. Estimated improved score is not available yet.</>
+            )}
           </p>
         </div>
       </div>
