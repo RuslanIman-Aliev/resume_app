@@ -28,6 +28,41 @@ import AnalyzerResults from "./analyzer-results";
 import AnalyzeKeywords from "./analyze-keywords";
 import AnalyzeRequirementsMatch from "./analyze-requirements-match";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const normalizeSkillsGapData = (value: unknown): SkillsGapData => {
+  const data = isRecord(value) ? value : {};
+
+  return {
+    soft: Array.isArray(data.soft) ? data.soft : [],
+    technical: Array.isArray(data.technical) ? data.technical : [],
+    missingCriticalSkills: Array.isArray(data.missingCriticalSkills)
+      ? data.missingCriticalSkills
+      : [],
+  };
+};
+
+const normalizeKeywordsGapData = (value: unknown): KeywordsGapData => {
+  const data = isRecord(value) ? value : {};
+
+  return {
+    found: Array.isArray(data.found) ? data.found : [],
+    missing: Array.isArray(data.missing) ? data.missing : [],
+  };
+};
+
+const normalizeRequirementsMatchData = (
+  value: unknown,
+): RequirementsMatchData => {
+  const data = isRecord(value) ? value : {};
+
+  return {
+    required: Array.isArray(data.required) ? data.required : [],
+    preferred: Array.isArray(data.preferred) ? data.preferred : [],
+  };
+};
+
 export const AnalyzeResumeClient = () => {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -83,24 +118,14 @@ export const AnalyzeResumeClient = () => {
   }
 
   const rawSkillsGap = (appData as { skillsGap?: unknown }).skillsGap;
-  const skillsGapData = (rawSkillsGap as SkillsGapData) || {
-    soft: [],
-    technical: [],
-    missingCriticalSkills: [],
-  };
+  const skillsGapData = normalizeSkillsGapData(rawSkillsGap);
 
   const rawKeywordsGap = (appData as { keywordsGap?: unknown }).keywordsGap;
-  const keywordsGapData = (rawKeywordsGap as KeywordsGapData) || {
-    found: [],
-    missing: [],
-  };
+  const keywordsGapData = normalizeKeywordsGapData(rawKeywordsGap);
   const rawRequirementsMatch = (appData as { requirementsMatch?: unknown })
     .requirementsMatch;
   const requirementsMatchData =
-    (rawRequirementsMatch as RequirementsMatchData) || {
-      required: [],
-      preferred: [],
-    };
+    normalizeRequirementsMatchData(rawRequirementsMatch);
   const improvementsArray = (appData as unknown as { improvements?: unknown[] })
     .improvements;
   const improvementsCount = improvementsArray?.length || 0;
