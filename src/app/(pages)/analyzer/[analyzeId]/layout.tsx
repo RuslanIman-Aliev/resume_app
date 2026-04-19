@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 
-const AnalyzerrLayout = ({ children }: { children: React.ReactNode }) => {
+const AnalyzerLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <main className="w-full my-6">
       <section className="max-w-7xl mx-auto flex flex-col items-center py-10">
@@ -21,4 +21,4 @@ const AnalyzerrLayout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export default AnalyzerrLayout;
+export default AnalyzerLayout;
