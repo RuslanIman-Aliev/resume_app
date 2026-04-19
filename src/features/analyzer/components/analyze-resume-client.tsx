@@ -2,21 +2,39 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useJobMatchPusher } from "@/hooks/usePusher";
+import {
+  ApplicationData,
+  KeywordsGapData,
+  RequirementsMatchData,
+  SkillsGapData,
+} from "@/lib/types";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { Sparkles, Target, TrendingUp, Zap } from "lucide-react";
-import { useParams } from "next/navigation";
+import {
+  useParams,
+  useRouter,
+  usePathname,
+  useSearchParams,
+} from "next/navigation";
 import { useCallback } from "react";
 import AnalyzeResumeImprovements from "./analyze-resume-improvements";
 import {
   AnalyzeResumeError,
   AnalyzeResumeLoading,
 } from "./analyze-resume-states";
+import AnalyzeSkillsGap from "./analyze-skills-gap";
 import AnalyzerResults from "./analyzer-results";
-import { ApplicationData } from "@/lib/types";
+import AnalyzeKeywords from "./analyze-keywords";
+import AnalyzeRequirementsMatch from "./analyze-requirements-match";
 
 export const AnalyzeResumeClient = () => {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const currentTab = searchParams.get("tab") || "overview";
   const analyzeId = params?.analyzeId as string | undefined;
   const trpc = useTRPC();
 
@@ -63,8 +81,41 @@ export const AnalyzeResumeClient = () => {
   if (!appData) {
     return <AnalyzeResumeError onRetry={refetch} isRetrying={isFetching} />;
   }
-  console.log("Application data:", appData);
 
+  const rawSkillsGap = (appData as { skillsGap?: unknown }).skillsGap;
+  const skillsGapData = (rawSkillsGap as SkillsGapData) || {
+    soft: [],
+    technical: [],
+    missingCriticalSkills: [],
+  };
+
+  const rawKeywordsGap = (appData as { keywordsGap?: unknown }).keywordsGap;
+  const keywordsGapData = (rawKeywordsGap as KeywordsGapData) || {
+    found: [],
+    missing: [],
+  };
+  const rawRequirementsMatch = (appData as { requirementsMatch?: unknown })
+    .requirementsMatch;
+  const requirementsMatchData =
+    (rawRequirementsMatch as RequirementsMatchData) || {
+      required: [],
+      preferred: [],
+    };
+  const improvementsArray = (appData as unknown as { improvements?: unknown[] })
+    .improvements;
+  const improvementsCount = improvementsArray?.length || 0;
+
+  const summaryObj = (
+    appData as unknown as {
+      summary?: { estimatedScoreWithAllImprovements?: number };
+    }
+  ).summary;
+  const potentialScore = summaryObj?.estimatedScoreWithAllImprovements || 100;
+
+  const navigateToImprovements = () => {
+    // Navigate via URL parameters so Tabs can sync cleanly without hacking the DOM.
+    router.push(`${pathname}?tab=improvements`);
+  };
   return (
     <>
       <AnalyzerResults
@@ -77,7 +128,8 @@ export const AnalyzeResumeClient = () => {
 
       <Tabs
         className=" text-white flex flex-col gap-1! mt-4"
-        defaultValue="overview"
+        value={currentTab}
+        onValueChange={(val) => router.push(`${pathname}?tab=${val}`)}
       >
         <TabsList className="bg-background p-1">
           <TabsTrigger
@@ -95,14 +147,14 @@ export const AnalyzeResumeClient = () => {
             Improvements
           </TabsTrigger>
           <TabsTrigger
-            value="action-plan"
+            value="skills-gap"
             className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
           >
             <Zap className="h-4 w-4 mr-2" />
             Skills Gap
           </TabsTrigger>
           <TabsTrigger
-            value="chat"
+            value="keywords"
             className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
           >
             <Sparkles className="h-4 w-4 mr-2" />
@@ -111,13 +163,24 @@ export const AnalyzeResumeClient = () => {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
-          {/* <MainScoreCard /> */}
+          <AnalyzeRequirementsMatch
+            data={requirementsMatchData}
+            improvementsCount={improvementsCount}
+            potentialScore={potentialScore}
+            onViewImprovements={navigateToImprovements}
+          />
         </TabsContent>
 
         <TabsContent value="improvements" className="mt-4">
           <AnalyzeResumeImprovements
             data={appData as unknown as ApplicationData}
           />{" "}
+        </TabsContent>
+        <TabsContent value="skills-gap" className="mt-4">
+          <AnalyzeSkillsGap data={skillsGapData} />
+        </TabsContent>
+        <TabsContent value="keywords" className="mt-4">
+          <AnalyzeKeywords data={keywordsGapData} />
         </TabsContent>
       </Tabs>
       {/* <div className="grid lg:grid-cols-2 gap-6">

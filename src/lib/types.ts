@@ -59,3 +59,36 @@ export type ApplicationData = Omit<RawApplicationData, "improvements" | "summary
 
 export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;
 export type ResumeAnalysis = z.infer<typeof resumeAnalysisSchema>;
+
+export type SkillImportance = "Critical" | "High" | "Medium";
+
+export type SkillGapItem = {
+  skill: string;
+  matched: boolean;
+  importance: SkillImportance;
+};
+
+export type SkillsGapData = {
+  soft: SkillGapItem[];
+  technical: SkillGapItem[];
+  missingCriticalSkills: string[];
+};
+
+export type KeywordsGapData = {
+  found: string[];
+  missing: string[];
+};
+
+export type RequirementImportance = "Critical" | "High" | "Medium" | "Low";
+
+export type RequirementItem = {
+  matched: boolean;
+  evidence: string | null;
+  importance: RequirementImportance;
+  requirement: string;
+};
+
+export type RequirementsMatchData = {
+  required: RequirementItem[];
+  preferred: RequirementItem[];
+};
