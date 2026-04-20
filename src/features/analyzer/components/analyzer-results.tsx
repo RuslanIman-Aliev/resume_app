@@ -5,6 +5,7 @@ import { getScoreColor } from "@/lib/utils";
 import {
   Briefcase,
   Building2,
+  Building2Icon,
   CircleDollarSign,
   Target,
   TrendingUp,
@@ -17,6 +18,7 @@ type AnalyzerResultsProps = {
   experience: string;
   salaryRange: string;
   matchScore: number;
+  updatedAt: string;
 };
 
 type ResultCardItem = {
@@ -60,6 +62,7 @@ const AnalyzerResults = ({
   experience,
   salaryRange,
   matchScore,
+  updatedAt,
 }: AnalyzerResultsProps) => {
   const overviewItems: ResultCardItem[] = [
     { title: "Position", value: position, icon: Briefcase },
@@ -70,6 +73,36 @@ const AnalyzerResults = ({
 
   return (
     <>
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-3">
+          <Badge
+            variant="outline"
+            className="border-green-500/30 bg-green-500/10 text-green-500 px-2.5 py-0.5 font-medium"
+          >
+            Analysis Complete
+          </Badge>
+          <p className="text-sm text-muted-foreground font-medium">
+            Analyzed{" "}
+            {new Date(updatedAt).toLocaleDateString(undefined, {
+              dateStyle: "short",
+            })}
+          </p>
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3 text-foreground">
+          {position}
+        </h1>
+        <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-sm font-medium">
+            <Building2Icon className="h-4 w-4 shrink-0" />
+            {company}
+          </div>
+          {/* Можно добавить резюме, если будет проп: */}
+          {/* <div className="flex items-center gap-1.5 text-sm font-medium">
+            <FileTextIcon className="h-4 w-4 shrink-0" />
+            Software Engineer Resume
+          </div> */}
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {overviewItems.map((item) => (
           <InfoCard key={item.title} {...item} />
