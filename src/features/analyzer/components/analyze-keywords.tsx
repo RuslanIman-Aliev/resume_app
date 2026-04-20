@@ -5,12 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { KeywordsGapData } from "@/lib/types";
 import { Check, X } from "lucide-react";
+import { EmptyDataCard } from "./empty-data-card";
 
 type AnalyzeKeywordsProps = {
   data: KeywordsGapData;
 };
 
 const AnalyzeKeywords = ({ data }: AnalyzeKeywordsProps) => {
+  const isDataEmpty = data.found.length === 0 && data.missing.length === 0;
+
+  if (isDataEmpty) {
+    return (
+      <EmptyDataCard
+        title="No Keywords Found"
+        description="We couldn't extract any specific keywords to analyze against your resume."
+      />
+    );
+  }
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
@@ -60,7 +72,6 @@ const AnalyzeKeywords = ({ data }: AnalyzeKeywordsProps) => {
                   title="Click to copy"
                 >
                   {keyword}
-                 
                 </Badge>
               ))}
             </div>
@@ -79,7 +90,9 @@ const AnalyzeKeywords = ({ data }: AnalyzeKeywordsProps) => {
               keywords.
             </p>
           </div>
-          <Button variant="ghost" className="bg-black">Generate Resume</Button>
+          <Button variant="ghost" className="bg-black">
+            Generate Resume
+          </Button>
         </CardContent>
       </Card>
     </>

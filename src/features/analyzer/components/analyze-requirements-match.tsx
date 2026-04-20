@@ -8,8 +8,9 @@ import {
   ChevronRight,
   Lightbulb,
   Star,
-  X
+  X,
 } from "lucide-react";
+import { EmptyDataCard } from "./empty-data-card";
 
 type AnalyzeRequirementsMatchProps = {
   data: RequirementsMatchData;
@@ -41,6 +42,17 @@ const AnalyzeRequirementsMatch = ({
   potentialScore,
   onViewImprovements,
 }: AnalyzeRequirementsMatchProps) => {
+  const isDataEmpty = data.required.length === 0 && data.preferred.length === 0;
+
+  if (isDataEmpty) {
+    return (
+      <EmptyDataCard
+        title="No Requirements Found"
+        description="We couldn't extract any specific requirements to analyze against your resume."
+      />
+    );
+  }
+
   const requiredMatched = data.required.filter((r) => r.matched).length;
   const requireAllMatched = requiredMatched === data.required.length;
 

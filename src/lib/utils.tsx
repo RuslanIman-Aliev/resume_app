@@ -235,6 +235,7 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   - Each improvement card must be independently renderable in UI using only its own fields.
   - If there is no close matching bullet in the resume, currentResumeText must be exactly: "No direct match found in the resume. Add a new bullet aligned with this requirement."
   - Keep wording concise and ATS-friendly.
+  - Generate a large number of actionable improvements. Do not isolate your feedback to only a few points; aim to find every possible weak point, missing keyword, or phrasing issue and provide a highly specific improvement for each.
 
   You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
 
@@ -254,7 +255,8 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
       }
     ],
     "improvements": [
-      // Array of 3 to 6 improvement cards for UI (split by fields, not one combined string)
+      // Array of AT LEAST 6 to 12 improvement cards for UI (split by fields, not one combined string).
+      // Find EVERY possible weak point, keyword gap, or phrasing issue and generate a specific improvement.
       {
         "priority": string ("high", "medium", or "low"),
         "title": string (short action title, e.g., "Add Testing Experience"),

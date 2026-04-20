@@ -9,8 +9,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ApplicationData } from "@/lib/types";
-import { getPriorityConfig, getScoreColor } from "@/lib/utils";
-import { ArrowRight, CheckIcon, Lightbulb, XIcon } from "lucide-react";
+import { getScoreColor } from "@/lib/utils";
+import { CheckIcon, CircleDot, Copy, Wand2, XIcon } from "lucide-react";
+import { EmptyDataCard } from "./empty-data-card";
+
+const getPriorityStyles = (priority: string) => {
+  switch (priority.toLowerCase()) {
+    case "high":
+    case "critical":
+      return "border-red-500/30 text-red-500 bg-red-500/10";
+    case "medium":
+      return "border-yellow-500/30 text-yellow-500 bg-yellow-500/10";
+    default:
+      return "border-blue-500/30 text-blue-500 bg-blue-500/10";
+  }
+};
 
 const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
   const improvementsList = data.improvements || [];
@@ -18,20 +31,28 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
   const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
   const hasImprovedScore = improvedScore != null;
 
+  if (improvementsList.length === 0) {
+    return (
+      <EmptyDataCard
+        title="No Improvements Found"
+        description="No AI improvements available yet. Run analysis to generate improvement cards."
+      />
+    );
+  }
+
   return (
     <section>
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
           <p className="text-muted-foreground">
             Apply these suggestions to improve your resume match from{" "}
-            <span
-              className={`font-bold ${getScoreColor(currentScore || 0)}`}
-            >
+            <span className={`font-bold ${getScoreColor(currentScore || 0)}`}>
               {currentScore}%
             </span>
             {hasImprovedScore ? (
               <>
-                {" "}to{" "}
+                {" "}
+                to{" "}
                 <span
                   className={`font-bold ${getScoreColor(improvedScore || 0)}`}
                 >
@@ -46,15 +67,8 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
       </div>
       <div>
         <Accordion type="multiple" className="mt-4 space-y-6">
-          {improvementsList.length === 0 && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              No AI improvements available yet. Run analysis to generate
-              improvement cards.
-            </p>
-          )}
           {improvementsList.map((improvement, index) => {
             const accordionItemValue = `${improvement.description}-${index}`;
-            const bgBageColor = getPriorityConfig(improvement.priority)?.color || "bg-gray-500";
             return (
               <AccordionItem
                 key={accordionItemValue}
@@ -62,46 +76,61 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
                 className="rounded-2xl border border-border/50 bg-card/50"
               >
                 <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
-                  <div className="flex items-start gap-5 text-left">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ">
-                      <Badge className={`text-muted-foreground ${bgBageColor}`}>
-                        {improvement.priority}
-                      </Badge>
-                    </div>
-                    <div className="flex flex-col gap-1 ">
-                      <h2 className="text-lg font-semibold">
-                        {improvement.title}
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
+                  <div className="flex items-start justify-between w-full text-left gap-4 pr-2">
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      <div className="flex items-center text-lg font-semibold gap-3">
+                        <Badge
+                          variant="outline"
+                          className={`font-medium px-2 py-0 h-5 lowercase ${getPriorityStyles(
+                            improvement.priority,
+                          )}`}
+                        >
+                          {improvement.priority}
+                        </Badge>
+                        <h2 className="leading-none pt-0.5">
+                          {improvement.title}
+                        </h2>
+                      </div>
+                      <p className="text-sm text-muted-foreground mr-6">
                         {improvement.description}
                       </p>
                     </div>
+                    {improvement.matchScoreBoost != null && (
+                      <Badge
+                        variant="outline"
+                        className="border-primary/30 bg-primary/10 text-primary shrink-0 mt-0.5"
+                      >
+                        +{improvement.matchScoreBoost}% match score
+                      </Badge>
+                    )}
                   </div>
                 </AccordionTrigger>
 
                 <AccordionContent className="overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down ">
-                  <div className="px-5 pt-0 pb-4 border-t border-border/30">
-                    <div>
-                      <h4 className="flex items-center gap-2 text-sm font-medium">
-                        <Lightbulb className="h-4 w-4 text-yellow-400" />
-                        Tips
+                  <div className="px-5 pt-0 pb-4">
+                    <div className="mt-4 mb-4">
+                      <h4 className="text-sm font-semibold mb-3">
+                        Suggestions:
                       </h4>
-                      <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                      <ul className="space-y-2 text-sm text-muted-foreground">
                         {improvement.suggestions.map(
                           (tip: string, index: number) => (
-                            <li className="flex gap-2" key={index}>
-                              <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                            <li
+                              className="flex items-start gap-2.5"
+                              key={index}
+                            >
+                              <CircleDot className="mt-0.75 h-4 w-4 shrink-0 text-primary" />
                               {tip}
                             </li>
                           ),
                         )}
                       </ul>
                     </div>
-                    <div className="my-3 grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
                         <div className="mb-2 flex items-center gap-2">
-                          <XIcon className="h-4 w-4 text-red-400" />
-                          <span className="text-sm font-medium text-red-400">
+                          <XIcon className="h-4 w-4 text-red-500" />
+                          <span className="font-medium text-red-500">
                             Before
                           </span>
                         </div>
@@ -111,21 +140,28 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
                       </div>
 
                       <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                        <div className="mb-2 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <CheckIcon className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-medium text-primary">
-                              After
-                            </span>
-                          </div>
+                        <div className="mb-2 flex items-center gap-2">
+                          <CheckIcon className="h-4 w-4 text-primary" />
+                          <span className="font-medium text-primary">
+                            After
+                          </span>
                         </div>
-                        <p className="text-sm">{improvement.afterText}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {improvement.afterText}
+                        </p>
                       </div>
                     </div>
-                    <div className="mt-4 pt-4 border-t border-border/30 text-end">
+                    <div className="mt-4 flex justify-end gap-3">
+                      <Button
+                        variant="outline"
+                        className="border-border/60 bg-card/60"
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Suggestion
+                      </Button>
                       <Button>
-                        Apply This Suggestion
-                        <ArrowRight className="h-4 w-4 ml-2" />
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Apply to Resume
                       </Button>
                     </div>
                   </div>

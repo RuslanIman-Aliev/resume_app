@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SkillGapItem, SkillsGapData } from "@/lib/types";
 import { cn, getImportanceStyles } from "@/lib/utils";
 import { AlertTriangle, Check, X } from "lucide-react";
+import { EmptyDataCard } from "./empty-data-card";
 
 type AnalyzeSkillsGapProps = {
   data: SkillsGapData;
@@ -42,11 +43,22 @@ const SkillRow = ({ skillItem }: { skillItem: SkillGapItem }) => (
 );
 
 const AnalyzeSkillsGap = ({ data }: AnalyzeSkillsGapProps) => {
+  const isDataEmpty = data.technical.length === 0 && data.soft.length === 0;
+
+  if (isDataEmpty) {
+    return (
+      <EmptyDataCard
+        title="No Skills Data Found"
+        description="We couldn't extract any specific technical or soft skills requirements from this job description."
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8 w-full mt-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-border/60 bg-card/60">
-          <CardContent className="pt-2">
+          <CardContent className="pt-4">
             <h2 className="text-2xl font-semibold tracking-tight pb-2">
               Technical Skills
             </h2>
@@ -54,15 +66,21 @@ const AnalyzeSkillsGap = ({ data }: AnalyzeSkillsGapProps) => {
               Skills mentioned in the job posting
             </p>
             <div className="space-y-1">
-              {data.technical.map((skillItem: SkillGapItem, index) => (
-                <SkillRow key={index} skillItem={skillItem} />
-              ))}
+              {data.technical.length > 0 ? (
+                data.technical.map((skillItem: SkillGapItem, index) => (
+                  <SkillRow key={index} skillItem={skillItem} />
+                ))
+              ) : (
+                <div className="text-sm text-muted-foreground py-6 text-center border rounded-md border-dashed bg-muted/20">
+                  No technical skills specified
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-border/60 bg-card/60">
-          <CardContent className="pt-2">
+          <CardContent className="pt-4">
             <h2 className="text-2xl font-semibold tracking-tight pb-2">
               Soft Skills
             </h2>
@@ -70,9 +88,15 @@ const AnalyzeSkillsGap = ({ data }: AnalyzeSkillsGapProps) => {
               Non-technical skills required
             </p>
             <div className="space-y-1">
-              {data.soft.map((skillItem, index) => (
-                <SkillRow key={index} skillItem={skillItem} />
-              ))}
+              {data.soft.length > 0 ? (
+                data.soft.map((skillItem, index) => (
+                  <SkillRow key={index} skillItem={skillItem} />
+                ))
+              ) : (
+                <div className="text-sm text-muted-foreground py-6 text-center border rounded-md border-dashed bg-muted/20">
+                  No soft skills specified
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

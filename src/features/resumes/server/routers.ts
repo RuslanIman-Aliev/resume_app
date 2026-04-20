@@ -238,6 +238,7 @@ export const resumeRouter = createTRPCRouter({
         improvements: analysis.improvements as any[],
       };
     }),
+    // For job match analysis - trigger job match analysis by sending data to inngest function, which will then trigger the analysis workflow and update the database once done. This is done to offload the analysis work from the main request thread and provide a better user experience.
   triggerJobMatchAnalysis: protectedProcedure
     .input(
       z.object({
@@ -284,7 +285,7 @@ export const resumeRouter = createTRPCRouter({
 
       return { applicationId: application.id };
     }),
-
+ // For job match result page - get analysis result for a job application 
   getJobMatchResult: protectedProcedure
     .input(z.object({ applicationId: z.string() }))
     .query(async ({ ctx, input }) => {

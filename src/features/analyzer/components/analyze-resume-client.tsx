@@ -94,7 +94,7 @@ export const AnalyzeResumeClient = () => {
       return false;
     },
   });
-
+  console.log("Fetched data:", data);
   const errorCode = (error as { data?: { code?: string } } | null)?.data?.code;
   const isPendingAnalysis = errorCode === "NOT_FOUND";
 
@@ -139,7 +139,7 @@ export const AnalyzeResumeClient = () => {
 
   const navigateToImprovements = () => {
     // Navigate via URL parameters so Tabs can sync cleanly without hacking the DOM.
-    router.push(`${pathname}?tab=improvements`);
+    router.push(`${pathname}?tab=improvements`, { scroll: false });
   };
   return (
     <>
@@ -149,12 +149,13 @@ export const AnalyzeResumeClient = () => {
         experience={appData.experience ?? ""}
         salaryRange={appData.salaryRange ?? ""}
         matchScore={appData.matchScore ?? 0}
+        updatedAt={appData.updatedAt ?? ""}
       />
 
       <Tabs
         className=" text-white flex flex-col gap-1! mt-4"
         value={currentTab}
-        onValueChange={(val) => router.push(`${pathname}?tab=${val}`)}
+        onValueChange={(val) => router.push(`${pathname}?tab=${val}`, { scroll: false })}
       >
         <TabsList className="bg-background p-1">
           <TabsTrigger
