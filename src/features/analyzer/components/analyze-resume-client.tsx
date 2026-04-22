@@ -94,7 +94,6 @@ export const AnalyzeResumeClient = () => {
       return false;
     },
   });
-  console.log("Fetched data:", data);
   const errorCode = (error as { data?: { code?: string } } | null)?.data?.code;
   const isPendingAnalysis = errorCode === "NOT_FOUND";
 

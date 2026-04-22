@@ -37,6 +37,44 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+type ScoreFilter = "all" | "high" | "medium" | "low";
+type SortBy = "date" | "score";
+
+const scoreParamKey = "score";
+const sortParamKey = "sort";
+
+type SearchParamsReader = {
+  get: (name: string) => string | null;
+};
+
+const parseScoreFilter = (value: string | null): ScoreFilter => {
+  switch (value) {
+    case "all":
+    case "high":
+    case "medium":
+    case "low":
+      return value;
+    default:
+      return "all";
+  }
+};
+
+const parseSortBy = (value: string | null): SortBy => {
+  switch (value) {
+    case "date":
+    case "score":
+      return value;
+    default:
+      return "date";
+  }
+};
+
+const getScoreFilterFromParams = (params: SearchParamsReader): ScoreFilter =>
+  parseScoreFilter(params.get(scoreParamKey));
+
+const getSortByFromParams = (params: SearchParamsReader): SortBy =>
+  parseSortBy(params.get(sortParamKey));
+
 const CardComponent = ({
   title,
   value,
@@ -70,21 +108,97 @@ const RecentAnalysesList = () => {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const filterScore = getScoreFilterFromParams(searchParams);
+  const sortBy = getSortByFromParams(searchParams);
   const currentPage = Number(searchParams.get("page")) || 1;
+
+  const scoreFilterLabelMap = {
+    all: "All Scores",
+    high: "High (80%+)",
+    medium: "Medium (60-79%)",
+    low: "Low (<60%)",
+  } as const;
+
+  const sortLabelMap = {
+    date: "Date",
+    score: "Score",
+  } as const;
+
+  const resetToFirstPage = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    if (!params.has("page") || params.get("page") === "1") {
+      return;
+    }
+    params.set("page", "1");
+    replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, pathname, replace]);
+
+  const updateParams = useCallback(
+    (updates: Record<string, string | null>, resetPage = false) => {
+      const params = new URLSearchParams(searchParams);
+      let changed = false;
+
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === null) {
+          if (params.has(key)) {
+            params.delete(key);
+            changed = true;
+          }
+          continue;
+        }
+
+        if (params.get(key) !== value) {
+          params.set(key, value);
+          changed = true;
+        }
+      }
+
+      if (resetPage && params.has("page") && params.get("page") !== "1") {
+        params.set("page", "1");
+        changed = true;
+      }
+
+      if (!changed) return;
+
+      const nextUrl = params.toString()
+        ? `${pathname}?${params.toString()}`
+        : pathname;
+      replace(nextUrl, { scroll: false });
+    },
+    [searchParams, pathname, replace],
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (debouncedQuery !== searchQuery) {
         setDebouncedQuery(searchQuery);
-        const params = new URLSearchParams(searchParams);
-        if (params.has("page") && params.get("page") !== "1") {
-          params.set("page", "1");
-          replace(`${pathname}?${params.toString()}`, { scroll: false });
-        }
+        resetToFirstPage();
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [searchQuery, debouncedQuery, searchParams, pathname, replace]);
+  }, [searchQuery, debouncedQuery, resetToFirstPage]);
+
+  const updateScoreFilter = useCallback(
+    (nextFilter: ScoreFilter) => {
+      if (nextFilter === filterScore) return;
+      updateParams(
+        { [scoreParamKey]: nextFilter === "all" ? null : nextFilter },
+        true,
+      );
+    },
+    [filterScore, updateParams],
+  );
+
+  const updateSortBy = useCallback(
+    (nextSort: SortBy) => {
+      if (nextSort === sortBy) return;
+      updateParams(
+        { [sortParamKey]: nextSort === "date" ? null : nextSort },
+        true,
+      );
+    },
+    [sortBy, updateParams],
+  );
 
   const handlePageChange = useCallback(
     (pageNumber: number) => {
@@ -99,6 +213,8 @@ const RecentAnalysesList = () => {
     ...trpc.jobApplication.getJobApplication.queryOptions({
       page: currentPage,
       jobTitle: debouncedQuery,
+      filterScore,
+      sortBy,
     }),
     placeholderData: keepPreviousData,
   });
@@ -225,27 +341,20 @@ const RecentAnalysesList = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <Filter className="h-4 w-4" />
-                {/* {filterScore === "all" ? "All Scores" : 
-                   filterScore === "high" ? "High (80%+)" :
-                   filterScore === "medium" ? "Medium (60-79%)" : "Low (<60%)"} */}
-                All Scores
+                {scoreFilterLabelMap[filterScore]}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem //onClick={() => setFilterScore("all")}
-              >
+              <DropdownMenuItem onClick={() => updateScoreFilter("all")}>
                 All Scores
               </DropdownMenuItem>
-              <DropdownMenuItem //onClick={() => setFilterScore("high")}
-              >
+              <DropdownMenuItem onClick={() => updateScoreFilter("high")}>
                 High (80%+)
               </DropdownMenuItem>
-              <DropdownMenuItem //onClick={() => setFilterScore("medium")}
-              >
+              <DropdownMenuItem onClick={() => updateScoreFilter("medium")}>
                 Medium (60-79%)
               </DropdownMenuItem>
-              <DropdownMenuItem //onClick={() => setFilterScore("low")}
-              >
+              <DropdownMenuItem onClick={() => updateScoreFilter("low")}>
                 Low (&lt;60%)
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -255,18 +364,14 @@ const RecentAnalysesList = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <ArrowUpDown className="h-4 w-4" />
-                {/* {sortBy === "date" ? "Date" : "Score"} */}
-                Data
+                {sortLabelMap[sortBy]}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-              //onClick={() => setSortBy("date")}
-              >
+              <DropdownMenuItem onClick={() => updateSortBy("date")}>
                 Sort by Date
               </DropdownMenuItem>
-              <DropdownMenuItem //onClick={() => setSortBy("score")}
-              >
+              <DropdownMenuItem onClick={() => updateSortBy("score")}>
                 Sort by Score
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -301,8 +406,10 @@ const RecentAnalysesList = () => {
               <Card
                 key={analysis.id}
                 className="group border border-border/40 hover:cursor-pointer hover:border-primary/50 bg-card/40 backdrop-blur hover:bg-card/60 transition-all duration-300"
-              
-                onClick={() => {router.push(`/analyzer/${analysis.id}`)}}>
+                onClick={() => {
+                  router.push(`/analyzer/${analysis.id}`);
+                }}
+              >
                 <CardContent className="p-4 flex items-center gap-5">
                   <div
                     className={`flex h-13 w-14 shrink-0 flex-col items-center justify-center rounded-xl border ${scoreBoxClass}`}
@@ -338,14 +445,13 @@ const RecentAnalysesList = () => {
                       <div className="flex items-center gap-1.5">
                         <CalendarIcon className="h-4 w-4 shrink-0 opacity-70" />
                         <span>
-                          {new Date(analysis.updatedAt ?? "").toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}
+                          {new Date(
+                            analysis.updatedAt ?? "",
+                          ).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </span>
                       </div>
                     </div>
