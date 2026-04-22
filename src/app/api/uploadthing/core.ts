@@ -48,8 +48,6 @@ export const ourFileRouter = {
 
         if (!convertResponse.ok) {
           const errorDetails = await convertResponse.text();
-          console.error("CONVERT_API_REJECTED:", errorDetails);
-
           throw new Error(`API Error: ${errorDetails}`);
         }
 

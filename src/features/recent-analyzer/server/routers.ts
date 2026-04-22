@@ -7,11 +7,22 @@ export const jobApplicationRouter = createTRPCRouter({
     .input(
       z.object({
         jobTitle: z.string().optional(),
-        limit: z.number().default(6), 
+        filterScore: z.enum(["all", "high", "medium", "low"]).default("all"),
+        sortBy: z.enum(["date", "score"]).default("date"),
+        limit: z.number().default(6),
         page: z.number().default(1),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
+      const scoreFilterClause =
+        input.filterScore === "high"
+          ? { matchScore: { gte: 80 } }
+          : input.filterScore === "medium"
+            ? { matchScore: { gte: 60, lt: 80 } }
+            : input.filterScore === "low"
+              ? { matchScore: { lt: 60 } }
+              : {};
+
       const whereClause = {
         userId: ctx.auth.user.id,
         ...(input.jobTitle
@@ -32,9 +43,17 @@ export const jobApplicationRouter = createTRPCRouter({
               ],
             }
           : {}),
+        ...scoreFilterClause,
       };
 
-      const totalCount = await prisma.jobApplication.count({ where: whereClause });
+      const orderBy =
+        input.sortBy === "score"
+          ? [{ matchScore: "desc" as const }, { updatedAt: "desc" as const }]
+          : [{ updatedAt: "desc" as const }];
+
+      const totalCount = await prisma.jobApplication.count({
+        where: whereClause,
+      });
       const limit = input.limit;
       const pageCount = Math.max(1, Math.ceil(totalCount / limit));
       const page = Math.min(Math.max(input.page, 1), pageCount);
@@ -59,37 +78,44 @@ export const jobApplicationRouter = createTRPCRouter({
             improvements: true,
             resume: { select: { resumeName: true } },
           },
-          orderBy: { updatedAt: "desc" },
+          orderBy,
         }),
 
         prisma.jobApplication.aggregate({
           where: whereClause,
           _avg: { matchScore: true },
-          _count: { id: true }, 
+          _count: { id: true },
         }),
 
         prisma.jobApplication.count({
-          where: { ...whereClause, matchScore: { gte: 80 } },
+          where: {
+            AND: [whereClause, { matchScore: { gte: 80 } }],
+          },
         }),
 
         prisma.jobApplication.count({
-          where: { ...whereClause, createdAt: { gte: oneWeekAgo } },
+          where: {
+            AND: [whereClause, { createdAt: { gte: oneWeekAgo } }],
+          },
         }),
       ]);
 
       const mappedApplications = applications.map((app) => {
         const { improvements, ...rest } = app;
-        const improvementsCount = Array.isArray(improvements) ? improvements.length : 0;
         return {
           ...rest,
-          improvementsCount,
+          improvementsCount: Array.isArray(improvements)
+            ? improvements.length
+            : 0,
         };
       });
 
       return {
         application: mappedApplications,
         totalAnalyses: stats._count.id,
-        averageScore: stats._avg.matchScore ? Math.round(stats._avg.matchScore) : 0,
+        averageScore: stats._avg.matchScore
+          ? Math.round(stats._avg.matchScore)
+          : 0,
         highMatches,
         thisWeek,
         pagination: {

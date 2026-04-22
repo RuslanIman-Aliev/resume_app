@@ -99,107 +99,124 @@ const RecentAnalyses = () => {
       <Card className="p-6">
         <h1 className="text-lg font-bold mb-2">Recent Analyses</h1>
         <ScrollArea className="h-100 w-full rounded-md border border-border/50 bg-secondary/10 p-4">
-          {data?.analyses.map(
-            (
-              {
-                resume: { id, resumeName, postedRole, status },
-                overallScore,
-                createdAt,
-                keywords,
-              },
-              index,
-            ) => (
-              <div
-                key={`recent-analysis-${id}-${index}`}
-                className="cursor-pointer"
-                onClick={() => router.push(`/ai-coach/${id}`)}
-              >
-                <div className="flex  mb-4  items-center gap-3 w-full rounded-lg border border-border/50 bg-secondary/30 p-4 transition-all hover:border-border hover:bg-secondary/50">
-                  <Avatar className="flex  items-center justify-center rounded-lg bg-primary/10 h-11 w-11 text-sm font-bold text-primary">
-                    <AvatarFallback className="text-primary h-11 w-11 shrink-0 rounded-lg bg-primary/10 text-sm">
-                      <FileText className="h-5 w-5" />
-                    </AvatarFallback>
-                  </Avatar>
+          {!data?.analyses?.length ? (
+            <div className="flex flex-col items-center justify-center py-14 text-center animate-in fade-in duration-500">
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-primary/30 bg-primary/5 mb-4">
+                <FileText className="h-8 w-8 text-primary/50" />
+                <div className="absolute -bottom-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border bg-background text-primary">
+                  <Sparkles className="h-3.5 w-3.5" />
+                </div>
+              </div>
+              <p className="text-base font-semibold text-foreground mb-1">
+                No analyses yet
+              </p>
+              <p className="text-sm text-muted-foreground max-w-65 mx-auto">
+                Analyze a job description against your resume to get your match
+                score and insights.
+              </p>
+            </div>
+          ) : (
+            data?.analyses.map(
+              (
+                {
+                  resume: { id, resumeName, postedRole, status },
+                  overallScore,
+                  createdAt,
+                  keywords,
+                },
+                index,
+              ) => (
+                <div
+                  key={`recent-analysis-${id}-${index}`}
+                  className="cursor-pointer"
+                  onClick={() => router.push(`/ai-coach/${id}`)}
+                >
+                  <div className="flex  mb-4  items-center gap-3 w-full rounded-lg border border-border/50 bg-secondary/30 p-4 transition-all hover:border-border hover:bg-secondary/50">
+                    <Avatar className="flex  items-center justify-center rounded-lg bg-primary/10 h-11 w-11 text-sm font-bold text-primary">
+                      <AvatarFallback className="text-primary h-11 w-11 shrink-0 rounded-lg bg-primary/10 text-sm">
+                        <FileText className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
 
-                  <div className="w-full">
-                    <div className="flex justify-between">
-                      <div className="gap-2 flex items-center">
-                        <span className="truncate font-medium text-sm">
-                          {postedRole
-                            ? postedRole.charAt(0).toUpperCase() +
-                              postedRole.slice(1).toLowerCase()
-                            : ""}
-                        </span>
-                        {getStatusBadge(status)}
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {keywords.slice(0, 2).map((skill, index) => (
-                          <Badge
-                            key={`keyword-${skill}-${index}`}
-                            variant="outline"
-                            className="text-xs"
-                          >
-                            {skill}
-                          </Badge>
-                        ))}
-                        {keywords.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{keywords.length - 2}
-                          </Badge>
-                        )}
-                        <div
-                          className={cn(
-                            `${getScoreColor(overallScore)} text-2xl font-bold`,
-                          )}
-                        >
-                          {overallScore}%
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs text-muted-foreground ">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex items-center gap-1 truncate">
-                          <span className="truncate ">
-                            {resumeName
-                              ? resumeName.charAt(0).toUpperCase() +
-                                resumeName.slice(1).toLowerCase()
+                    <div className="w-full">
+                      <div className="flex justify-between">
+                        <div className="gap-2 flex items-center">
+                          <span className="truncate font-medium text-sm">
+                            {postedRole
+                              ? postedRole.charAt(0).toUpperCase() +
+                                postedRole.slice(1).toLowerCase()
                               : ""}
                           </span>
+                          {getStatusBadge(status)}
                         </div>
-
-                        <div className="flex items-center gap-1 truncate">
-                          <span className="truncate">
-                            {getRelativeTime(createdAt)}
-                          </span>
+                        <div className="flex items-center gap-4">
+                          {keywords.slice(0, 2).map((skill, index) => (
+                            <Badge
+                              key={`keyword-${skill}-${index}`}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {skill}
+                            </Badge>
+                          ))}
+                          {keywords.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{keywords.length - 2}
+                            </Badge>
+                          )}
+                          <div
+                            className={cn(
+                              `${getScoreColor(overallScore)} text-2xl font-bold`,
+                            )}
+                          >
+                            {overallScore}%
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-muted-foreground">match</span>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground ">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-1 truncate">
+                            <span className="truncate ">
+                              {resumeName
+                                ? resumeName.charAt(0).toUpperCase() +
+                                  resumeName.slice(1).toLowerCase()
+                                : ""}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1 truncate">
+                            <span className="truncate">
+                              {getRelativeTime(createdAt)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-muted-foreground">match</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ),
+              ),
+            )
           )}
-          
         </ScrollArea>
         <div className=" flex items-center justify-center gap-2 rounded-lg border border-dashed border-border p-4 text-muted-foreground">
-            <Sparkles className="h-4 w-4" />
-            <span className="text-sm">
-              Analyze more jobs to improve your match accuracy
-            </span>
-            <Button
-              asChild
-              size="sm"
-              variant="link"
-              className="text-primary px-0 hover:text-primary/80"
-            >
-              <Link href="/resumes">Analyze Now</Link>
-            </Button>
-          </div>
+          <Sparkles className="h-4 w-4" />
+          <span className="text-sm">
+            Analyze more jobs to improve your match accuracy
+          </span>
+          <Button
+            asChild
+            size="sm"
+            variant="link"
+            className="text-primary px-0 hover:text-primary/80"
+          >
+            <Link href="/resumes">Analyze Now</Link>
+          </Button>
+        </div>
       </Card>
     </section>
   );
