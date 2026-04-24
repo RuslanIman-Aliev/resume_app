@@ -319,13 +319,27 @@ const ResumeManager = () => {
                   }
                   onClick={async () => {
                     if (file) {
+                      const uploadToastId = toast.loading("Uploading resume...");
+
                       try {
-                        toast.loading("Uploading resume...");
                         const imageFile = await generatePdfThumbnail(file);
                         await startUpload([file, imageFile]);
+                        toast.success("Resume uploaded successfully", {
+                          id: uploadToastId,
+                        });
                       } catch (error) {
                         toast.error("Failed to generate preview image");
-                        await startUpload([file]); // fallback
+
+                        try {
+                          await startUpload([file]); // fallback
+                          toast.success("Resume uploaded successfully", {
+                            id: uploadToastId,
+                          });
+                        } catch (uploadError) {
+                          toast.error("Failed to upload resume", {
+                            id: uploadToastId,
+                          });
+                        }
                       }
                     }
                   }}
