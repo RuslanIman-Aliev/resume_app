@@ -12,6 +12,10 @@ export const ourFileRouter = {
       maxFileSize: "4MB",
       maxFileCount: 1,
     },
+    image: {
+      maxFileSize: "4MB",
+      maxFileCount: 1,
+    },
   })
     .middleware(async ({ req }) => {
       const session = await auth.api.getSession({
@@ -25,39 +29,20 @@ export const ourFileRouter = {
     })
     .onUploadComplete(async ({ metadata, file }) => {
       try {
-        const pdfUrl = file.ufsUrl;
-        // Ask ConvertAPI to turn the first page of the PDF into a JPG
-        const convertResponse = await fetch(
-          `https://v2.convertapi.com/convert/pdf/to/jpg?Secret=${process.env.CONVERT_API_SECRET}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              Parameters: [
-                {
-                  Name: "File",
-                  FileValue: { Url: file.url },
-                },
-                { Name: "StoreFile", Value: true },
-                { Name: "PageRange", Value: "1" },
-                { Name: "ImageResolution", Value: "350" },
-              ],
-            }),
-          },
-        );
-
-        if (!convertResponse.ok) {
-          const errorDetails = await convertResponse.text();
-          throw new Error(`API Error: ${errorDetails}`);
+        if (
+          file.name.endsWith(".png") ||
+          file.name.endsWith(".jpg") ||
+          file.name.endsWith(".jpeg")
+        ) {
+          return {
+            uploadedBy: metadata.userId,
+            type: "image",
+          };
         }
-
-        const convertData = await convertResponse.json();
-        const temporaryImageUrl = convertData.Files[0].Url;
-        const uploadResult = await utapi.uploadFilesFromUrl(temporaryImageUrl);
-
+        const pdfUrl = file.ufsUrl;
         const pdfFileResponse = await fetch(pdfUrl);
         const pdfBuffer = await pdfFileResponse.arrayBuffer();
-
+        // Use unpdf to extract text from the PDF
         const { text: extractedText } = await extractText(
           new Uint8Array(pdfBuffer),
           {
@@ -66,8 +51,8 @@ export const ourFileRouter = {
         );
         return {
           uploadedBy: metadata.userId,
-          thumbnailUrl: uploadResult.data?.url,
           extractedText,
+          type: "pdf",
         };
       } catch {
         await utapi.deleteFiles(file.key);

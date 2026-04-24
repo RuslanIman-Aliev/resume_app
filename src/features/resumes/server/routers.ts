@@ -238,7 +238,7 @@ export const resumeRouter = createTRPCRouter({
         improvements: analysis.improvements as any[],
       };
     }),
-    // For job match analysis - trigger job match analysis by sending data to inngest function, which will then trigger the analysis workflow and update the database once done. This is done to offload the analysis work from the main request thread and provide a better user experience.
+  // For job match analysis - trigger job match analysis by sending data to inngest function, which will then trigger the analysis workflow and update the database once done. This is done to offload the analysis work from the main request thread and provide a better user experience.
   triggerJobMatchAnalysis: protectedProcedure
     .input(
       z.object({
@@ -258,12 +258,14 @@ export const resumeRouter = createTRPCRouter({
           resume: {
             select: {
               parsedContent: true,
+              structuredData: true,
             },
           },
         },
       });
 
       const parsedContent = application.resume.parsedContent;
+      const structuredData = application.resume.structuredData;
 
       if (!parsedContent?.trim()) {
         throw new TRPCError({
@@ -279,13 +281,15 @@ export const resumeRouter = createTRPCRouter({
           applicationId: application.id,
           resumeId: input.resumeId,
           jobDescription: input.jobDescription,
-          parsedContent,
+          parsedContent: structuredData
+            ? JSON.stringify(structuredData, null, 2)
+            : parsedContent,
         },
       });
 
       return { applicationId: application.id };
     }),
- // For job match result page - get analysis result for a job application 
+  // For job match result page - get analysis result for a job application
   getJobMatchResult: protectedProcedure
     .input(z.object({ applicationId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -303,5 +307,72 @@ export const resumeRouter = createTRPCRouter({
         });
       }
       return { application };
+    }),
+
+  // For applying AI suggestions to the structured JSON resume
+  applyImprovement: protectedProcedure
+    .input(
+      z.object({
+        resumeId: z.string(),
+        targetSection: z.enum([
+          "summary",
+          "experience",
+          "education",
+          "projects",
+          "skills",
+        ]),
+        targetId: z.string().optional(),
+        newText: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const resume = await prisma.resume.findUnique({
+        where: { id: input.resumeId, userId: ctx.auth.user.id },
+      });
+
+      if (!resume || !resume.structuredData) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resume or structured data not found",
+        });
+      }
+
+      // 1. Parse JSON
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = resume.structuredData as any;
+
+      // 2. Precisely edit the fragment
+      if (input.targetSection === "summary" && data.personalInfo) {
+        data.personalInfo.summary = input.newText;
+      }
+
+      if (
+        input.targetSection === "experience" &&
+        input.targetId &&
+        Array.isArray(data.experience)
+      ) {
+        for (const exp of data.experience) {
+          if (exp.id === input.targetId) {
+            exp.role = input.newText;
+          }
+          if (Array.isArray(exp.bullets)) {
+            for (const bullet of exp.bullets) {
+              if (bullet.id === input.targetId) {
+                bullet.text = input.newText;
+              }
+            }
+          }
+        }
+      }
+
+      // Update for education similarly if needed
+
+      // 3. Save back to DB
+      await prisma.resume.update({
+        where: { id: input.resumeId },
+        data: { structuredData: data },
+      });
+
+      return { success: true };
     }),
 });

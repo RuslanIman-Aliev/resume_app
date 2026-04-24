@@ -154,7 +154,9 @@ export const AnalyzeResumeClient = () => {
       <Tabs
         className=" text-white flex flex-col gap-1! mt-4"
         value={currentTab}
-        onValueChange={(val) => router.push(`${pathname}?tab=${val}`, { scroll: false })}
+        onValueChange={(val) =>
+          router.push(`${pathname}?tab=${val}`, { scroll: false })
+        }
       >
         <TabsList className="bg-background p-1">
           <TabsTrigger
@@ -199,6 +201,7 @@ export const AnalyzeResumeClient = () => {
         <TabsContent value="improvements" className="mt-4">
           <AnalyzeResumeImprovements
             data={appData as unknown as ApplicationData}
+            resumeId={appData.resumeId}
           />{" "}
         </TabsContent>
         <TabsContent value="skills-gap" className="mt-4">

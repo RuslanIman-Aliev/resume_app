@@ -22,7 +22,7 @@ export const analyzeResume = inngest.createFunction(
     );
     const result = await step.run("handle-task", async () => {
       const response = await client.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5.4",
         messages: [
           {
             role: "user",
@@ -46,6 +46,7 @@ export const analyzeResume = inngest.createFunction(
         },
         data: {
           status: "ANALYZED",
+          structuredData: validatedData.structuredData,
           analysis: {
             create: {
               overallScore: validatedData.overallScore,
@@ -99,7 +100,7 @@ export const analyzeJobMatched = inngest.createFunction(
     );
     const result = await step.run("handle-task", async () => {
       const response = await client.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5.4",
         messages: [
           {
             role: "user",

@@ -62,6 +62,14 @@ const jobMatchImprovementSchema = z.object({
   description: z.string(),
   matchScoreBoost: z.number().int().min(0).max(100).default(0),
   suggestions: z.array(z.string()).default([]),
+  targetSection: z.enum([
+    "summary",
+    "experience",
+    "education",
+    "projects",
+    "skills",
+  ]),
+  targetId: z.string().optional(),
   beforeText: z
     .string()
     .nullish()
@@ -120,8 +128,80 @@ export const resumeAnalysisSchema = z.object({
       currentText: z.string().nullable(),
       suggestedText: z.string().nullable(),
       tips: z.array(z.string()),
+      targetSection: z.enum([
+        "summary",
+        "experience",
+        "education",
+        "projects",
+        "skills",
+      ]),
+      targetId: z.string().optional(),
     }),
   ),
+  structuredData: z
+    .object({
+      personalInfo: z.object({
+        name: z.string().optional().default(""),
+        email: z.string().optional().default(""),
+        phone: z.string().optional().default(""),
+        location: z.string().optional().default(""),
+        links: z.array(z.string()).optional().default([]),
+        summary: z.string().optional().default(""),
+      }),
+      experience: z
+        .array(
+          z.object({
+            id: z.string(),
+            company: z.string(),
+            role: z.string(),
+            date: z.string(),
+            bullets: z.array(
+              z.object({
+                id: z.string(),
+                text: z.string(),
+              }),
+            ),
+          }),
+        )
+        .default([]),
+      education: z
+        .array(
+          z.object({
+            id: z.string(),
+            institution: z.string(),
+            degree: z.string(),
+            date: z.string(),
+            bullets: z
+              .array(
+                z.object({
+                  id: z.string(),
+                  text: z.string(),
+                }),
+              )
+              .default([]),
+          }),
+        )
+        .default([]),
+      projects: z
+        .array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            date: z.string(),
+            bullets: z
+              .array(
+                z.object({
+                  id: z.string(),
+                  text: z.string(),
+                }),
+              )
+              .default([]),
+          }),
+        )
+        .default([]),
+      skills: z.array(z.string()).default([]),
+    })
+    .optional(),
 });
 
 export const jobMatchAnalysisSchema = z.object({
@@ -195,4 +275,3 @@ export const jobMatchAnalysisSchema = z.object({
   }),
   coverLetterText: z.string(),
 });
-

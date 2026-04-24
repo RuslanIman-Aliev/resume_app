@@ -38,6 +38,45 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Set worker source
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+const generatePdfThumbnail = async (file: File): Promise<File> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 1.5 });
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.height = viewport.height;
+  canvas.width = viewport.width;
+
+  await page.render({
+    canvasContext: ctx!,
+    viewport: viewport,
+  }).promise;
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(
+            new File([blob], `${file.name}-thumbnail.jpg`, {
+              type: "image/jpeg",
+            }),
+          );
+        } else {
+          reject(new Error("Canvas to Blob failed"));
+        }
+      },
+      "image/jpeg",
+      0.8,
+    );
+  });
+};
 
 const ResumeManager = () => {
   const [file, setFiles] = useState<File | null>(null);
@@ -84,15 +123,20 @@ const ResumeManager = () => {
   const { startUpload, isUploading } = useUploadThing("resumeUploader", {
     onClientUploadComplete(res) {
       if (res && res.length > 0) {
-        const uploadedFile = res[0];
-        createResumeMutation.mutate({
-          fileName: uploadedFile.name,
-          fileUrl: uploadedFile.url,
-          resumeName,
-          postedRole: targetRole,
-          thumbnailUrl: uploadedFile.serverData?.thumbnailUrl,
-          parsedContent: uploadedFile.serverData?.extractedText,
-        });
+        // Since we upload 2 files (pdf and image), we need to extract info from both
+        const pdfFile = res.find((f) => f.serverData?.type === "pdf");
+        const imageFile = res.find((f) => f.serverData?.type === "image");
+
+        if (pdfFile) {
+          createResumeMutation.mutate({
+            fileName: pdfFile.name,
+            fileUrl: pdfFile.url,
+            resumeName,
+            postedRole: targetRole,
+            thumbnailUrl: imageFile?.url,
+            parsedContent: pdfFile.serverData?.extractedText,
+          });
+        }
       }
     },
     onUploadError: () => {
@@ -263,9 +307,7 @@ const ResumeManager = () => {
 
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button variant="outline">
-                    Cancel
-                  </Button>
+                  <Button variant="outline">Cancel</Button>
                 </DialogClose>
                 <Button
                   disabled={
@@ -277,7 +319,14 @@ const ResumeManager = () => {
                   }
                   onClick={async () => {
                     if (file) {
-                      await startUpload([file]);
+                      try {
+                        toast.loading("Uploading resume...");
+                        const imageFile = await generatePdfThumbnail(file);
+                        await startUpload([file, imageFile]);
+                      } catch (error) {
+                        toast.error("Failed to generate preview image");
+                        await startUpload([file]); // fallback
+                      }
                     }
                   }}
                 >

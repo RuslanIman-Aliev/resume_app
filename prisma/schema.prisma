@@ -93,6 +93,7 @@ model Resume {
   postedRole     String   
   status         String   @default("draft") 
   parsedContent  String?   @db.Text 
+  structuredData Json?    
   resumeLink     String
   resumePreviewLink     String?
   createdAt      DateTime @default(now())

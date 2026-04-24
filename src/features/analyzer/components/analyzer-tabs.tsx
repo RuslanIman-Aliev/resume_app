@@ -188,7 +188,7 @@ const AnalyzerTabs = () => {
                             <span className="text-border">•</span>
                             <div className="flex items-center gap-1 truncate">
                               <span className="truncate">
-                                Updated {getRelativeTime(resume.createdAt)}
+                                Created  {getRelativeTime(resume.createdAt)}
                               </span>
                             </div>
                           </div>

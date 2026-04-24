@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -8,10 +9,19 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ApplicationData } from "@/lib/types";
+import { ApplicationData, ImprovementTip } from "@/lib/types";
 import { getScoreColor } from "@/lib/utils";
-import { CheckIcon, CircleDot, Copy, Wand2, XIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CircleDot,
+  Copy,
+  Wand2,
+  XIcon,
+  Loader2,
+} from "lucide-react";
 import { EmptyDataCard } from "./empty-data-card";
+import { useTRPC } from "@/trpc/client";
+import { useMutation } from "@tanstack/react-query";
 
 const getPriorityStyles = (priority: string) => {
   switch (priority.toLowerCase()) {
@@ -25,11 +35,46 @@ const getPriorityStyles = (priority: string) => {
   }
 };
 
-const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
+const AnalyzeResumeImprovements = ({
+  data,
+  resumeId,
+}: {
+  data: ApplicationData;
+  resumeId: string;
+}) => {
   const improvementsList = data.improvements || [];
   const currentScore = data.matchScore;
   const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
   const hasImprovedScore = improvedScore != null;
+  const trpc = useTRPC();
+  const updateBlockMutation = useMutation(
+    trpc.resume.applyImprovement.mutationOptions()
+  );
+  const [applyingId, setApplyingId] = useState<string | null>(null);
+
+  const handleApplyToResume = async (
+    improvement: ImprovementTip,
+    index: number,
+  ) => {
+    const id = `${improvement.targetId}-${index}`;
+    setApplyingId(id);
+
+    try {
+      await updateBlockMutation.mutateAsync({
+        resumeId,
+        targetSection: improvement.targetSection,
+        targetId: improvement.targetId,
+        newText: improvement.afterText,
+      });
+
+      // Successfully applied logic here
+      // (e.g. invalidating query or showing toast)
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setApplyingId(null);
+    }
+  };
 
   if (improvementsList.length === 0) {
     return (
@@ -68,7 +113,9 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
       <div>
         <Accordion type="multiple" className="mt-4 space-y-6">
           {improvementsList.map((improvement, index) => {
-            const accordionItemValue = `${improvement.description}-${index}`;
+            const accordionItemValue = `${improvement.targetId}-${index}`;
+            const isApplying = applyingId === accordionItemValue;
+
             return (
               <AccordionItem
                 key={accordionItemValue}
@@ -159,9 +206,16 @@ const AnalyzeResumeImprovements = ({ data }: { data: ApplicationData }) => {
                         <Copy className="h-4 w-4 mr-2" />
                         Copy Suggestion
                       </Button>
-                      <Button>
-                        <Wand2 className="h-4 w-4 mr-2" />
-                        Apply to Resume
+                      <Button
+                        onClick={() => handleApplyToResume(improvement, index)}
+                        disabled={isApplying}
+                      >
+                        {isApplying ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Wand2 className="h-4 w-4 mr-2" />
+                        )}
+                        {isApplying ? "Applying..." : "Apply to Resume"}
                       </Button>
                     </div>
                   </div>
