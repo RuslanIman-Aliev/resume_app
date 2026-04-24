@@ -326,7 +326,7 @@ export const resumeRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const resume = await prisma.resume.findUnique({
+      const resume = await prisma.resume.findFirst({
         where: { id: input.resumeId, userId: ctx.auth.user.id },
       });
 
