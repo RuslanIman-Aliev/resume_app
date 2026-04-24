@@ -105,7 +105,7 @@ export function getPrompt(resumeText: string, targetRole: string) {
         "title": string (e.g., "Transform duties into quantifiable achievements"),
         "description": string (Explain exactly why this change will increase the candidate's ATS score and impress a human recruiter),
         
-        "targetSection": string (must be "summary", "experience", or "education"),
+        "targetSection": string (must be "summary", "experience", "education", "projects", or "skills"),
         "targetId": string (must be the EXACT ID of the corresponding JSON block or bullet from the structuredData you generated, e.g., "exp-1-bullet-2". Leave empty and do not include the field if targetSection is summary),
         
         // YOU MUST ALWAYS PROVIDE THESE TWO FIELDS. NEVER LEAVE THEM NULL.
