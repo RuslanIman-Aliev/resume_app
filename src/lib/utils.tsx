@@ -14,6 +14,10 @@ export function getPrompt(resumeText: string, targetRole: string) {
   Your task is to critically analyze the provided resume against the target role of: ${targetRole}.
 
   Your primary goal is to find weak, generic responsibilities and rewrite them into powerful, highly measurable achievements using the famous Google XYZ formula: "Accomplished [X] as measured by [Y], by doing [Z]." 
+
+  CRITICAL REQUIREMENT: structuredData MUST contain the ENTIRETY of the candidate's resume losslessly. 
+  Do not summarize, skip, or omit ANY bullet points, jobs, degrees, links, or skills from the raw text. 
+  EVERY piece of experience, project, education, and personal info must be accurately mapped into the structuredData JSON object so a perfect visual reconstructed resume can be rendered purely from this data.
   
   You must eliminate weak verbs (e.g., "helped", "worked on") and replace them with strong action verbs (e.g., "architected", "scaled", "drove"). You must inject specific metrics, percentages, and business impact into your suggestions.
 
@@ -41,6 +45,58 @@ export function getPrompt(resumeText: string, targetRole: string) {
         "timeEstimate": string (e.g., "5 min")
       }
     ],
+    "structuredData": {
+      "personalInfo": {
+        "name": string,
+        "email": string,
+        "phone": string,
+        "location": string,
+        "links": [string],
+        "summary": string
+      },
+      "experience": [
+        {
+          "id": string (Generate a unique id like 'exp-1', 'exp-2'),
+          "company": string,
+          "role": string,
+          "date": string,
+          "bullets": [
+            {
+              "id": string (Generate a unique id like 'exp-1-bullet-1'),
+              "text": string
+            }
+          ]
+        }
+      ],
+      "education": [
+        {
+          "id": string (Generate a unique id like 'edu-1'),
+          "institution": string,
+          "degree": string,
+          "date": string,
+          "bullets": [
+            {
+              "id": string (Generate a unique id like 'edu-1-bullet-1'),
+              "text": string
+            }
+          ]
+        }
+      ],
+      "projects": [
+        {
+          "id": string (Generate a unique id like 'proj-1'),
+          "name": string,
+          "date": string,
+          "bullets": [
+            {
+              "id": string (Generate a unique id like 'proj-1-bullet-1'),
+              "text": string
+            }
+          ]
+        }
+      ],
+      "skills": [string]
+    },
     "improvements": [
       // Array of EXACTLY 5 to 8 detailed suggestions. 
       {
@@ -48,6 +104,9 @@ export function getPrompt(resumeText: string, targetRole: string) {
         "impact": string ("High Impact", "Medium Impact", or "Low Impact"),
         "title": string (e.g., "Transform duties into quantifiable achievements"),
         "description": string (Explain exactly why this change will increase the candidate's ATS score and impress a human recruiter),
+        
+        "targetSection": string (must be "summary", "experience", "education", "projects", or "skills"),
+        "targetId": string (must be the EXACT ID of the corresponding JSON block or bullet from the structuredData you generated, e.g., "exp-1-bullet-2". Leave empty and do not include the field if targetSection is summary),
         
         // YOU MUST ALWAYS PROVIDE THESE TWO FIELDS. NEVER LEAVE THEM NULL.
         "currentText": string (You MUST extract a direct, weak quote from the candidate's provided resume text. Do not make this up.),
@@ -262,6 +321,8 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
         "title": string (short action title, e.g., "Add Testing Experience"),
         "description": string (1 sentence why this gap affects ATS matching),
         "matchScoreBoost": number (integer boost estimate, e.g., 8),
+        "targetSection": string (must be "summary", "experience", "education", "projects", or "skills"),
+        "targetId": string (must be the EXACT ID of the corresponding JSON block or bullet from the candidate's structured resume data input, e.g., "exp-1-bullet-2". Leave empty and do not include the field if targetSection is summary),
         "suggestions": [
           string,
           string,

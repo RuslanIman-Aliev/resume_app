@@ -43,7 +43,57 @@ export interface ImprovementTip {
   suggestions: string[];
   matchScoreBoost: number;
   category?: string;
+  targetSection: "summary" | "experience" | "education" | "projects" | "skills";
+  targetId?: string;
 }
+
+export interface ResumeBlockInfo {
+  id: string;
+  company: string;
+  role: string;
+  date: string;
+  bullets: {
+    id: string;
+    text: string;
+  }[];
+}
+
+export interface EducationBlockInfo {
+  id: string;
+  institution: string;
+  degree: string;
+  date: string;
+  bullets: {
+    id: string;
+    text: string;
+  }[];
+}
+
+export interface ProjectBlockInfo {
+  id: string;
+  name: string;
+  date: string;
+  bullets: {
+    id: string;
+    text: string;
+  }[];
+}
+
+export interface StructuredResumeData {
+  personalInfo: {
+    name: string;
+    email: string;
+    phone: string;
+    location?: string;
+    links?: string[];
+    summary: string;
+  };
+  experience: ResumeBlockInfo[];
+  education: EducationBlockInfo[];
+  projects?: ProjectBlockInfo[];
+  skills: string[];
+}
+
 type RouterOutput = inferRouterOutputs<AppRouter>;
 interface ApplicationSummary {
   estimatedScoreWithAllImprovements: number;
@@ -51,11 +101,13 @@ interface ApplicationSummary {
 type RawApplicationData =
   RouterOutput["resume"]["getJobMatchResult"]["application"];
 
-export type ApplicationData = Omit<RawApplicationData, "improvements" | "summary"> & {
+export type ApplicationData = Omit<
+  RawApplicationData,
+  "improvements" | "summary"
+> & {
   improvements: ImprovementTip[] | null;
   summary: ApplicationSummary | null;
 };
-
 
 export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;
 export type ResumeAnalysis = z.infer<typeof resumeAnalysisSchema>;
