@@ -321,7 +321,7 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
         "title": string (short action title, e.g., "Add Testing Experience"),
         "description": string (1 sentence why this gap affects ATS matching),
         "matchScoreBoost": number (integer boost estimate, e.g., 8),
-        "targetSection": string (must be "summary", "experience", or "education"),
+        "targetSection": string (must be "summary", "experience", "education", "projects", or "skills"),
         "targetId": string (must be the EXACT ID of the corresponding JSON block or bullet from the candidate's structured resume data input, e.g., "exp-1-bullet-2". Leave empty and do not include the field if targetSection is summary),
         "suggestions": [
           string,
