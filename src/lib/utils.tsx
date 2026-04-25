@@ -2,6 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import { clsx, type ClassValue } from "clsx";
 import { Briefcase, Code, FileText, GraduationCap, Target } from "lucide-react";
 import { twMerge } from "tailwind-merge";
+import * as pdfjsLib from "pdfjs-dist";
+import mammoth from "mammoth";
+import { toBlob } from "html-to-image";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -400,3 +403,93 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   """
   `;
 }
+
+// Set worker source
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+export const generatePdfThumbnail = async (file: File): Promise<File> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 1.5 });
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.height = viewport.height;
+  canvas.width = viewport.width;
+
+  await page.render({
+    canvasContext: ctx!,
+    viewport: viewport,
+  }).promise;
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(
+            new File([blob], `${file.name}-thumbnail.jpg`, {
+              type: "image/jpeg",
+            }),
+          );
+        } else {
+          reject(new Error("Canvas to Blob failed"));
+        }
+      },
+      "image/jpeg",
+      0.8,
+    );
+  });
+};
+
+export const generateDocxThumbnail = async (file: File): Promise<File> => {
+  const arrayBuffer = await file.arrayBuffer();
+  
+  const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+
+  const secretWrapper = document.createElement("div");
+  secretWrapper.style.position = "fixed";
+  secretWrapper.style.top = "0";
+  secretWrapper.style.left = "0";
+  secretWrapper.style.width = "1px";   
+  secretWrapper.style.height = "1px";
+  secretWrapper.style.overflow = "hidden"; 
+  secretWrapper.style.opacity = "0";      
+  secretWrapper.style.pointerEvents = "none"; 
+  secretWrapper.style.zIndex = "-9999";
+
+  const container = document.createElement("div");
+  container.style.width = "800px"; 
+  container.style.height = "1130px"; 
+  container.style.backgroundColor = "#ffffff"; 
+  container.style.color = "#000000"; 
+  container.style.padding = "60px"; 
+  container.style.fontFamily = "sans-serif";
+  container.style.fontSize = "14px"; 
+  container.style.lineHeight = "1.5";
+  container.innerHTML = html;
+  secretWrapper.appendChild(container);
+  document.body.appendChild(secretWrapper);
+
+  try {
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const blob = await toBlob(container, {
+      quality: 0.8,
+      backgroundColor: '#ffffff', 
+      pixelRatio: 1, 
+    });
+
+    if (!blob) {
+      throw new Error("Failed to generate image blob");
+    }
+
+    return new File([blob], `${file.name}-thumbnail.jpg`, { type: "image/jpeg" });
+  } catch (error) {
+    console.error("html-to-image error:", error);
+    throw error;
+  } finally {
+    document.body.removeChild(secretWrapper);
+  }
+};

@@ -1,4 +1,5 @@
 "use client";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,45 +39,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as pdfjsLib from "pdfjs-dist";
-
-// Set worker source
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
-const generatePdfThumbnail = async (file: File): Promise<File> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale: 1.5 });
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  canvas.height = viewport.height;
-  canvas.width = viewport.width;
-
-  await page.render({
-    canvasContext: ctx!,
-    viewport: viewport,
-  }).promise;
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) {
-          resolve(
-            new File([blob], `${file.name}-thumbnail.jpg`, {
-              type: "image/jpeg",
-            }),
-          );
-        } else {
-          reject(new Error("Canvas to Blob failed"));
-        }
-      },
-      "image/jpeg",
-      0.8,
-    );
-  });
-};
+import { generateDocxThumbnail, generatePdfThumbnail } from "@/lib/utils";
 
 const ResumeManager = () => {
   const [file, setFiles] = useState<File | null>(null);
@@ -96,26 +59,28 @@ const ResumeManager = () => {
   {
     /* This mutation will be used to save the uploaded resume's metadata to the database after a successful upload */
   }
-  const createResumeMutation = useMutation(
-    trpc.resume.create.mutationOptions({
-      onSuccess: () => {
-        setOpen(false);
-        setFiles(null);
-        setResumeName("");
-        setTargetRole("");
+  const mutationOptions = trpc.resume.create.mutationOptions();
 
-        queryClient.invalidateQueries({
-          queryKey: trpc.resume.getAll.queryKey(),
-        });
-        toast.success("Resume uploaded successfully!");
-      },
-      onError: (error) => {
-        toast.error(
-          `Failed to save resume${error?.message ? `: ${error.message}` : "."}`,
-        );
-      },
-    }),
-  );
+  const createResumeMutation = useMutation({
+    ...mutationOptions,
+    onSuccess: () => {
+      setOpen(false);
+      setFiles(null);
+      setResumeName("");
+      setTargetRole("");
+
+      queryClient.invalidateQueries({
+        queryKey: trpc.resume.getAll.queryKey(),
+      });
+
+      toast.success("Resume uploaded successfully!");
+    },
+    onError: (error) => {
+      toast.error(
+        `Failed to save resume${error?.message ? `: ${error.message}` : "."}`,
+      );
+    },
+  });
 
   {
     /* This hook from UploadThing will handle the file upload process. We pass in callbacks for when the upload completes or if there is an error. */
@@ -124,17 +89,19 @@ const ResumeManager = () => {
     onClientUploadComplete(res) {
       if (res && res.length > 0) {
         // Since we upload 2 files (pdf and image), we need to extract info from both
-        const pdfFile = res.find((f) => f.serverData?.type === "pdf");
+       const documentFile = res.find(
+          (f) => f.serverData?.type === "pdf" || f.serverData?.type === "docx"
+        );
         const imageFile = res.find((f) => f.serverData?.type === "image");
 
-        if (pdfFile) {
+        if (documentFile) {
           createResumeMutation.mutate({
-            fileName: pdfFile.name,
-            fileUrl: pdfFile.url,
+            fileName: documentFile.name,
+            fileUrl: documentFile.url,
             resumeName,
             postedRole: targetRole,
             thumbnailUrl: imageFile?.url,
-            parsedContent: pdfFile.serverData?.extractedText,
+            parsedContent: documentFile.serverData?.extractedText,
           });
         }
       }
@@ -247,14 +214,14 @@ const ResumeManager = () => {
                       Drag and drop your resume here
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      or click to browse (PDF)
+                      or click to browse (PDF| DOCX| DOC, max 4MB)
                     </p>
                   </div>
                 )}
 
                 <input
                   type="file"
-                  accept=".pdf"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={handleFileSelect}
                   className="absolute inset-0 cursor-pointer opacity-0"
                 />
@@ -319,20 +286,45 @@ const ResumeManager = () => {
                   }
                   onClick={async () => {
                     if (file) {
-                      const uploadToastId = toast.loading("Uploading resume...");
+                      const uploadToastId = toast.loading(
+                        "Uploading resume...",
+                      );
 
                       try {
-                        const imageFile = await generatePdfThumbnail(file);
+                        let imageFile: File;
+
+                        if (
+                          file.type === "application/pdf" ||
+                          file.name.endsWith(".pdf")
+                        ) {
+                          imageFile = await generatePdfThumbnail(file);
+                        } else if (
+                          file.name.endsWith(".docx") ||
+                          file.name.endsWith(".doc") ||
+                          file.type.includes("wordprocessingml") ||
+                          file.type === "application/msword"
+                        ) {
+                          imageFile = await generateDocxThumbnail(file);
+                        } else {
+                          throw new Error(
+                            "Unsupported file format for thumbnail generation",
+                          );
+                        }
+
                         await startUpload([file, imageFile]);
+
                         toast.success("Resume uploaded successfully", {
                           id: uploadToastId,
                         });
                       } catch (error) {
-                        toast.error("Failed to generate preview image");
+                        console.error("Thumbnail generation error:", error);
+                        toast.error(
+                          "Failed to generate preview image, uploading without it...",
+                        );
 
                         try {
-                          await startUpload([file]); // fallback
-                          toast.success("Resume uploaded successfully", {
+                          await startUpload([file]);
+                          toast.success("Resume uploaded (without preview)", {
                             id: uploadToastId,
                           });
                         } catch (uploadError) {

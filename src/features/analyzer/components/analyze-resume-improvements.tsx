@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -21,7 +21,86 @@ import {
 } from "lucide-react";
 import { EmptyDataCard } from "./empty-data-card";
 import { useTRPC } from "@/trpc/client";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { EditorContent, useEditor } from "@tiptap/react";
+import { Mark, mergeAttributes } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { toast } from "sonner";
+
+type SuggestionStatus = "pending" | "accepted" | "rejected";
+
+type PendingSuggestion = {
+  id: string;
+  targetSection: ImprovementTip["targetSection"];
+  targetId?: string;
+  beforeText: string;
+  afterText: string;
+  status: SuggestionStatus;
+};
+
+type QueuedApply = {
+  improvement: ImprovementTip;
+  index: number;
+};
+
+const suggestionClassByStatus: Record<SuggestionStatus, string> = {
+  pending: "bg-green-500/15 ring-1 ring-green-500/40 rounded-sm",
+  accepted: "bg-green-500/10 ring-1 ring-green-500/20 rounded-sm",
+  rejected: "",
+};
+
+const SuggestionMark = Mark.create({
+  name: "suggestionMark",
+
+  addAttributes() {
+    return {
+      suggestionId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-suggestion-id"),
+        renderHTML: (attributes) => {
+          if (!attributes.suggestionId) {
+            return {};
+          }
+
+          return { "data-suggestion-id": attributes.suggestionId };
+        },
+      },
+      status: {
+        default: "pending",
+        parseHTML: (element) =>
+          element.getAttribute("data-status") ?? "pending",
+        renderHTML: (attributes) => ({
+          "data-status": attributes.status ?? "pending",
+        }),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: "span[data-suggestion-id]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const status = (HTMLAttributes.status as SuggestionStatus) ?? "pending";
+
+    return [
+      "span",
+      mergeAttributes(HTMLAttributes, {
+        class: suggestionClassByStatus[status],
+      }),
+      0,
+    ];
+  },
+});
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
 const getPriorityStyles = (priority: string) => {
   switch (priority.toLowerCase()) {
@@ -33,6 +112,79 @@ const getPriorityStyles = (priority: string) => {
     default:
       return "border-blue-500/30 text-blue-500 bg-blue-500/10";
   }
+};
+
+type TextRange = { from: number; to: number };
+
+const findRangeByTextNode = (
+  editor: NonNullable<ReturnType<typeof useEditor>>,
+  text: string,
+): TextRange | null => {
+  const searchValue = text.trim();
+  if (!searchValue) {
+    return null;
+  }
+
+  let found: TextRange | null = null;
+
+  editor.state.doc.descendants((node, pos) => {
+    if (found || !node.isText || !node.text) {
+      return !found;
+    }
+
+    const startIndex = node.text.indexOf(searchValue);
+    if (startIndex === -1) {
+      return true;
+    }
+
+    const from = pos + startIndex;
+    found = { from, to: from + searchValue.length };
+    return false;
+  });
+
+  return found;
+};
+
+const findSuggestionMarkRange = (
+  editor: NonNullable<ReturnType<typeof useEditor>>,
+  suggestionId: string,
+): TextRange | null => {
+  const markType = editor.state.schema.marks.suggestionMark;
+
+  if (!markType) {
+    return null;
+  }
+
+  let from: number | null = null;
+  let to: number | null = null;
+
+  editor.state.doc.descendants((node, pos) => {
+    if (!node.isText || !node.text) {
+      return true;
+    }
+
+    const hasSuggestionMark = node.marks.some(
+      (mark) =>
+        mark.type === markType && mark.attrs.suggestionId === suggestionId,
+    );
+
+    if (!hasSuggestionMark) {
+      return true;
+    }
+
+    if (from === null) {
+      from = pos;
+    }
+
+    to = pos + node.nodeSize;
+    return true;
+  });
+
+  if (from === null || to === null) {
+    return null;
+  }
+
+  return { from, to };
 };
 
 const AnalyzeResumeImprovements = ({
@@ -47,34 +199,215 @@ const AnalyzeResumeImprovements = ({
   const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
   const hasImprovedScore = improvedScore != null;
   const trpc = useTRPC();
-  const updateBlockMutation = useMutation(
-    trpc.resume.applyImprovement.mutationOptions()
+  const queryClient = useQueryClient();
+  const applyImprovementMutation = useMutation(
+    trpc.resume.applyImprovement.mutationOptions(),
   );
-  const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [applyingId] = useState<string | null>(null);
+  const [isEditorDialogOpen, setIsEditorDialogOpen] = useState(false);
+  const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  const [pendingSuggestions, setPendingSuggestions] = useState<
+    Record<string, PendingSuggestion>
+  >({});
+  const queuedApplyRef = useRef<QueuedApply | null>(null);
 
-  const handleApplyToResume = async (
-    improvement: ImprovementTip,
-    index: number,
-  ) => {
-    const id = `${improvement.targetId}-${index}`;
-    setApplyingId(id);
+  const { data: parsedResumeData, isLoading: isParsedResumeLoading } = useQuery(
+    {
+      ...trpc.resume.getParsedContent.queryOptions({ resumeId }),
+      enabled: isEditorDialogOpen,
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
+    },
+  );
+
+  const parsedResumeText = parsedResumeData?.resume.parsedContent ?? "";
+
+  const editorInitialContent = useMemo(() => {
+    const text = parsedResumeText.trim();
+    // ИСправить потом для пдф файлов
+    if (text.startsWith("<")) {
+      return text;
+    }
+    return text;
+    //plainTextToEditorHtml(text);
+  }, [parsedResumeText]);
+  const editor = useEditor({
+    extensions: [StarterKit, SuggestionMark],
+    content: "<p></p>",
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class:
+          "prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[420px] max-h-[70vh] overflow-y-auto rounded-xl border border-border/60 bg-background px-8 py-6 shadow-sm",
+      },
+    },
+  });
+
+  const applySuggestionToEditor = useCallback(
+    (improvement: ImprovementTip, index: number) => {
+      if (!editor) {
+        return;
+      }
+
+      const suggestionId = `${improvement.targetId ?? "summary"}-${index}`;
+      const beforeText = (improvement.beforeText || "").trim();
+      const afterText = (improvement.afterText || "").trim();
+
+      if (!afterText) {
+        return;
+      }
+
+      const range = findRangeByTextNode(editor, beforeText);
+      const markType = editor.state.schema.marks.suggestionMark;
+
+      if (range) {
+        let tr = editor.state.tr.insertText(afterText, range.from, range.to);
+
+        if (markType) {
+          tr = tr.addMark(
+            range.from,
+            range.from + afterText.length,
+            markType.create({
+              suggestionId,
+              status: "pending",
+            }),
+          );
+        }
+
+        editor.view.dispatch(tr);
+      } else {
+        editor
+          .chain()
+          .focus()
+          .insertContent(
+            `<p><span data-suggestion-id="${suggestionId}" data-status="pending">${escapeHtml(afterText)}</span></p>`,
+          )
+          .run();
+      }
+
+      setPendingSuggestions((prev) => ({
+        ...prev,
+        [suggestionId]: {
+          id: suggestionId,
+          targetSection: improvement.targetSection,
+          targetId: improvement.targetId,
+          beforeText,
+          afterText,
+          status: "pending",
+        },
+      }));
+    },
+    [editor],
+  );
+
+  useEffect(() => {
+    if (!editor || !isEditorDialogOpen || isParsedResumeLoading) {
+      return;
+    }
+
+    editor.commands.setContent(editorInitialContent);
+
+    const queuedApply = queuedApplyRef.current;
+    if (queuedApply) {
+      applySuggestionToEditor(queuedApply.improvement, queuedApply.index);
+      queuedApplyRef.current = null;
+    }
+  }, [
+    applySuggestionToEditor,
+    editor,
+    editorInitialContent,
+    isEditorDialogOpen,
+    isParsedResumeLoading,
+  ]);
+
+  const handleClick = (improvement: ImprovementTip, index: number) => {
+    setIsEditorDialogOpen(true);
+
+    if (editor && !isParsedResumeLoading && isEditorDialogOpen) {
+      applySuggestionToEditor(improvement, index);
+      return;
+    }
+
+    queuedApplyRef.current = { improvement, index };
+  };
+
+  const handleCancelPending = (suggestionId: string) => {
+    if (!editor) {
+      return;
+    }
+
+    const pending = pendingSuggestions[suggestionId];
+    if (!pending) {
+      return;
+    }
+
+    const range = findSuggestionMarkRange(editor, suggestionId);
+    if (range) {
+      const tr = editor.state.tr.insertText(
+        pending.beforeText,
+        range.from,
+        range.to,
+      );
+      editor.view.dispatch(tr);
+    }
+
+    setPendingSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[suggestionId];
+      return next;
+    });
+  };
+
+  const handleApplyPending = async (suggestionId: string) => {
+    if (!editor) {
+      return;
+    }
+
+    const pending = pendingSuggestions[suggestionId];
+    if (!pending) {
+      return;
+    }
+
+    setPendingActionId(suggestionId);
 
     try {
-      await updateBlockMutation.mutateAsync({
+      await applyImprovementMutation.mutateAsync({
         resumeId,
-        targetSection: improvement.targetSection,
-        targetId: improvement.targetId,
-        newText: improvement.afterText,
+        targetSection: pending.targetSection,
+        targetId: pending.targetId,
+        previousText: pending.beforeText,
+        newText: pending.afterText,
       });
 
-      // Successfully applied logic here
-      // (e.g. invalidating query or showing toast)
+      await queryClient.invalidateQueries({
+        queryKey: trpc.resume.getParsedContent.queryKey({ resumeId }),
+      });
+
+      const markType = editor.state.schema.marks.suggestionMark;
+      const range = findSuggestionMarkRange(editor, suggestionId);
+
+      if (markType && range) {
+        const tr = editor.state.tr.removeMark(range.from, range.to, markType);
+        editor.view.dispatch(tr);
+      }
+
+      setPendingSuggestions((prev) => {
+        const next = { ...prev };
+        delete next[suggestionId];
+        return next;
+      });
+      toast.success("Suggestion applied and saved.");
     } catch (error) {
-      console.error(error);
+      const message =
+        error instanceof Error ? error.message : "Failed to apply suggestion.";
+      toast.error(message);
     } finally {
-      setApplyingId(null);
+      setPendingActionId(null);
     }
   };
+
+  const pendingItems = Object.values(pendingSuggestions);
 
   if (improvementsList.length === 0) {
     return (
@@ -207,7 +540,7 @@ const AnalyzeResumeImprovements = ({
                         Copy Suggestion
                       </Button>
                       <Button
-                        onClick={() => handleApplyToResume(improvement, index)}
+                        onClick={() => handleClick(improvement, index)}
                         disabled={isApplying}
                       >
                         {isApplying ? (
@@ -224,6 +557,67 @@ const AnalyzeResumeImprovements = ({
             );
           })}
         </Accordion>
+        <Dialog open={isEditorDialogOpen} onOpenChange={setIsEditorDialogOpen}>
+          <DialogTitle>Resume Editor</DialogTitle>
+          <DialogContent className="w-[95vw]! h-[95vh]! max-h-[95vh]! max-w-[95vw]! mx-auto">
+            <div className="space-y-3">
+              <h3 className="text-base font-semibold">Resume Editor</h3>
+              {pendingItems.length > 0 ? (
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+                  <p className="text-xs font-medium text-foreground">
+                    Pending suggestions: {pendingItems.length}
+                  </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {pendingItems.map((item) => {
+                      const isPendingAction = pendingActionId === item.id;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-xs text-muted-foreground">
+                              {item.afterText}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCancelPending(item.id)}
+                              disabled={isPendingAction}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleApplyPending(item.id)}
+                              disabled={isPendingAction}
+                            >
+                              {isPendingAction ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Apply"
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+              {isParsedResumeLoading ? (
+                <p className="text-sm text-muted-foreground">
+                  Loading resume content...
+                </p>
+              ) : (
+                <EditorContent editor={editor} />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </section>
   );

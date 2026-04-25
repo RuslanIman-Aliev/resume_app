@@ -57,7 +57,7 @@ const AnalyzerTabs = () => {
         toast.info(
           "Analysis triggered successfully! It may take a few moments to complete.",
         );
-          router.push(`/analyzer/${data.applicationId}`);
+        router.push(`/analyzer/${data.applicationId}`);
       },
       onError: (error) => {
         toast.error(
@@ -72,7 +72,6 @@ const AnalyzerTabs = () => {
       resumeId: selectedResumeId!,
       jobDescription: inputJobDescription!,
     });
-
   };
 
   return (
@@ -188,7 +187,7 @@ const AnalyzerTabs = () => {
                             <span className="text-border">•</span>
                             <div className="flex items-center gap-1 truncate">
                               <span className="truncate">
-                                Created  {getRelativeTime(resume.createdAt)}
+                                Updated {getRelativeTime(resume.createdAt)}
                               </span>
                             </div>
                           </div>
