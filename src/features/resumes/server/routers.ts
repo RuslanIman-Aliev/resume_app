@@ -322,6 +322,7 @@ export const resumeRouter = createTRPCRouter({
           "skills",
         ]),
         targetId: z.string().optional(),
+        previousText: z.string().optional(),
         newText: z.string(),
       }),
     )
@@ -340,10 +341,14 @@ export const resumeRouter = createTRPCRouter({
       // 1. Parse JSON
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = resume.structuredData as any;
+      let changed = false;
 
       // 2. Precisely edit the fragment
       if (input.targetSection === "summary" && data.personalInfo) {
-        data.personalInfo.summary = input.newText;
+        if (data.personalInfo.summary !== input.newText) {
+          data.personalInfo.summary = input.newText;
+          changed = true;
+        }
       }
 
       if (
@@ -352,27 +357,125 @@ export const resumeRouter = createTRPCRouter({
         Array.isArray(data.experience)
       ) {
         for (const exp of data.experience) {
-          if (exp.id === input.targetId) {
+          if (exp.id === input.targetId && exp.role !== input.newText) {
             exp.role = input.newText;
+            changed = true;
           }
           if (Array.isArray(exp.bullets)) {
             for (const bullet of exp.bullets) {
-              if (bullet.id === input.targetId) {
+              if (
+                bullet.id === input.targetId &&
+                bullet.text !== input.newText
+              ) {
                 bullet.text = input.newText;
+                changed = true;
               }
             }
           }
         }
       }
 
-      // Update for education similarly if needed
+      if (
+        input.targetSection === "education" &&
+        input.targetId &&
+        Array.isArray(data.education)
+      ) {
+        for (const edu of data.education) {
+          if (edu.id === input.targetId && edu.degree !== input.newText) {
+            edu.degree = input.newText;
+            changed = true;
+          }
+
+          if (Array.isArray(edu.bullets)) {
+            for (const bullet of edu.bullets) {
+              if (
+                bullet.id === input.targetId &&
+                bullet.text !== input.newText
+              ) {
+                bullet.text = input.newText;
+                changed = true;
+              }
+            }
+          }
+        }
+      }
+
+      if (
+        input.targetSection === "projects" &&
+        input.targetId &&
+        Array.isArray(data.projects)
+      ) {
+        for (const project of data.projects) {
+          if (project.id === input.targetId && project.name !== input.newText) {
+            project.name = input.newText;
+            changed = true;
+          }
+
+          if (Array.isArray(project.bullets)) {
+            for (const bullet of project.bullets) {
+              if (
+                bullet.id === input.targetId &&
+                bullet.text !== input.newText
+              ) {
+                bullet.text = input.newText;
+                changed = true;
+              }
+            }
+          }
+        }
+      }
+
+      if (input.targetSection === "skills") {
+        const normalizedNewSkill = input.newText.trim();
+
+        if (!Array.isArray(data.skills)) {
+          data.skills = normalizedNewSkill ? [normalizedNewSkill] : [];
+          changed = true;
+        } else if (
+          normalizedNewSkill &&
+          !data.skills.some(
+            (skill: string) => skill?.trim() === normalizedNewSkill,
+          )
+        ) {
+          data.skills.push(normalizedNewSkill);
+          changed = true;
+        }
+      }
+
+      if (!changed) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "No matching target was found to update in structured resume data.",
+        });
+      }
+
+      const previousText = input.previousText?.trim();
+      const newText = input.newText.trim();
+
+      let nextParsedContent = resume.parsedContent;
+
+      if (typeof resume.parsedContent === "string") {
+        if (previousText && resume.parsedContent.includes(previousText)) {
+          nextParsedContent = resume.parsedContent.replace(
+            previousText,
+            newText,
+          );
+        } else if (newText && !resume.parsedContent.includes(newText)) {
+          const base = resume.parsedContent.trim();
+          nextParsedContent = base.length > 0 ? `${base}\n${newText}` : newText;
+        }
+      }
 
       // 3. Save back to DB
       await prisma.resume.update({
         where: { id: input.resumeId },
-        data: { structuredData: data },
+        data: {
+          structuredData: data,
+          parsedContent: nextParsedContent,
+        },
       });
 
-      return { success: true };
+      return { success: true, changed: true };
     }),
 });
