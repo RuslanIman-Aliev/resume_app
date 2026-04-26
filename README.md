@@ -310,26 +310,93 @@ The app should be available at http://localhost:3000.
 - npm run build - Build for production.
 - npm run start - Run the production build.
 - npm run lint - Lint the codebase.
+- npm run typecheck - Run TypeScript type checking without emit.
 - npm run test - Run unit/integration tests with Vitest.
+- npm run test:server - Run focused server/router tests.
+- npm run test:coverage - Run Vitest with coverage output.
 - npm run test:watch - Run Vitest in watch mode.
 - npm run test:e2e - Run Playwright end-to-end tests.
+- npm run test:e2e:smoke - Run a fast smoke subset of e2e tests.
+- npm run test:e2e:full - Run the full Playwright e2e suite.
 - npm run postinstall - Prisma generate.
 
 ## Testing
 
-Unit and integration tests:
+This project uses two test layers:
+
+- Vitest for fast unit/integration tests (server logic and router behavior).
+- Playwright for end-to-end browser flows.
+
+### Run all unit/integration tests
 
 ```
 npm run test
 ```
 
-End-to-end tests:
+### Run focused server/router tests
+
+```
+npm run test:server
+```
+
+### Run unit/integration tests in watch mode
+
+```
+npm run test:watch
+```
+
+### Run a focused test file
+
+```
+npx vitest run src/features/resumes/server/routers.test.ts
+```
+
+### Run coverage report
+
+```
+npm run test:coverage
+```
+
+Vitest coverage uses the V8 provider and outputs text plus HTML reports.
+
+### Run all e2e tests
 
 ```
 npm run test:e2e
 ```
 
+### Run smoke e2e tests
+
+```
+npm run test:e2e:smoke
+```
+
+### Run full e2e tests
+
+```
+npm run test:e2e:full
+```
+
 Playwright starts the app automatically using the configured webServer command.
+
+### CI quality gate
+
+GitHub Actions runs lint, coverage-enabled unit tests, and Playwright e2e tests on pull requests and pushes to main/master.
+
+### Current coverage highlights
+
+- Resume router create/getAll pagination behavior.
+- Parsed content and analysis NOT_FOUND error paths.
+- Inngest event dispatch for resume analysis and job match analysis.
+- Job match payload behavior with structuredData fallback/priority.
+- applyImprovement mutation behavior:
+  - summary replacement and parsedContent sync
+  - skills append behavior
+  - NOT_FOUND when structured data is unavailable
+  - PRECONDITION_FAILED when no effective change is applied
+- analyzer improvements UI behavior:
+  - editor loading state rendering
+  - pending suggestion queue add/cancel/apply flow
 
 ## Database and Prisma workflow
 

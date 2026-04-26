@@ -8,6 +8,7 @@ const prismaMock = vi.hoisted(() => ({
     count: vi.fn(),
     findMany: vi.fn(),
     findFirst: vi.fn(),
+    update: vi.fn(),
   },
   resumeAnalysis: {
     findFirst: vi.fn(),
@@ -52,6 +53,7 @@ const createCaller = createCallerFactory(resumeRouter);
 const session = { user: { id: "user_123" } };
 
 beforeEach(() => {
+  vi.clearAllMocks();
   headersMock.mockResolvedValue(new Headers());
   authMock.api.getSession.mockResolvedValue(session);
 });
@@ -179,6 +181,10 @@ describe("resumeRouter", () => {
     const caller = createCaller({});
     const result = await caller.getParsedContent({ resumeId: "resume_1" });
 
+    expect(prismaMock.resume.findFirst).toHaveBeenCalledWith({
+      where: { id: "resume_1", userId: session.user.id },
+      select: { parsedContent: true, resumeName: true, postedRole: true },
+    });
     expect(result).toEqual({ resume });
   });
 
@@ -390,6 +396,148 @@ describe("resumeRouter", () => {
       applicationId: "application_3",
     });
 
+    expect(prismaMock.jobApplication.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "application_3",
+        userId: session.user.id,
+        status: "ANALYZED",
+      },
+    });
     expect(result).toEqual({ application });
+  });
+
+  it("uses structuredData payload when triggering job match analysis", async () => {
+    prismaMock.jobApplication.create.mockResolvedValue({
+      id: "application_4",
+      resume: {
+        parsedContent: "Fallback parsed content",
+        structuredData: {
+          personalInfo: { summary: "Senior frontend engineer" },
+          skills: ["React", "TypeScript"],
+        },
+      },
+    });
+    inngestMock.send.mockResolvedValue({});
+
+    const caller = createCaller({});
+    await caller.triggerJobMatchAnalysis({
+      resumeId: "resume_1",
+      jobDescription: "Need frontend engineer",
+    });
+
+    expect(inngestMock.send).toHaveBeenCalledWith({
+      name: "app/job-matched.analyzed",
+      data: {
+        applicationId: "application_4",
+        resumeId: "resume_1",
+        jobDescription: "Need frontend engineer",
+        parsedContent: JSON.stringify(
+          {
+            personalInfo: { summary: "Senior frontend engineer" },
+            skills: ["React", "TypeScript"],
+          },
+          null,
+          2,
+        ),
+      },
+    });
+  });
+
+  it("applies summary improvement and replaces parsed content text", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      id: "resume_1",
+      parsedContent: "Old summary text\nOther line",
+      structuredData: {
+        personalInfo: { summary: "Old summary text" },
+      },
+    });
+    prismaMock.resume.update.mockResolvedValue({ id: "resume_1" });
+
+    const caller = createCaller({});
+    const result = await caller.applyImprovement({
+      resumeId: "resume_1",
+      targetSection: "summary",
+      previousText: "Old summary text",
+      newText: "New summary text",
+    });
+
+    expect(prismaMock.resume.update).toHaveBeenCalledWith({
+      where: { id: "resume_1" },
+      data: {
+        structuredData: {
+          personalInfo: { summary: "New summary text" },
+        },
+        parsedContent: "New summary text\nOther line",
+      },
+    });
+    expect(result).toEqual({ success: true, changed: true });
+  });
+
+  it("adds a new unique skill and appends text when previous text is absent", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      id: "resume_1",
+      parsedContent: "Existing parsed content",
+      structuredData: {
+        skills: ["React", "TypeScript"],
+      },
+    });
+    prismaMock.resume.update.mockResolvedValue({ id: "resume_1" });
+
+    const caller = createCaller({});
+    await caller.applyImprovement({
+      resumeId: "resume_1",
+      targetSection: "skills",
+      newText: "Node.js",
+    });
+
+    expect(prismaMock.resume.update).toHaveBeenCalledWith({
+      where: { id: "resume_1" },
+      data: {
+        structuredData: {
+          skills: ["React", "TypeScript", "Node.js"],
+        },
+        parsedContent: "Existing parsed content\nNode.js",
+      },
+    });
+  });
+
+  it("throws NOT_FOUND when applyImprovement cannot load structured resume data", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      id: "resume_1",
+      structuredData: null,
+      parsedContent: "Any",
+    });
+
+    const caller = createCaller({});
+
+    await expect(
+      caller.applyImprovement({
+        resumeId: "resume_1",
+        targetSection: "summary",
+        newText: "Updated summary",
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(prismaMock.resume.update).not.toHaveBeenCalled();
+  });
+
+  it("throws PRECONDITION_FAILED when applyImprovement does not change data", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      id: "resume_1",
+      parsedContent: "Summary stays same",
+      structuredData: {
+        personalInfo: { summary: "Summary stays same" },
+      },
+    });
+
+    const caller = createCaller({});
+
+    await expect(
+      caller.applyImprovement({
+        resumeId: "resume_1",
+        targetSection: "summary",
+        newText: "Summary stays same",
+      }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(prismaMock.resume.update).not.toHaveBeenCalled();
   });
 });
