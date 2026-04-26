@@ -27,6 +27,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { Mark, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type SuggestionStatus = "pending" | "accepted" | "rejected";
 
@@ -609,9 +610,43 @@ const AnalyzeResumeImprovements = ({
                 </div>
               ) : null}
               {isParsedResumeLoading ? (
-                <p className="text-sm text-muted-foreground">
-                  Loading resume content...
-                </p>
+                <div
+                  data-testid="resume-editor-loading"
+                  className="relative overflow-hidden rounded-2xl border border-border/70 bg-linear-to-br from-primary/10 via-card to-secondary/30 p-5"
+                >
+                  <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
+                  <div className="pointer-events-none absolute -right-16 -bottom-16 h-44 w-44 rounded-full bg-chart-2/15 blur-3xl" />
+
+                  <div className="relative space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/40 bg-primary/15 text-primary shadow-sm">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        </div>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-44" />
+                          <Skeleton className="h-3 w-56" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-7 w-24 rounded-full" />
+                    </div>
+
+                    <div className="rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
+                      <Skeleton className="h-4 w-1/3" />
+                      {Array.from({ length: 8 }).map((_, index) => (
+                        <Skeleton
+                          key={`editor-loading-line-${index}`}
+                          className="h-3 w-full"
+                        />
+                      ))}
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Skeleton className="h-9 w-20 rounded-md" />
+                      <Skeleton className="h-9 w-24 rounded-md" />
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <EditorContent editor={editor} />
               )}
