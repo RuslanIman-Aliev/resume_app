@@ -24,6 +24,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnalyzerError, AnalyzerLoading } from "./analyzer-states";
 import { useRouter } from "next/navigation";
+import { getErrorFeedback } from "@/lib/error-feedback";
 
 const AnalyzerTabs = () => {
   const trpc = useTRPC();
@@ -61,7 +62,9 @@ const AnalyzerTabs = () => {
       },
       onError: (error) => {
         toast.error(
-          error.message || "Failed to trigger analysis. Please try again.",
+          getErrorFeedback(error, {
+            fallbackMessage: "Failed to trigger analysis. Please try again.",
+          }).message,
         );
       },
     }),

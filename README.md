@@ -246,6 +246,11 @@ UploadThing:
 
 - UploadThing relies on its own environment variables. If you use it in production, set them according to UploadThing docs (e.g., UPLOADTHING_APP_ID, UPLOADTHING_SECRET).
 
+Startup validation:
+
+- The app validates required server environment variables at startup.
+- Missing or malformed values fail fast instead of surfacing as late request-time errors.
+
 Example .env (replace values):
 
 ```
@@ -318,7 +323,14 @@ The app should be available at http://localhost:3000.
 - npm run test:e2e - Run Playwright end-to-end tests.
 - npm run test:e2e:smoke - Run a fast smoke subset of e2e tests.
 - npm run test:e2e:full - Run the full Playwright e2e suite.
+- npm run check:bundle-size - Check total and route-level production JS bundle budgets.
 - npm run postinstall - Prisma generate.
+
+Bundle budget environment variables:
+
+- BUNDLE_SIZE_LIMIT_BYTES (default: 10000000)
+- ROUTE_BUNDLE_SIZE_LIMIT_BYTES (default: 4500000)
+- ROUTE_BUNDLE_SIZE_BUDGETS_JSON (optional JSON map, example: {"/dashboard":3500000,"/resumes":3800000})
 
 ## Testing
 
@@ -381,7 +393,12 @@ Playwright starts the app automatically using the configured webServer command.
 
 ### CI quality gate
 
-GitHub Actions runs lint, coverage-enabled unit tests, and Playwright e2e tests on pull requests and pushes to main/master.
+GitHub Actions runs lint, secret scanning, typecheck, coverage-enabled unit tests, a production build, bundle-size checks, and Playwright e2e tests on pull requests and pushes to main/master.
+
+### Security and logging
+
+- Server-side environment variables are validated on startup.
+- Sensitive upload and file-processing failures are logged through a scrubbed logger that avoids dumping raw objects.
 
 ### Current coverage highlights
 

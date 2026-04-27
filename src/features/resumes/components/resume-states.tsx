@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FeedbackState } from "@/components/ui/feedback-state";
 import { AlertTriangle, FileText, RefreshCcw } from "lucide-react";
 
 type ResumeErrorProps = {
@@ -11,35 +11,24 @@ type ResumeErrorProps = {
 
 export const ResumeError = ({ onRetry, isRetrying }: ResumeErrorProps) => {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-destructive/40 bg-linear-to-br from-destructive/10 via-card to-secondary/40 p-10">
-      <div className="pointer-events-none absolute -top-16 left-8 h-44 w-44 rounded-full bg-destructive/20 blur-3xl" />
-
-      <div className="relative flex min-h-56 flex-col items-center justify-center gap-5 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-destructive/50 bg-destructive/15 shadow-lg shadow-destructive/20">
-          <AlertTriangle className="h-8 w-8 text-destructive" />
-        </div>
-
-        <div>
-          <p className="text-xl font-semibold tracking-tight">
-            Resume feed is temporarily offline
-          </p>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            We couldn&apos;t load your resumes right now. Please retry in a
-            moment.
-          </p>
-        </div>
-
-        <Button
-          onClick={onRetry}
-          variant="secondary"
-          className="gap-2"
-          disabled={isRetrying || !onRetry}
-        >
-          <RefreshCcw className="h-4 w-4" />
-          Retry loading
-        </Button>
-      </div>
-    </div>
+    <FeedbackState
+      status="error"
+      layout="card"
+      icon={<AlertTriangle className="h-8 w-8 text-destructive" />}
+      title="Resume feed is temporarily offline"
+      description="We couldn't load your resumes right now. Please retry in a moment."
+      primaryAction={
+        onRetry
+          ? {
+              label: "Retry loading",
+              onClick: onRetry,
+              disabled: isRetrying,
+              icon: <RefreshCcw className="h-4 w-4" />,
+              variant: "secondary",
+            }
+          : undefined
+      }
+    />
   );
 };
 
@@ -94,27 +83,17 @@ export const ResumeLoading = () => {
 
 export const ResumeEmpty = () => {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-primary/35 bg-linear-to-br from-primary/10 via-card to-chart-2/10 p-10">
-      <div className="pointer-events-none absolute -top-20 -left-16 h-56 w-56 rounded-full bg-primary/20 blur-3xl" />
-      <div className="pointer-events-none absolute right-6 bottom-2 h-40 w-40 rounded-full bg-chart-2/20 blur-3xl" />
-
-      <div className="relative flex min-h-56 flex-col items-center justify-center gap-5 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/40 bg-primary/15 shadow-lg shadow-primary/20">
-          <FileText className="h-8 w-8 text-primary" />
-        </div>
-
-        <div>
-          <p className="text-xl font-semibold tracking-tight">No resumes yet</p>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            Upload your first resume to unlock AI scoring, role-fit insights,
-            and improvement tracking.
-          </p>
-        </div>
-
+    <FeedbackState
+      status="default"
+      layout="card"
+      icon={<FileText className="h-8 w-8 text-primary" />}
+      title="No resumes yet"
+      description="Upload your first resume to unlock AI scoring, role-fit insights, and improvement tracking."
+      extra={
         <Badge className="border-0 bg-primary/15 text-primary">
           Best results with PDF files
         </Badge>
-      </div>
-    </div>
+      }
+    />
   );
 };

@@ -4,6 +4,7 @@ import PusherClient from "pusher-js";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { publicEnv } from "@/lib/env.public";
 
 // Custom hook to listen for Pusher events related to resume analysis completion.
 // It takes the ID of the resume being analyzed and a callback function to execute when the analysis is complete.
@@ -20,8 +21,15 @@ export const useResumePusher = (
   useEffect(() => {
     if (!analyzingId) return;
 
-    const pusher = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    if (
+      !publicEnv.NEXT_PUBLIC_PUSHER_KEY ||
+      !publicEnv.NEXT_PUBLIC_PUSHER_CLUSTER
+    ) {
+      return;
+    }
+
+    const pusher = new PusherClient(publicEnv.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: publicEnv.NEXT_PUBLIC_PUSHER_CLUSTER,
     });
 
     const channel = pusher.subscribe("resume-updates");
@@ -33,12 +41,14 @@ export const useResumePusher = (
         queryKey: trpc.resume.getAnalysisResult.queryOptions({
           resumeId: analyzingId,
         }).queryKey,
+        refetchType: "active",
       });
 
       queryClient.invalidateQueries({
         queryKey: trpc.resume.getImprovements.queryOptions({
           resumeId: analyzingId,
         }).queryKey,
+        refetchType: "active",
       });
 
       onSuccess();
@@ -68,8 +78,15 @@ export const useJobMatchPusher = (
   useEffect(() => {
     if (!applicationId) return;
 
-    const pusher = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    if (
+      !publicEnv.NEXT_PUBLIC_PUSHER_KEY ||
+      !publicEnv.NEXT_PUBLIC_PUSHER_CLUSTER
+    ) {
+      return;
+    }
+
+    const pusher = new PusherClient(publicEnv.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: publicEnv.NEXT_PUBLIC_PUSHER_CLUSTER,
     });
 
     // Subscribe to the new job-match channel
@@ -78,12 +95,12 @@ export const useJobMatchPusher = (
     channel.bind(`analyzed-${applicationId}`, () => {
       toast.success("Job Match Analysis complete!", { icon: "🎯" });
 
-      // Invalidate the query that fetches the specific job match results
-      // queryClient.invalidateQueries({
-      //   queryKey: trpc.jobApplication.getById.queryOptions({
-      //     applicationId: applicationId,
-      //   }).queryKey,
-      // });
+      queryClient.invalidateQueries({
+        queryKey: trpc.resume.getJobMatchResult.queryOptions({
+          applicationId,
+        }).queryKey,
+        refetchType: "active",
+      });
 
       onSuccess();
     });

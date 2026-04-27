@@ -35,6 +35,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ResumeEmpty, ResumeError, ResumeLoading } from "./resume-states";
+import { getErrorFeedback } from "@/lib/error-feedback";
 
 const ResumeCard = () => {
   const trpc = useTRPC();
@@ -59,6 +60,15 @@ const ResumeCard = () => {
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
     trpc.resume.getAll.queryOptions({ page: currentPage }),
   );
+
+  useEffect(() => {
+    if (!data?.resumes?.length) return;
+
+    router.prefetch("/analyzer");
+    for (const resume of data.resumes.slice(0, 3)) {
+      router.prefetch(`/ai-coach/${resume.id}`);
+    }
+  }, [data?.resumes, router]);
 
   // When the server clamps an out-of-range page, redirect the URL to match
   useEffect(() => {
@@ -94,7 +104,11 @@ const ResumeCard = () => {
         router.push(`/ai-coach/${variables.resumeId}?${analysisParams}`);
       },
       onError: (error) => {
-        toast.error(error.message || "Failed to start analysis");
+        toast.error(
+          getErrorFeedback(error, {
+            fallbackMessage: "Failed to start analysis",
+          }).message,
+        );
         setAnalyzingId(null);
       },
     }),
@@ -249,6 +263,12 @@ const ResumeCard = () => {
                         variant="outline"
                         size="lg"
                         onClick={() => router.push(`/ai-coach/${resume.id}`)}
+                        onMouseEnter={() =>
+                          router.prefetch(`/ai-coach/${resume.id}`)
+                        }
+                        onFocus={() =>
+                          router.prefetch(`/ai-coach/${resume.id}`)
+                        }
                         disabled={isPending || analyzingId === resume.id}
                       >
                         See Resume Insights &rarr;

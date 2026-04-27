@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
+import { useTRPC } from "@/trpc/client";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   BrainCircuit,
   FileText,
@@ -23,8 +25,18 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { logError } from "@/lib/logger";
+
+const KEY_ROUTES = [
+  "/dashboard",
+  "/resumes",
+  "/analyzer",
+  "/recent-analyzer",
+  "/tracker",
+];
 
 export function Header() {
   const navItems = [
@@ -48,11 +60,47 @@ export function Header() {
 
   const { data: session, isPending } = authClient.useSession();
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+
+  useEffect(() => {
+    if (isPending || !session) {
+      return;
+    }
+
+    const warmKeyScreens = () => {
+      for (const route of KEY_ROUTES) {
+        router.prefetch(route);
+      }
+
+      void queryClient.prefetchQuery(
+        trpc.resume.getLatest4Analyses.queryOptions(),
+      );
+      void queryClient.prefetchQuery(
+        trpc.resume.getResumesAndAnalyses.queryOptions(),
+      );
+      void queryClient.prefetchQuery(
+        trpc.resume.getAll.queryOptions({ page: 1, limit: 6 }),
+      );
+    };
+
+    if (
+      typeof globalThis.requestIdleCallback === "function" &&
+      typeof globalThis.cancelIdleCallback === "function"
+    ) {
+      const idleHandle = globalThis.requestIdleCallback(warmKeyScreens);
+      return () => globalThis.cancelIdleCallback(idleHandle);
+    }
+
+    const timeoutHandle = setTimeout(warmKeyScreens, 300);
+    return () => clearTimeout(timeoutHandle);
+  }, [isPending, queryClient, router, session, trpc]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between ">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
+        <Link href="/dashboard" prefetch className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Sparkles className="h-5 w-5" />
           </div>
@@ -62,7 +110,13 @@ export function Header() {
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-1">
           {navItems.map((item) => (
-            <Link key={item.id} href={item.href}>
+            <Link
+              key={item.id}
+              href={item.href}
+              prefetch
+              onMouseEnter={() => router.prefetch(item.href)}
+              onFocus={() => router.prefetch(item.href)}
+            >
               <Button
                 variant={"ghost"}
                 size="sm"
@@ -92,7 +146,13 @@ export function Header() {
             <DropdownMenuContent align="end" className="w-48">
               {navItems.map((item) => (
                 <DropdownMenuItem key={item.id} asChild>
-                  <Link href={item.href} className="flex items-center gap-2">
+                  <Link
+                    href={item.href}
+                    prefetch
+                    onMouseEnter={() => router.prefetch(item.href)}
+                    onFocus={() => router.prefetch(item.href)}
+                    className="flex items-center gap-2"
+                  >
                     <item.icon className="h-4 w-4" />
                     {item.label}
                   </Link>
@@ -149,7 +209,7 @@ export function Header() {
                     try {
                       await authClient.signOut();
                     } catch (error) {
-                      console.error("Failed to sign out", error);
+                      logError("Failed to sign out", error);
                     }
                   }}
                 >

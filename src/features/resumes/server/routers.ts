@@ -1,20 +1,33 @@
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
+import {
+  normalizeResumeParsedContent,
+  updateResumeParsedContent,
+} from "@/lib/resume-content";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
+/**
+ * tRPC router for resume lifecycle operations, including uploads,
+ * analysis, job matching, and structured content updates.
+ */
 export const resumeRouter = createTRPCRouter({
-  // For uploading resume - we will save the resume info in database and trigger the analysis workflow in background using inngest, which will update the database once done. This is done to offload the analysis work from the main request thread and provide a better user experience.
+  /**
+   * Creates a resume record for the authenticated user.
+   *
+   * Persists upload metadata, the public file URL, and optional parsed
+   * content for downstream analysis workflows.
+   */
   create: protectedProcedure
     .input(
       z.object({
-        fileName: z.string(),
+        fileName: z.string().trim().min(1).max(255),
         fileUrl: z.string().url(),
-        resumeName: z.string(),
-        postedRole: z.string(),
+        resumeName: z.string().trim().min(1).max(120),
+        postedRole: z.string().trim().min(1).max(120),
         thumbnailUrl: z.string().optional().nullable(),
-        parsedContent: z.string().optional().nullable(),
+        parsedContent: z.string().max(300_000).optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -26,12 +39,17 @@ export const resumeRouter = createTRPCRouter({
           resumeLink: input.fileUrl,
           userId: ctx.auth.user.id,
           resumePreviewLink: input.thumbnailUrl,
-          parsedContent: input.parsedContent,
+          parsedContent: normalizeResumeParsedContent(input.parsedContent),
         },
       });
       return { resume };
     }),
-  // For listing resumes in dashboard with pagination - we will fetch 6 resumes at a time and also return total count for pagination calculation on client side
+  /**
+   * Returns a paginated list of the authenticated user's resumes.
+   *
+   * The response includes pagination metadata and clamps out-of-range page
+   * values to the nearest valid page.
+   */
   getAll: protectedProcedure
     .input(
       z
@@ -86,7 +104,12 @@ export const resumeRouter = createTRPCRouter({
         },
       };
     }),
-  // For listing resumes in analyzer page - we will fetch all resumes without pagination as we want to show all resumes in the dropdown
+  /**
+   * Returns all user-owned resumes together with their latest analyses.
+   *
+   * This is used by the analyzer selector to let the user pick a resume and
+   * inspect its most recent scoring data.
+   */
   getResumesAndAnalyses: protectedProcedure.query(async ({ ctx }) => {
     const resumes = await prisma.resume.findMany({
       where: { userId: ctx.auth.user.id },
@@ -111,7 +134,11 @@ export const resumeRouter = createTRPCRouter({
     });
     return { resumes };
   }),
-  // For resume details page - get parsed content and other resume info
+  /**
+   * Returns parsed resume content and basic metadata for a specific resume.
+   *
+   * The resume must belong to the authenticated user.
+   */
   getParsedContent: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -124,7 +151,11 @@ export const resumeRouter = createTRPCRouter({
       }
       return { resume };
     }),
-  // Trigger resume analysis by sending data to inngest function, which will then trigger the analysis workflow and update the database once done. This is done to offload the analysis work from the main request thread and provide a better user experience.
+  /**
+   * Triggers asynchronous resume analysis for a user-owned resume.
+   *
+   * The job is dispatched to Inngest after ownership is verified.
+   */
   triggerAnalysis: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -148,7 +179,12 @@ export const resumeRouter = createTRPCRouter({
       });
       return { success: true };
     }),
-  // For results page - get analysis result for a resume
+  /**
+   * Returns the latest completed analysis for a specific user-owned resume.
+   *
+   * The analysis payload is normalized so the client receives typed arrays for
+   * strengths, quick wins, and improvements.
+   */
   getAnalysisResult: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -184,7 +220,11 @@ export const resumeRouter = createTRPCRouter({
         },
       };
     }),
-  // For dashboard - get latest analyses with resume info to show in recent analyses section on dashboard
+  /**
+   * Returns the four most recent analyses for the authenticated user.
+   *
+   * This powers the dashboard "Recent Analyses" widget.
+   */
   getLatest4Analyses: protectedProcedure.query(async ({ ctx }) => {
     const analyses = await prisma.resumeAnalysis.findMany({
       where: { resume: { userId: ctx.auth.user.id } },
@@ -206,14 +246,18 @@ export const resumeRouter = createTRPCRouter({
     });
     return { analyses };
   }),
-  // For dashboard - get total count of analyses
+  /**
+   * Returns the total number of analyses available to the authenticated user.
+   */
   getAnalysesCount: protectedProcedure.query(async ({ ctx }) => {
     const count = await prisma.resumeAnalysis.count({
       where: { resume: { userId: ctx.auth.user.id } },
     });
     return { count };
   }),
-  // For improvements section - get all improvements for a resume
+  /**
+   * Returns AI improvement suggestions from the latest resume analysis.
+   */
   getImprovements: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -238,34 +282,37 @@ export const resumeRouter = createTRPCRouter({
         improvements: analysis.improvements as any[],
       };
     }),
-  // For job match analysis - trigger job match analysis by sending data to inngest function, which will then trigger the analysis workflow and update the database once done. This is done to offload the analysis work from the main request thread and provide a better user experience.
+  /**
+   * Creates a job application analysis task and dispatches it to Inngest.
+   *
+   * The resume is validated for ownership and for the presence of parsed
+   * content before the asynchronous workflow starts.
+   */
   triggerJobMatchAnalysis: protectedProcedure
     .input(
       z.object({
         resumeId: z.string(),
-        jobDescription: z.string(),
+        jobDescription: z.string().trim().min(1).max(20_000),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const application = await prisma.jobApplication.create({
-        data: {
-          userId: ctx.auth.user.id,
-          resumeId: input.resumeId,
-          jobDescription: input.jobDescription,
-          status: "TO_APPLY",
-        },
-        include: {
-          resume: {
-            select: {
-              parsedContent: true,
-              structuredData: true,
-            },
-          },
+      const ownedResume = await prisma.resume.findFirst({
+        where: { id: input.resumeId, userId: ctx.auth.user.id },
+        select: {
+          parsedContent: true,
+          structuredData: true,
         },
       });
 
-      const parsedContent = application.resume.parsedContent;
-      const structuredData = application.resume.structuredData;
+      if (!ownedResume) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resume not found",
+        });
+      }
+
+      const parsedContent = ownedResume.parsedContent;
+      const structuredData = ownedResume.structuredData;
 
       if (!parsedContent?.trim()) {
         throw new TRPCError({
@@ -274,6 +321,15 @@ export const resumeRouter = createTRPCRouter({
             "Resume parsed content is required before triggering job match analysis",
         });
       }
+
+      const application = await prisma.jobApplication.create({
+        data: {
+          userId: ctx.auth.user.id,
+          resumeId: input.resumeId,
+          jobDescription: input.jobDescription,
+          status: "TO_APPLY",
+        },
+      });
 
       await inngest.send({
         name: "app/job-matched.analyzed",
@@ -289,7 +345,11 @@ export const resumeRouter = createTRPCRouter({
 
       return { applicationId: application.id };
     }),
-  // For job match result page - get analysis result for a job application
+  /**
+   * Returns a completed job match analysis for a user-owned application.
+   *
+   * Only applications with an ANALYZED status are returned.
+   */
   getJobMatchResult: protectedProcedure
     .input(z.object({ applicationId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -309,7 +369,12 @@ export const resumeRouter = createTRPCRouter({
       return { application };
     }),
 
-  // For applying AI suggestions to the structured JSON resume
+  /**
+   * Applies a single AI suggestion to structured resume JSON.
+   *
+   * The procedure updates the matching fragment in structured data and keeps
+   * the parsed text content aligned with the edited value when possible.
+   */
   applyImprovement: protectedProcedure
     .input(
       z.object({
@@ -321,9 +386,9 @@ export const resumeRouter = createTRPCRouter({
           "projects",
           "skills",
         ]),
-        targetId: z.string().optional(),
-        previousText: z.string().optional(),
-        newText: z.string(),
+        targetId: z.string().trim().max(120).optional(),
+        previousText: z.string().max(20_000).optional(),
+        newText: z.string().trim().min(1).max(20_000),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -453,28 +518,30 @@ export const resumeRouter = createTRPCRouter({
       const previousText = input.previousText?.trim();
       const newText = input.newText.trim();
 
-      let nextParsedContent = resume.parsedContent;
-
-      if (typeof resume.parsedContent === "string") {
-        if (previousText && resume.parsedContent.includes(previousText)) {
-          nextParsedContent = resume.parsedContent.replace(
-            previousText,
-            newText,
-          );
-        } else if (newText && !resume.parsedContent.includes(newText)) {
-          const base = resume.parsedContent.trim();
-          nextParsedContent = base.length > 0 ? `${base}\n${newText}` : newText;
-        }
-      }
+      const nextParsedContent = updateResumeParsedContent(
+        resume.parsedContent,
+        previousText,
+        newText,
+      );
 
       // 3. Save back to DB
-      await prisma.resume.update({
-        where: { id: input.resumeId },
+      const updateResult = await prisma.resume.updateMany({
+        where: {
+          id: input.resumeId,
+          userId: ctx.auth.user.id,
+        },
         data: {
           structuredData: data,
           parsedContent: nextParsedContent,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resume not found",
+        });
+      }
 
       return { success: true, changed: true };
     }),

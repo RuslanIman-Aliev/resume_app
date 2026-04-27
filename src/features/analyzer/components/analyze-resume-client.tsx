@@ -98,8 +98,8 @@ export const AnalyzeResumeClient = () => {
   const isPendingAnalysis = errorCode === "NOT_FOUND";
 
   const handleAnalysisReady = useCallback(() => {
-    refetch();
-  }, [refetch]);
+    // Query invalidation in the pusher hook is enough to refresh active screens.
+  }, []);
   useJobMatchPusher(analyzeId ?? "", handleAnalysisReady);
 
   if (isLoading || isPendingAnalysis) {

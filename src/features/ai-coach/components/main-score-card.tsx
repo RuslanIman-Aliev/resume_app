@@ -60,7 +60,7 @@ const MainScoreCard = () => {
   const analysisParam = searchParams.get("analysis");
   const analysisStartedAt = Number(searchParams.get("ts")) || 0;
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     ...trpc.resume.getAnalysisResult.queryOptions({ resumeId }),
     retry: (failureCount, queryError) => {
       const errorCode = (queryError as { data?: { code?: string } } | null)
@@ -97,9 +97,8 @@ const MainScoreCard = () => {
   }, [analysisParam, pathname, router, searchParams]);
 
   const handleAnalysisReady = useCallback(() => {
-    refetch();
     clearAnalysisParams();
-  }, [clearAnalysisParams, refetch]);
+  }, [clearAnalysisParams]);
 
   useEffect(() => {
     if (!isAwaitingAnalysis || !analysisStartedAt) return;
@@ -117,6 +116,15 @@ const MainScoreCard = () => {
   ]);
 
   useResumePusher(isAwaitingAnalysis ? resumeId : null, handleAnalysisReady);
+
+  useEffect(() => {
+    if (!data?.analysis) return;
+
+    queryClient.invalidateQueries({
+      queryKey: trpc.resume.getAll.queryKey(),
+      refetchType: "active",
+    });
+  }, [data?.analysis?.id, queryClient, trpc]);
 
   if (isLoading) {
     return <MainScoreSkeleton />;
@@ -138,9 +146,6 @@ const MainScoreCard = () => {
 
   const strengths = (data?.analysis?.strengths as string[]) || [];
 
-  queryClient.invalidateQueries({
-    queryKey: trpc.resume.getAll.queryKey(),
-  });
   return (
     <>
       <div className="grid grid-cols-3 gap-4">

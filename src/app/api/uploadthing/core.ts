@@ -1,8 +1,10 @@
 import { auth } from "@/lib/auth";
+import { normalizeResumeParsedContent } from "@/lib/resume-content";
 import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError, UTApi } from "uploadthing/server";
 import { extractText } from "unpdf";
 import mammoth from "mammoth";
+import { logError } from "@/lib/logger";
 
 const f = createUploadthing();
 const utapi = new UTApi();
@@ -36,12 +38,14 @@ export const ourFileRouter = {
       }
       return { userId: session.user.id };
     })
-   .onUploadComplete(async ({ metadata, file }) => {
+    .onUploadComplete(async ({ metadata, file }) => {
       try {
+        const normalizedFileName = file.name.toLowerCase();
+
         if (
-          file.name.endsWith(".png") ||
-          file.name.endsWith(".jpg") ||
-          file.name.endsWith(".jpeg")
+          normalizedFileName.endsWith(".png") ||
+          normalizedFileName.endsWith(".jpg") ||
+          normalizedFileName.endsWith(".jpeg")
         ) {
           return {
             uploadedBy: metadata.userId,
@@ -52,41 +56,53 @@ export const ourFileRouter = {
         const fileResponse = await fetch(file.ufsUrl);
         const arrayBuffer = await fileResponse.arrayBuffer();
 
-        if (file.name.endsWith(".docx") || file.name.endsWith(".doc")) {
+        if (normalizedFileName.endsWith(".docx")) {
           const buffer = Buffer.from(arrayBuffer);
-          
-          const { value: extractedHtml } = await mammoth.convertToHtml({ buffer });
+
+          const { value: extractedHtml } = await mammoth.convertToHtml({
+            buffer,
+          });
 
           return {
             uploadedBy: metadata.userId,
-            extractedText: extractedHtml, 
+            extractedText: normalizeResumeParsedContent(extractedHtml),
             type: "docx",
           };
         }
 
-        if (file.name.endsWith(".pdf")) {
+        if (normalizedFileName.endsWith(".doc")) {
+          const buffer = Buffer.from(arrayBuffer);
+
+          const { value: extractedText } = await mammoth.extractRawText({
+            buffer,
+          });
+
+          return {
+            uploadedBy: metadata.userId,
+            extractedText: normalizeResumeParsedContent(extractedText),
+            type: "docx",
+          };
+        }
+
+        if (normalizedFileName.endsWith(".pdf")) {
           const { text } = await extractText(new Uint8Array(arrayBuffer), {
             mergePages: true,
           });
 
-          const formattedPdfText = text
-            .split('\n')
-            .filter(line => line.trim().length > 0)
-            .map(line => `<p>${line}</p>`)
-            .join('');
-
           return {
             uploadedBy: metadata.userId,
-            extractedText: formattedPdfText, 
+            extractedText: normalizeResumeParsedContent(text),
             type: "pdf",
           };
         }
 
         throw new Error("Unsupported file format.");
-
       } catch (error) {
         await utapi.deleteFiles(file.key);
-        console.error("Upload process error:", error);
+        logError("Upload process error", error, {
+          fileName: file.name,
+          fileType: file.type,
+        });
         throw new Error("Failed to process uploaded file.");
       }
     }),
