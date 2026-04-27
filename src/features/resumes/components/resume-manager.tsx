@@ -40,6 +40,8 @@ import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { generateDocxThumbnail, generatePdfThumbnail } from "@/lib/utils";
+import { getErrorFeedback } from "@/lib/error-feedback";
+import { logError } from "@/lib/logger";
 
 const ResumeManager = () => {
   const [file, setFiles] = useState<File | null>(null);
@@ -71,13 +73,16 @@ const ResumeManager = () => {
 
       queryClient.invalidateQueries({
         queryKey: trpc.resume.getAll.queryKey(),
+        refetchType: "active",
       });
 
       toast.success("Resume uploaded successfully!");
     },
     onError: (error) => {
       toast.error(
-        `Failed to save resume${error?.message ? `: ${error.message}` : "."}`,
+        getErrorFeedback(error, {
+          fallbackMessage: "Failed to save resume.",
+        }).message,
       );
     },
   });
@@ -89,8 +94,8 @@ const ResumeManager = () => {
     onClientUploadComplete(res) {
       if (res && res.length > 0) {
         // Since we upload 2 files (pdf and image), we need to extract info from both
-       const documentFile = res.find(
-          (f) => f.serverData?.type === "pdf" || f.serverData?.type === "docx"
+        const documentFile = res.find(
+          (f) => f.serverData?.type === "pdf" || f.serverData?.type === "docx",
         );
         const imageFile = res.find((f) => f.serverData?.type === "image");
 
@@ -107,7 +112,7 @@ const ResumeManager = () => {
       }
     },
     onUploadError: () => {
-      toast.error("Error occurred while uploading, try again later.");
+      toast.error("Error occurred while uploading. Please try again.");
     },
   });
 
@@ -317,9 +322,12 @@ const ResumeManager = () => {
                           id: uploadToastId,
                         });
                       } catch (error) {
-                        console.error("Thumbnail generation error:", error);
+                        logError("Thumbnail generation error", error, {
+                          resumeName,
+                          targetRole,
+                        });
                         toast.error(
-                          "Failed to generate preview image, uploading without it...",
+                          "Preview generation failed. Uploading without a thumbnail.",
                         );
 
                         try {
@@ -328,6 +336,10 @@ const ResumeManager = () => {
                             id: uploadToastId,
                           });
                         } catch (uploadError) {
+                          logError("Resume upload failed", uploadError, {
+                            resumeName,
+                            targetRole,
+                          });
                           toast.error("Failed to upload resume", {
                             id: uploadToastId,
                           });

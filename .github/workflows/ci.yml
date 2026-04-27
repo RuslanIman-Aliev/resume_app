@@ -45,6 +45,8 @@ jobs:
       PUSHER_APP_KEY: test
       PUSHER_APP_SECRET: test
       PUSHER_APP_CLUSTER: test
+      BUNDLE_SIZE_LIMIT_BYTES: 10000000
+      ROUTE_BUNDLE_SIZE_LIMIT_BYTES: 4500000
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,6 +57,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Apply migrations
         run: npx prisma migrate deploy
       - name: Install Playwright browsers
@@ -65,6 +71,10 @@ jobs:
         run: npm run typecheck
       - name: Unit tests with coverage
         run: npm run test:coverage
+      - name: Build production bundle
+        run: npm run build
+      - name: Check bundle size
+        run: npm run check:bundle-size
       - name: E2E smoke tests (PR)
         if: github.event_name == 'pull_request'
         run: npm run test:e2e:smoke

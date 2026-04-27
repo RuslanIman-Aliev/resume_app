@@ -28,6 +28,7 @@ import { Mark, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getErrorFeedback } from "@/lib/error-feedback";
 
 type SuggestionStatus = "pending" | "accepted" | "rejected";
 
@@ -95,6 +96,9 @@ const SuggestionMark = Mark.create({
   },
 });
 
+/**
+ * Escapes user-controlled text before it is embedded into editor HTML.
+ */
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -216,9 +220,9 @@ const AnalyzeResumeImprovements = ({
     {
       ...trpc.resume.getParsedContent.queryOptions({ resumeId }),
       enabled: isEditorDialogOpen,
-      staleTime: 0,
-      refetchOnMount: "always",
-      refetchOnWindowFocus: true,
+      staleTime: 2 * 60 * 1000,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
     },
   );
 
@@ -282,7 +286,7 @@ const AnalyzeResumeImprovements = ({
           .chain()
           .focus()
           .insertContent(
-            `<p><span data-suggestion-id="${suggestionId}" data-status="pending">${escapeHtml(afterText)}</span></p>`,
+            `<p><span data-suggestion-id="${escapeHtml(suggestionId)}" data-status="pending">${escapeHtml(afterText)}</span></p>`,
           )
           .run();
       }
@@ -400,9 +404,11 @@ const AnalyzeResumeImprovements = ({
       });
       toast.success("Suggestion applied and saved.");
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to apply suggestion.";
-      toast.error(message);
+      toast.error(
+        getErrorFeedback(error, {
+          fallbackMessage: "Failed to apply suggestion.",
+        }).message,
+      );
     } finally {
       setPendingActionId(null);
     }

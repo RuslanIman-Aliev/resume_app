@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FeedbackState } from "@/components/ui/feedback-state";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 export const MainScoreSkeleton = () => {
@@ -155,35 +155,18 @@ export const MainScorePending = () => {
 
 export const MainScoreError = () => {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-destructive/40 bg-linear-to-br from-destructive/10 via-card to-secondary/20 p-8">
-      <div className="pointer-events-none absolute -top-16 left-8 h-44 w-44 rounded-full bg-destructive/20 blur-3xl" />
-
-      <div className="relative flex min-h-48 flex-col items-center justify-center gap-4 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-destructive/40 bg-destructive/15">
-          <AlertTriangle className="h-7 w-7 text-destructive" />
-        </div>
-        <div>
-          <p className="text-lg font-semibold">
-            We could not load this analysis.
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Please try again in a moment.
-          </p>
-        </div>
-        <Button
-          variant="secondary"
-          className="gap-2"
-          // onClick={() => refetch()}
-          //disabled={isFetching}
-        >
-          {/* {isFetching ? ( */}
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {/* // ) : (
-                //   <RefreshCcw className="h-4 w-4" />
-                // )} */}
-          Try again
-        </Button>
-      </div>
-    </div>
+    <FeedbackState
+      status="error"
+      layout="card"
+      icon={<AlertTriangle className="h-7 w-7 text-destructive" />}
+      title="We could not load this analysis."
+      description="Please try again in a moment."
+      primaryAction={{
+        label: "Try again",
+        onClick: () => {}, // TODO: Pass refetch
+        icon: <Loader2 className="h-4 w-4 animate-spin" />,
+        variant: "secondary",
+      }}
+    />
   );
 };

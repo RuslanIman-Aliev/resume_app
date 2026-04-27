@@ -12,6 +12,7 @@ import {
   getStatusBadge,
 } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
+import { FeedbackState } from "@/components/ui/feedback-state";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, FileText, RefreshCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -66,30 +67,24 @@ const RecentAnalyses = () => {
     return (
       <section>
         <Card className="p-6">
-          <div className="flex flex-col items-center justify-center gap-3 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-destructive/40 bg-destructive/10">
-              <AlertTriangle className="h-6 w-6 text-destructive" />
-            </div>
-            <div>
-              <p className="text-base font-semibold">
-                Unable to load recent analyses
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Please try again in a moment.
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              className="gap-2"
-              onClick={() => refetch()}
-              disabled={isFetching}
-            >
-              <RefreshCcw
-                className={cn("h-4 w-4", isFetching && "animate-spin")}
-              />
-              Retry
-            </Button>
-          </div>
+          <FeedbackState
+            status="error"
+            layout="inline"
+            icon={<AlertTriangle className="h-6 w-6 text-destructive" />}
+            title="Unable to load recent analyses"
+            description="Please try again in a moment."
+            primaryAction={{
+              label: "Retry",
+              onClick: () => refetch(),
+              disabled: isFetching,
+              icon: (
+                <RefreshCcw
+                  className={cn("h-4 w-4", isFetching && "animate-spin")}
+                />
+              ),
+              variant: "secondary",
+            }}
+          />
         </Card>
       </section>
     );
@@ -100,21 +95,21 @@ const RecentAnalyses = () => {
         <h1 className="text-lg font-bold mb-2">Recent Analyses</h1>
         <ScrollArea className="h-100 w-full rounded-md border border-border/50 bg-secondary/10 p-4">
           {!data?.analyses?.length ? (
-            <div className="flex flex-col items-center justify-center py-14 text-center animate-in fade-in duration-500">
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-primary/30 bg-primary/5 mb-4">
-                <FileText className="h-8 w-8 text-primary/50" />
-                <div className="absolute -bottom-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border bg-background text-primary">
-                  <Sparkles className="h-3.5 w-3.5" />
+            <FeedbackState
+              status="default"
+              layout="inline"
+              className="py-14 animate-in fade-in duration-500"
+              icon={
+                <div className="relative">
+                  <FileText className="h-8 w-8 text-primary/50" />
+                  <div className="absolute -bottom-4 -right-4 flex h-7 w-7 items-center justify-center rounded-full border bg-background text-primary">
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </div>
                 </div>
-              </div>
-              <p className="text-base font-semibold text-foreground mb-1">
-                No analyses yet
-              </p>
-              <p className="text-sm text-muted-foreground max-w-65 mx-auto">
-                Analyze a job description against your resume to get your match
-                score and insights.
-              </p>
-            </div>
+              }
+              title="No analyses yet"
+              description="Analyze a job description against your resume to get your match score and insights."
+            />
           ) : (
             data?.analyses.map(
               (
@@ -129,6 +124,7 @@ const RecentAnalyses = () => {
                 <div
                   key={`recent-analysis-${id}-${index}`}
                   className="cursor-pointer"
+                  onMouseEnter={() => router.prefetch(`/ai-coach/${id}`)}
                   onClick={() => router.push(`/ai-coach/${id}`)}
                 >
                   <div className="flex  mb-4  items-center gap-3 w-full rounded-lg border border-border/50 bg-secondary/30 p-4 transition-all hover:border-border hover:bg-secondary/50">
@@ -214,7 +210,9 @@ const RecentAnalyses = () => {
             variant="link"
             className="text-primary px-0 hover:text-primary/80"
           >
-            <Link href="/resumes">Analyze Now</Link>
+            <Link href="/resumes" prefetch>
+              Analyze Now
+            </Link>
           </Button>
         </div>
       </Card>

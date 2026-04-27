@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FeedbackState } from "@/components/ui/feedback-state";
 import { AlertTriangle, Loader2, RefreshCcw } from "lucide-react";
 
 type ImprovementsErrorProps = {
@@ -75,35 +75,27 @@ export const ImprovementsError = ({
   isRetrying,
 }: ImprovementsErrorProps) => {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-destructive/40 bg-linear-to-br from-destructive/10 via-card to-secondary/30 p-8">
-      <div className="pointer-events-none absolute -top-16 left-8 h-44 w-44 rounded-full bg-destructive/20 blur-3xl" />
-
-      <div className="relative flex min-h-48 flex-col items-center justify-center gap-4 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-destructive/50 bg-destructive/15 shadow-lg shadow-destructive/20">
-          <AlertTriangle className="h-7 w-7 text-destructive" />
-        </div>
-        <div>
-          <p className="text-lg font-semibold">
-            We could not load improvement suggestions.
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Please try again in a moment.
-          </p>
-        </div>
-        <Button
-          variant="secondary"
-          className="gap-2"
-          onClick={onRetry}
-          disabled={isRetrying || !onRetry}
-        >
-          {isRetrying ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCcw className="h-4 w-4" />
-          )}
-          {isRetrying ? "Retrying..." : "Try again"}
-        </Button>
-      </div>
-    </div>
+    <FeedbackState
+      status="error"
+      layout="card"
+      icon={<AlertTriangle className="h-7 w-7 text-destructive" />}
+      title="We could not load improvement suggestions."
+      description="Please try again in a moment."
+      primaryAction={
+        onRetry
+          ? {
+              label: isRetrying ? "Retrying..." : "Try again",
+              onClick: onRetry,
+              disabled: isRetrying,
+              icon: isRetrying ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-4 w-4" />
+              ),
+              variant: "secondary",
+            }
+          : undefined
+      }
+    />
   );
 };

@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { getErrorFeedback } from "@/lib/error-feedback";
 
 export function SignUpForm() {
   const [isPending, setIsPending] = useState(false);
@@ -56,7 +57,11 @@ export function SignUpForm() {
           router.push("/dashboard");
         },
         onError: (ctx) => {
-          toast.error(ctx.error.message || "An error occurred during sign up.");
+          toast.error(
+            getErrorFeedback(ctx.error, {
+              fallbackMessage: "An error occurred during sign up.",
+            }).message,
+          );
           setIsPending(false);
         },
       },

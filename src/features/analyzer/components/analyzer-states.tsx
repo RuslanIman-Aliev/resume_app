@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FeedbackState } from "@/components/ui/feedback-state";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
 
@@ -40,25 +40,27 @@ type AnalyzerErrorProps = {
 
 export const AnalyzerError = ({ onRetry, isRetrying }: AnalyzerErrorProps) => {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-destructive/40 bg-destructive/10">
-        <AlertTriangle className="h-6 w-6 text-destructive" />
-      </div>
-      <div>
-        <p className="text-base font-semibold">Unable to load resumes</p>
-        <p className="text-sm text-muted-foreground">
-          Please try again in a moment.
-        </p>
-      </div>
-      <Button
-        variant="secondary"
-        className="gap-2"
-        onClick={onRetry}
-        disabled={isRetrying || !onRetry}
-      >
-        <RefreshCcw className={cn("h-4 w-4", isRetrying && "animate-spin")} />
-        Retry
-      </Button>
-    </div>
+    <FeedbackState
+      status="error"
+      layout="inline"
+      icon={<AlertTriangle className="h-6 w-6 text-destructive" />}
+      title="Unable to load resumes"
+      description="Please try again in a moment."
+      primaryAction={
+        onRetry
+          ? {
+              label: "Retry",
+              onClick: onRetry,
+              disabled: isRetrying,
+              icon: (
+                <RefreshCcw
+                  className={cn("h-4 w-4", isRetrying && "animate-spin")}
+                />
+              ),
+              variant: "secondary",
+            }
+          : undefined
+      }
+    />
   );
 };

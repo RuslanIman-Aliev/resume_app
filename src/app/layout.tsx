@@ -1,4 +1,5 @@
 import "@/app/globals.css";
+import "@/lib/env.server";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TRPCReactProvider } from "@/trpc/client";

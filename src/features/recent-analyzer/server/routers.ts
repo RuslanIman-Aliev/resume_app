@@ -2,15 +2,24 @@ import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import z from "zod";
 
+/**
+ * tRPC router for listing and aggregating job application analysis history.
+ */
 export const jobApplicationRouter = createTRPCRouter({
+  /**
+   * Returns paginated job applications for the authenticated user.
+   *
+   * The response supports text filtering, score filtering, sorting, and KPI
+   * aggregates for the dashboard summary cards.
+   */
   getJobApplication: protectedProcedure
     .input(
       z.object({
-        jobTitle: z.string().optional(),
+        jobTitle: z.string().trim().max(120).optional(),
         filterScore: z.enum(["all", "high", "medium", "low"]).default("all"),
         sortBy: z.enum(["date", "score"]).default("date"),
-        limit: z.number().default(6),
-        page: z.number().default(1),
+        limit: z.number().int().min(1).max(50).default(6),
+        page: z.number().int().min(1).default(1),
       }),
     )
     .query(async ({ ctx, input }) => {
