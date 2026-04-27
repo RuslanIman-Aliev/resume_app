@@ -24,7 +24,17 @@ const parseRouteBudgetOverrides = () => {
     return Object.fromEntries(
       Object.entries(parsed)
         .filter((entry) => typeof entry[0] === "string")
-        .map(([route, limit]) => [route, Number(limit)]),
+        .map(([route, limit]) => {
+          const budget = Number(limit);
+
+          if (!Number.isFinite(budget) || budget <= 0) {
+            throw new Error(
+              `Invalid budget for route "${route}". Expected a finite positive number, received ${String(limit)}.`,
+            );
+          }
+
+          return [route, budget];
+        }),
     );
   } catch (error) {
     console.error(
