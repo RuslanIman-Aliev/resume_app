@@ -80,6 +80,12 @@ vi.mock("@/trpc/client", () => ({
         queryOptions: () => ({}),
         queryKey: () => ["resume.getParsedContent"],
       },
+      getJobMatchResult: {
+        queryKey: (input: { applicationId?: string }) => [
+          "resume.getJobMatchResult",
+          input,
+        ],
+      },
     },
   }),
 }));
@@ -152,6 +158,7 @@ describe("AnalyzeResumeImprovements", () => {
       <AnalyzeResumeImprovements
         data={createData({ improvements: [] })}
         resumeId="resume_1"
+        applicationId="app_1"
       />,
     );
 
@@ -160,7 +167,11 @@ describe("AnalyzeResumeImprovements", () => {
 
   it("shows current and improved score when summary estimate exists", () => {
     render(
-      <AnalyzeResumeImprovements data={createData()} resumeId="resume_1" />,
+      <AnalyzeResumeImprovements
+        data={createData()}
+        resumeId="resume_1"
+        applicationId="app_1"
+      />,
     );
 
     expect(screen.getByText("55%", { exact: false })).toBeInTheDocument();
@@ -171,7 +182,11 @@ describe("AnalyzeResumeImprovements", () => {
     queryState = { isLoading: true };
 
     render(
-      <AnalyzeResumeImprovements data={createData()} resumeId="resume_1" />,
+      <AnalyzeResumeImprovements
+        data={createData()}
+        resumeId="resume_1"
+        applicationId="app_1"
+      />,
     );
 
     fireEvent.click(
@@ -184,7 +199,11 @@ describe("AnalyzeResumeImprovements", () => {
 
   it("adds and cancels a pending suggestion", async () => {
     render(
-      <AnalyzeResumeImprovements data={createData()} resumeId="resume_1" />,
+      <AnalyzeResumeImprovements
+        data={createData()}
+        resumeId="resume_1"
+        applicationId="app_1"
+      />,
     );
 
     fireEvent.click(
@@ -209,7 +228,11 @@ describe("AnalyzeResumeImprovements", () => {
     mockMutateAsync.mockResolvedValue({ success: true });
 
     render(
-      <AnalyzeResumeImprovements data={createData()} resumeId="resume_1" />,
+      <AnalyzeResumeImprovements
+        data={createData()}
+        resumeId="resume_1"
+        applicationId="app_1"
+      />,
     );
 
     fireEvent.click(
@@ -226,6 +249,7 @@ describe("AnalyzeResumeImprovements", () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith({
         resumeId: "resume_1",
+        applicationId: "app_1",
         targetSection: "summary",
         targetId: undefined,
         previousText: "Old summary",
@@ -243,7 +267,11 @@ describe("AnalyzeResumeImprovements", () => {
     mockMutateAsync.mockRejectedValue(new Error("Mutation failed"));
 
     render(
-      <AnalyzeResumeImprovements data={createData()} resumeId="resume_1" />,
+      <AnalyzeResumeImprovements
+        data={createData()}
+        resumeId="resume_1"
+        applicationId="app_1"
+      />,
     );
 
     fireEvent.click(
@@ -270,7 +298,11 @@ describe("AnalyzeResumeImprovements", () => {
     mockMutateAsync.mockReturnValue(pendingMutation);
 
     render(
-      <AnalyzeResumeImprovements data={createData()} resumeId="resume_1" />,
+      <AnalyzeResumeImprovements
+        data={createData()}
+        resumeId="resume_1"
+        applicationId="app_1"
+      />,
     );
 
     fireEvent.click(

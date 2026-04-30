@@ -195,9 +195,11 @@ const findSuggestionMarkRange = (
 const AnalyzeResumeImprovements = ({
   data,
   resumeId,
+  applicationId,
 }: {
   data: ApplicationData;
   resumeId: string;
+  applicationId?: string;
 }) => {
   const improvementsList = data.improvements || [];
   const currentScore = data.matchScore;
@@ -379,6 +381,7 @@ const AnalyzeResumeImprovements = ({
     try {
       await applyImprovementMutation.mutateAsync({
         resumeId,
+        applicationId,
         targetSection: pending.targetSection,
         targetId: pending.targetId,
         previousText: pending.beforeText,
@@ -388,6 +391,15 @@ const AnalyzeResumeImprovements = ({
       await queryClient.invalidateQueries({
         queryKey: trpc.resume.getParsedContent.queryKey({ resumeId }),
       });
+
+      // Invalidate getJobMatchResult to refresh improvements with isApplied flag
+      if (applicationId) {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.resume.getJobMatchResult.queryKey({
+            applicationId,
+          }),
+        });
+      }
 
       const markType = editor.state.schema.marks.suggestionMark;
       const range = findSuggestionMarkRange(editor, suggestionId);
@@ -416,6 +428,11 @@ const AnalyzeResumeImprovements = ({
 
   const pendingItems = Object.values(pendingSuggestions);
 
+  const unappliedImprovements = improvementsList.filter(
+    (imp) => !imp.isApplied,
+  );
+  const appliedImprovements = improvementsList.filter((imp) => imp.isApplied);
+
   if (improvementsList.length === 0) {
     return (
       <EmptyDataCard
@@ -424,6 +441,8 @@ const AnalyzeResumeImprovements = ({
       />
     );
   }
+
+  const hasUnapplied = unappliedImprovements.length > 0;
 
   return (
     <section>
@@ -451,121 +470,208 @@ const AnalyzeResumeImprovements = ({
         </div>
       </div>
       <div>
-        <Accordion type="multiple" className="mt-4 space-y-6">
-          {improvementsList.map((improvement, index) => {
-            const accordionItemValue = `${improvement.targetId}-${index}`;
-            const isApplying = applyingId === accordionItemValue;
+        {hasUnapplied && (
+          <Accordion type="multiple" className="mt-4 space-y-6">
+            {unappliedImprovements.map((improvement) => {
+              // Find the original index in the full improvements list
+              const originalIndex = improvementsList.indexOf(improvement);
+              const accordionItemValue = `${improvement.targetId}-${originalIndex}`;
+              const isApplying = applyingId === accordionItemValue;
 
-            return (
-              <AccordionItem
-                key={accordionItemValue}
-                value={accordionItemValue}
-                className="rounded-2xl border border-border/50 bg-card/50"
-              >
-                <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
-                  <div className="flex items-start justify-between w-full text-left gap-4 pr-2">
-                    <div className="flex flex-col gap-1.5 flex-1">
-                      <div className="flex items-center text-lg font-semibold gap-3">
+              return (
+                <AccordionItem
+                  key={accordionItemValue}
+                  value={accordionItemValue}
+                  className="rounded-2xl border border-border/50 bg-card/50"
+                >
+                  <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
+                    <div className="flex items-start justify-between w-full text-left gap-4 pr-2">
+                      <div className="flex flex-col gap-1.5 flex-1">
+                        <div className="flex items-center text-lg font-semibold gap-3">
+                          <Badge
+                            variant="outline"
+                            className={`font-medium px-2 py-0 h-5 lowercase ${getPriorityStyles(
+                              improvement.priority,
+                            )}`}
+                          >
+                            {improvement.priority}
+                          </Badge>
+                          <h2 className="leading-none pt-0.5">
+                            {improvement.title}
+                          </h2>
+                        </div>
+                        <p className="text-sm text-muted-foreground mr-6">
+                          {improvement.description}
+                        </p>
+                      </div>
+                      {improvement.matchScoreBoost != null && (
                         <Badge
                           variant="outline"
-                          className={`font-medium px-2 py-0 h-5 lowercase ${getPriorityStyles(
-                            improvement.priority,
-                          )}`}
+                          className="border-primary/30 bg-primary/10 text-primary shrink-0 mt-0.5"
                         >
-                          {improvement.priority}
+                          +{improvement.matchScoreBoost}% match score
                         </Badge>
-                        <h2 className="leading-none pt-0.5">
-                          {improvement.title}
-                        </h2>
-                      </div>
-                      <p className="text-sm text-muted-foreground mr-6">
-                        {improvement.description}
-                      </p>
+                      )}
                     </div>
-                    {improvement.matchScoreBoost != null && (
-                      <Badge
-                        variant="outline"
-                        className="border-primary/30 bg-primary/10 text-primary shrink-0 mt-0.5"
-                      >
-                        +{improvement.matchScoreBoost}% match score
-                      </Badge>
-                    )}
-                  </div>
-                </AccordionTrigger>
+                  </AccordionTrigger>
 
-                <AccordionContent className="overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down ">
-                  <div className="px-5 pt-0 pb-4">
-                    <div className="mt-4 mb-4">
-                      <h4 className="text-sm font-semibold mb-3">
-                        Suggestions:
-                      </h4>
-                      <ul className="space-y-2 text-sm text-muted-foreground">
-                        {improvement.suggestions.map(
-                          (tip: string, index: number) => (
-                            <li
-                              className="flex items-start gap-2.5"
-                              key={index}
+                  <AccordionContent className="overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down ">
+                    <div className="px-5 pt-0 pb-4">
+                      <div className="mt-4 mb-4">
+                        <h4 className="text-sm font-semibold mb-3">
+                          Suggestions:
+                        </h4>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
+                          {improvement.suggestions.map(
+                            (tip: string, index: number) => (
+                              <li
+                                className="flex items-start gap-2.5"
+                                key={index}
+                              >
+                                <CircleDot className="mt-0.75 h-4 w-4 shrink-0 text-primary" />
+                                {tip}
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                          <div className="mb-2 flex items-center gap-2">
+                            <XIcon className="h-4 w-4 text-red-500" />
+                            <span className="font-medium text-red-500">
+                              Before
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {improvement.beforeText}
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                          <div className="mb-2 flex items-center gap-2">
+                            <CheckIcon className="h-4 w-4 text-primary" />
+                            <span className="font-medium text-primary">
+                              After
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {improvement.afterText}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex justify-end gap-3">
+                        <Button
+                          variant="outline"
+                          className="border-border/60 bg-card/60"
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Suggestion
+                        </Button>
+                        <Button
+                          onClick={() =>
+                            handleClick(improvement, originalIndex)
+                          }
+                          disabled={isApplying}
+                        >
+                          {isApplying ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Wand2 className="h-4 w-4 mr-2" />
+                          )}
+                          {isApplying ? "Applying..." : "Apply to Resume"}
+                        </Button>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        )}
+        {appliedImprovements.length > 0 && (
+          <div className="mt-8 pt-6 border-xl border-border/50">
+            <h3 className="text-sm font-semibold mb-4 text-muted-foreground">
+              Applied Suggestions ({appliedImprovements.length})
+            </h3>
+            <Accordion type="multiple" className="space-y-6 opacity-60">
+              {appliedImprovements.map((improvement) => {
+                const originalIndex = improvementsList.indexOf(improvement);
+                const accordionItemValue = `applied-${improvement.targetId}-${originalIndex}`;
+                return (
+                  <AccordionItem
+                    key={accordionItemValue}
+                    value={accordionItemValue}
+                    className="rounded-2xl border border-border/30 bg-card/30"
+                  >
+                    <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
+                      <div className="flex items-start justify-between w-full text-left gap-4 pr-2">
+                        <div className="flex flex-col gap-1.5 flex-1">
+                          <div className="flex items-center text-lg font-semibold gap-3">
+                            <Badge
+                              variant="outline"
+                              className={`font-medium px-2 py-0 h-5 lowercase opacity-60 ${getPriorityStyles(
+                                improvement.priority,
+                              )}`}
                             >
-                              <CircleDot className="mt-0.75 h-4 w-4 shrink-0 text-primary" />
-                              {tip}
-                            </li>
-                          ),
-                        )}
-                      </ul>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
-                        <div className="mb-2 flex items-center gap-2">
-                          <XIcon className="h-4 w-4 text-red-500" />
-                          <span className="font-medium text-red-500">
-                            Before
-                          </span>
+                              {improvement.priority}
+                            </Badge>
+                            <h2 className="leading-none pt-0.5">
+                              {improvement.title}
+                            </h2>
+                          </div>
+                          <p className="text-sm text-muted-foreground mr-6">
+                            {improvement.description}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {improvement.beforeText}
-                        </p>
+                        {improvement.matchScoreBoost != null && (
+                          <Badge
+                            variant="outline"
+                            className="border-border/30 bg-border/20 text-muted-foreground shrink-0 mt-0.5 opacity-60"
+                          >
+                            +{improvement.matchScoreBoost}% match score
+                          </Badge>
+                        )}
                       </div>
+                    </AccordionTrigger>
 
-                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                        <div className="mb-2 flex items-center gap-2">
-                          <CheckIcon className="h-4 w-4 text-primary" />
-                          <span className="font-medium text-primary">
-                            After
-                          </span>
+                    <AccordionContent className="overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+                      <div className="px-5 pt-0 pb-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="rounded-lg border border-red-500/10 bg-red-500/2 p-4 opacity-75">
+                            <div className="mb-2 flex items-center gap-2">
+                              <XIcon className="h-4 w-4 text-red-500/60" />
+                              <span className="font-medium text-red-500/60">
+                                Before
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-through">
+                              {improvement.beforeText}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg border border-primary/10 bg-primary/2 p-4 opacity-75">
+                            <div className="mb-2 flex items-center gap-2">
+                              <CheckIcon className="h-4 w-4 text-primary/60" />
+                              <span className="font-medium text-primary/60">
+                                After
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {improvement.afterText}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {improvement.afterText}
-                        </p>
                       </div>
-                    </div>
-                    <div className="mt-4 flex justify-end gap-3">
-                      <Button
-                        variant="outline"
-                        className="border-border/60 bg-card/60"
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy Suggestion
-                      </Button>
-                      <Button
-                        onClick={() => handleClick(improvement, index)}
-                        disabled={isApplying}
-                      >
-                        {isApplying ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Wand2 className="h-4 w-4 mr-2" />
-                        )}
-                        {isApplying ? "Applying..." : "Apply to Resume"}
-                      </Button>
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          </div>
+        )}
         <Dialog open={isEditorDialogOpen} onOpenChange={setIsEditorDialogOpen}>
-          <DialogTitle>Resume Editor</DialogTitle>
+          <DialogTitle></DialogTitle>
           <DialogContent className="w-[95vw]! h-[95vh]! max-h-[95vh]! max-w-[95vw]! mx-auto">
             <div className="space-y-3">
               <h3 className="text-base font-semibold">Resume Editor</h3>

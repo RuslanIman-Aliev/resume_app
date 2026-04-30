@@ -202,6 +202,7 @@ export const AnalyzeResumeClient = () => {
           <AnalyzeResumeImprovements
             data={appData as unknown as ApplicationData}
             resumeId={appData.resumeId}
+            applicationId={appData.id}
           />{" "}
         </TabsContent>
         <TabsContent value="skills-gap" className="mt-4">

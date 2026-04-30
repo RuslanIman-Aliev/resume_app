@@ -187,6 +187,7 @@ export const updateResumeParsedContent = (
   const document = new JSDOM(`<body>${normalizedCurrent}</body>`).window
     .document;
   const trimmedPrevious = previousText?.trim();
+
   if (trimmedPrevious) {
     const nodeFilter = document.defaultView?.NodeFilter;
     const showText = nodeFilter?.SHOW_TEXT ?? 4;
@@ -206,6 +207,7 @@ export const updateResumeParsedContent = (
     }
   }
 
+  // If previousText not found or not provided, append new text as paragraph
   if (!safeNextText) {
     return normalizedCurrent;
   }

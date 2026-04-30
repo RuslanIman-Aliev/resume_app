@@ -374,6 +374,19 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   - Keep wording concise and ATS-friendly.
   - Generate a large number of actionable improvements. Do not isolate your feedback to only a few points; aim to find every possible weak point, missing keyword, or phrasing issue and provide a highly specific improvement for each.
 
+  CRITICAL INSTRUCTIONS FOR MATCHSCOREBOOST CALCULATION:
+  - For EACH improvement, calculate a precise matchScoreBoost (1-10 integer) representing the estimated ATS score increase after applying that specific improvement.
+  - Boost calculation rules:
+    * High-impact changes (adding missing critical keywords, required skills, or experience levels): 7-10 points
+    * Medium-impact changes (improving existing wording, adding context, formatting improvements): 4-6 points
+    * Low-impact changes (minor phrasing adjustments, optimization, polish): 1-3 points
+  - Sum of ALL improvements' matchScoreBoost should approximately equal: (estimatedScoreWithAllImprovements - matchScore)
+  - If improvement affects ATS keyword matching: weight higher (8-10)
+  - If improvement affects seniority/experience signaling: weight high (6-8)
+  - If improvement affects formatting/clarity: weight lower (1-4)
+  - NEVER use 0 for matchScoreBoost - every improvement must have measurable impact
+  - The frontend UI will sum these boosts to show users the cumulative expected score improvement
+
   You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
 
   {

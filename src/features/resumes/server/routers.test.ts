@@ -19,6 +19,7 @@ const prismaMock = vi.hoisted(() => ({
   jobApplication: {
     create: vi.fn(),
     findFirst: vi.fn(),
+    update: vi.fn(),
   },
 }));
 
@@ -579,10 +580,23 @@ describe("resumeRouter", () => {
       },
     });
     prismaMock.resume.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.jobApplication.findFirst.mockResolvedValue({
+      id: "app_1",
+      improvements: [
+        {
+          title: "Strengthen Summary",
+          beforeText: "Old summary text",
+          afterText: "New summary text",
+          targetSection: "summary",
+        },
+      ],
+    });
+    prismaMock.jobApplication.update.mockResolvedValue({});
 
     const caller = createCaller({});
     const result = await caller.applyImprovement({
       resumeId: "resume_1",
+      applicationId: "app_1",
       targetSection: "summary",
       previousText: "Old summary text",
       newText: "New summary text",
@@ -600,6 +614,23 @@ describe("resumeRouter", () => {
         parsedContent: "<p>New summary text</p><p>Other line</p>",
       },
     });
+
+    // Check that jobApplication was updated with isApplied flag
+    expect(prismaMock.jobApplication.update).toHaveBeenCalledWith({
+      where: { id: "app_1" },
+      data: {
+        improvements: [
+          {
+            title: "Strengthen Summary",
+            beforeText: "Old summary text",
+            afterText: "New summary text",
+            targetSection: "summary",
+            isApplied: true,
+          },
+        ],
+      },
+    });
+
     expect(result).toEqual({ success: true, changed: true });
   });
 
