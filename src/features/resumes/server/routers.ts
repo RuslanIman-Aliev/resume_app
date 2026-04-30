@@ -379,6 +379,7 @@ export const resumeRouter = createTRPCRouter({
     .input(
       z.object({
         resumeId: z.string(),
+        applicationId: z.string().optional(),
         targetSection: z.enum([
           "summary",
           "experience",
@@ -508,6 +509,72 @@ export const resumeRouter = createTRPCRouter({
       }
 
       if (!changed) {
+        // If no direct match found, append the new text to the appropriate section
+        const newText = input.newText.trim();
+
+        if (input.targetSection === "summary" && data.personalInfo) {
+          // Append to summary
+          data.personalInfo.summary =
+            (data.personalInfo.summary || "") + "\n" + newText;
+          changed = true;
+        } else if (
+          input.targetSection === "experience" &&
+          Array.isArray(data.experience)
+        ) {
+          // Append to last experience bullet
+          if (data.experience.length > 0) {
+            const lastExp = data.experience[data.experience.length - 1];
+            if (Array.isArray(lastExp.bullets)) {
+              lastExp.bullets.push({
+                id: `bullet-${Date.now()}`,
+                text: newText,
+              });
+              changed = true;
+            }
+          }
+        } else if (
+          input.targetSection === "education" &&
+          Array.isArray(data.education)
+        ) {
+          // Append to last education bullet
+          if (data.education.length > 0) {
+            const lastEdu = data.education[data.education.length - 1];
+            if (Array.isArray(lastEdu.bullets)) {
+              lastEdu.bullets.push({
+                id: `bullet-${Date.now()}`,
+                text: newText,
+              });
+              changed = true;
+            }
+          }
+        } else if (
+          input.targetSection === "projects" &&
+          Array.isArray(data.projects)
+        ) {
+          // Append to last project bullet
+          if (data.projects.length > 0) {
+            const lastProject = data.projects[data.projects.length - 1];
+            if (Array.isArray(lastProject.bullets)) {
+              lastProject.bullets.push({
+                id: `bullet-${Date.now()}`,
+                text: newText,
+              });
+              changed = true;
+            }
+          }
+        } else if (
+          input.targetSection === "skills" &&
+          Array.isArray(data.skills)
+        ) {
+          // Add as new skill if not exists
+          if (!data.skills.includes(newText)) {
+            data.skills.push(newText);
+            changed = true;
+          }
+        }
+      }
+
+      if (!changed) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message:
@@ -541,6 +608,56 @@ export const resumeRouter = createTRPCRouter({
           code: "NOT_FOUND",
           message: "Resume not found",
         });
+      }
+
+      // 4. Mark improvement as applied in JobApplication if applicationId is provided
+      if (input.applicationId) {
+        const application = await prisma.jobApplication.findFirst({
+          where: {
+            id: input.applicationId,
+            userId: ctx.auth.user.id,
+          },
+        });
+
+        if (application && application.improvements) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const improvements = application.improvements as any[];
+          let matchScoreBoostToApply = 0;
+
+          const updatedImprovements = improvements.map((imp) => {
+            // Mark improvement as applied if it matches the target and text
+            if (
+              imp.targetSection === input.targetSection &&
+              imp.targetId === input.targetId &&
+              imp.beforeText === input.previousText &&
+              imp.afterText === input.newText
+            ) {
+              // Capture the matchScoreBoost from this improvement
+              if (
+                imp.matchScoreBoost &&
+                typeof imp.matchScoreBoost === "number"
+              ) {
+                matchScoreBoostToApply = imp.matchScoreBoost;
+              }
+              return { ...imp, isApplied: true };
+            }
+            return imp;
+          });
+
+          // Calculate new matchScore by adding the boost
+          const newMatchScore = Math.min(
+            100,
+            (application.matchScore || 0) + matchScoreBoostToApply,
+          );
+
+          await prisma.jobApplication.update({
+            where: { id: input.applicationId },
+            data: {
+              improvements: updatedImprovements,
+              matchScore: newMatchScore,
+            },
+          });
+        }
       }
 
       return { success: true, changed: true };

@@ -45,6 +45,7 @@ export interface ImprovementTip {
   category?: string;
   targetSection: "summary" | "experience" | "education" | "projects" | "skills";
   targetId?: string;
+  isApplied?: boolean;
 }
 
 export interface ResumeBlockInfo {
