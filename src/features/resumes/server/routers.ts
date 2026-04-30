@@ -411,7 +411,10 @@ export const resumeRouter = createTRPCRouter({
 
       // 2. Precisely edit the fragment
       if (input.targetSection === "summary" && data.personalInfo) {
-        if (data.personalInfo.summary !== input.newText) {
+        const currentSummary = data.personalInfo.summary?.trim() ?? "";
+        const nextSummary = input.newText.trim();
+
+        if (currentSummary !== nextSummary) {
           data.personalInfo.summary = input.newText;
           changed = true;
         }
@@ -513,10 +516,15 @@ export const resumeRouter = createTRPCRouter({
         const newText = input.newText.trim();
 
         if (input.targetSection === "summary" && data.personalInfo) {
-          // Append to summary
-          data.personalInfo.summary =
-            (data.personalInfo.summary || "") + "\n" + newText;
-          changed = true;
+          const currentSummary = data.personalInfo.summary?.trim() ?? "";
+
+          if (currentSummary !== newText) {
+            // Append to summary only when it would actually change the text.
+            data.personalInfo.summary = currentSummary
+              ? `${data.personalInfo.summary}\n${newText}`
+              : newText;
+            changed = true;
+          }
         } else if (
           input.targetSection === "experience" &&
           Array.isArray(data.experience)
@@ -644,18 +652,24 @@ export const resumeRouter = createTRPCRouter({
             return imp;
           });
 
-          // Calculate new matchScore by adding the boost
-          const newMatchScore = Math.min(
-            100,
-            (application.matchScore || 0) + matchScoreBoostToApply,
-          );
+          const updateData: {
+            improvements: typeof updatedImprovements;
+            matchScore?: number;
+          } = {
+            improvements: updatedImprovements,
+          };
+
+          if (matchScoreBoostToApply > 0) {
+            // Only touch matchScore when the applied improvement carries a boost.
+            updateData.matchScore = Math.min(
+              100,
+              (application.matchScore || 0) + matchScoreBoostToApply,
+            );
+          }
 
           await prisma.jobApplication.update({
             where: { id: input.applicationId },
-            data: {
-              improvements: updatedImprovements,
-              matchScore: newMatchScore,
-            },
+            data: updateData,
           });
         }
       }
