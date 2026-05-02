@@ -1,6 +1,4 @@
 import z from "zod";
-import type { inferRouterOutputs } from "@trpc/server";
-import type { AppRouter } from "@/trpc/routers/_app";
 import { jobMatchAnalysisSchema, resumeAnalysisSchema } from "./schemas";
 
 export const signUpFormSchema = z
@@ -95,19 +93,67 @@ export interface StructuredResumeData {
   skills: string[];
 }
 
-type RouterOutput = inferRouterOutputs<AppRouter>;
+/**
+ * Summary data for a job application match analysis result.
+ */
 interface ApplicationSummary {
+  /** Estimated match score if all improvements are applied. */
   estimatedScoreWithAllImprovements: number;
 }
-type RawApplicationData =
-  RouterOutput["resume"]["getJobMatchResult"]["application"];
 
-export type ApplicationData = Omit<
-  RawApplicationData,
-  "improvements" | "summary"
-> & {
+/**
+ * Structured data for a job application with analysis results.
+ * Represents a single application including improvements and match summary.
+ */
+export interface ApplicationData {
+  /** Unique identifier for the application. */
+  id: string;
+  /** Match score between 0-100 for this application. */
+  matchScore: number;
+  /** List of improvement recommendations. */
   improvements: ImprovementTip[] | null;
+  /** Summary statistics for the match analysis. */
   summary: ApplicationSummary | null;
+}
+
+/**
+ * Job application card display type for tracker/kanban components.
+ * Simplified data structure for UI presentation of job applications.
+ */
+export type JobApplicationCard = {
+  /** Unique identifier for the job application. */
+  id: string;
+  /** Company name from the job posting. */
+  company?: string;
+  /** Job title/position from the job posting. */
+  position?: string;
+  /** Job location (e.g., city, state, remote). */
+  location?: string;
+  /** Salary range for the position. */
+  salary?: string;
+  /** Current status of the application (saved, applied, screening, interview, offer, rejected). */
+  status: string;
+  /** Date when the application was submitted. */
+  appliedDate?: string;
+  /** Date when the record was last updated. */
+  lastUpdated?: string;
+  /** Job match score between 0-100, null if not yet analyzed. */
+  matchScore: number | null;
+  /** Description of the next step in the application process. */
+  nextStep?: string;
+  /** Date of the next step. */
+  nextStepDate?: string;
+  /** URL to the job posting. */
+  url?: string;
+  /** Timestamp when the record was created. */
+  createdAt?: Date;
+  /** Timestamp when the record was last updated. */
+  updatedAt?: Date;
+  /** Associated resume metadata. */
+  resume?: {
+    /** Name of the resume used for this application. */
+    resumeName: string;
+  };
 };
 
 export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;

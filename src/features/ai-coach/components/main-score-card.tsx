@@ -60,7 +60,7 @@ const MainScoreCard = () => {
   const analysisParam = searchParams.get("analysis");
   const analysisStartedAt = Number(searchParams.get("ts")) || 0;
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     ...trpc.resume.getAnalysisResult.queryOptions({ resumeId }),
     retry: (failureCount, queryError) => {
       const errorCode = (queryError as { data?: { code?: string } } | null)
@@ -135,7 +135,7 @@ const MainScoreCard = () => {
   }
 
   if (isError) {
-    return <MainScoreError />;
+    return <MainScoreError onRetry={() => refetch()} />;
   }
 
   const overallScore = Math.min(

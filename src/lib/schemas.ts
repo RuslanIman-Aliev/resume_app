@@ -96,6 +96,10 @@ const safeString = (value: string | null | undefined, fallback: string) => {
   return trimmed.length > 0 ? trimmed : fallback;
 };
 
+/**
+ * Validation schema for resume analysis results from OpenAI.
+ * Includes scores, category breakdowns, keywords, strengths, improvements, and structured resume data.
+ */
 export const resumeAnalysisSchema = z.object({
   overallScore: z.number().int().min(0).max(100),
   categoryScores: z.object({
@@ -204,6 +208,10 @@ export const resumeAnalysisSchema = z.object({
     .optional(),
 });
 
+/**
+ * Validation schema for job match analysis comparing resume against job description.
+ * Includes match score, skill gaps, requirements matching, improvements, and generated cover letter.
+ */
 export const jobMatchAnalysisSchema = z.object({
   companyName: z.string().nullable().optional().default(null),
   experience: z.string().nullable().optional().default(null),

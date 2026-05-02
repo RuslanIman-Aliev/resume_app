@@ -7,6 +7,10 @@ import { createTRPCContext } from "@trpc/tanstack-react-query";
 import { useState } from "react";
 import { makeQueryClient } from "./query-client";
 import type { AppRouter } from "./routers/_app";
+/**
+ * Client-side tRPC provider and hook for React components.
+ * TRPCProvider wraps the app; useTRPC() accesses tRPC in components.
+ */
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 let browserQueryClient: QueryClient;
 function getQueryClient() {

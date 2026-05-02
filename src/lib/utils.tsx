@@ -7,6 +7,12 @@ import mammoth from "mammoth";
 import { toBlob } from "html-to-image";
 import { logError } from "./logger";
 
+/**
+ * Merges CSS class names using clsx and tailwind-merge.
+ * Resolves conflicting Tailwind classes automatically.
+ * @param inputs - Variable number of class names or conditional objects
+ * @returns Merged class string with Tailwind conflicts resolved
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -26,6 +32,13 @@ const buildUntrustedPromptPayload = (payload: Record<string, string>) =>
     2,
   )}\n\`\`\``;
 
+/**
+ * Generates a comprehensive AI prompt for resume analysis against a target role.
+ * The prompt guides the AI to analyze resume quality, suggest improvements, and optimize for ATS.
+ * @param resumeText - The candidate's resume content
+ * @param targetRole - The target job position to analyze against
+ * @returns Formatted prompt string with resume and role data embedded
+ */
 export function getPrompt(resumeText: string, targetRole: string) {
   const targetRoleInput = normalizePromptInput(targetRole);
   const promptPayload = buildUntrustedPromptPayload({
@@ -151,6 +164,11 @@ export function getPrompt(resumeText: string, targetRole: string) {
   `;
 }
 
+/**
+ * Maps importance level to Tailwind CSS class names for styling.
+ * @param importance - Importance level ('critical', 'high', or default)
+ * @returns Tailwind class string for styling the importance indicator
+ */
 export const getImportanceStyles = (importance: string) => {
   const imp = importance?.toLowerCase();
   if (imp === "critical")
@@ -160,6 +178,11 @@ export const getImportanceStyles = (importance: string) => {
   return "border-muted text-muted-foreground bg-transparent";
 };
 
+/**
+ * Returns a styled Badge component based on the status string.
+ * @param status - The status value ('tailored', 'ANALYZED', 'reviewed', or other)
+ * @returns JSX Badge component with appropriate styling or null
+ */
 export function getStatusBadge(status: string) {
   switch (status) {
     case "tailored":
@@ -185,6 +208,12 @@ export function getStatusBadge(status: string) {
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
+/**
+ * Converts a date to a human-readable relative time string (e.g., '2 hours ago', 'in 3 days').
+ * Uses the Intl.RelativeTimeFormat API for localization.
+ * @param date - The date to convert (Date object or ISO string)
+ * @returns Human-readable relative time string
+ */
 export function getRelativeTime(date: Date | string): string {
   const now = Date.now();
   const then = new Date(date).getTime();
@@ -204,6 +233,11 @@ export function getRelativeTime(date: Date | string): string {
   return rtf.format(diffYears, "year");
 }
 
+/**
+ * Maps a numeric score to a Tailwind color class for visual feedback.
+ * @param score - Numeric score (0-100)
+ * @returns Tailwind text color class ('text-success', 'text-chart-4', or 'text-chart-5')
+ */
 export function getScoreColor(score: number) {
   if (score >= 85) return "text-success";
   if (score >= 70) return "text-chart-4";
@@ -225,6 +259,11 @@ const priorityConfig = {
   },
 };
 
+/**
+ * Retrieves configuration object (label, color) for a given priority level.
+ * @param priority - Priority level as string ('high', 'medium', 'low', or with suffix like 'High Impact')
+ * @returns Configuration object with label and Tailwind color classes
+ */
 export const getPriorityConfig = (priority: unknown) => {
   if (typeof priority === "string") {
     const normalized = priority.toLowerCase().split(" ")[0]; // Get the first word (e.g., "high" from "High Impact")
@@ -263,6 +302,11 @@ const categoryConfig = {
   },
 };
 
+/**
+ * Retrieves configuration object (icon, label, color) for a given category.
+ * @param category - Category name as string ('content', 'skills', 'experience', 'format', 'keywords', or other)
+ * @returns Configuration object with icon, label, and Tailwind color classes
+ */
 export const getCategoryConfig = (category: unknown) => {
   if (typeof category === "string") {
     const normalized = category.toLowerCase();
@@ -328,6 +372,13 @@ const sanitizeHtmlForThumbnail = (html: string) => {
       }
     ], */
 }
+/**
+ * Generates a comprehensive AI prompt for matching a resume against a job description.
+ * Analyzes ATS compatibility, skill gaps, and provides personalized improvement suggestions.
+ * @param resumeText - The candidate's resume content
+ * @param jobDescription - The job posting text to match against
+ * @returns Formatted prompt string for AI analysis
+ */
 export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   const normalizedJobDescription = normalizePromptInput(jobDescription);
   const normalizedResumeText = normalizePromptInput(resumeText);
@@ -491,6 +542,12 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
+/**
+ * Generates a JPEG thumbnail from the first page of a PDF file.
+ * @param file - PDF file object to generate thumbnail from
+ * @returns Promise resolving to a new File object containing the thumbnail image
+ * @throws Error if canvas conversion or PDF parsing fails
+ */
 export const generatePdfThumbnail = async (file: File): Promise<File> => {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -526,6 +583,13 @@ export const generatePdfThumbnail = async (file: File): Promise<File> => {
   });
 };
 
+/**
+ * Generates a JPEG thumbnail from a DOCX (Word) document.
+ * Converts the document to HTML, renders it in a hidden container, and captures as image.
+ * @param file - DOCX file object to generate thumbnail from
+ * @returns Promise resolving to a new File object containing the thumbnail image
+ * @throws Error if document conversion or image generation fails
+ */
 export const generateDocxThumbnail = async (file: File): Promise<File> => {
   const arrayBuffer = await file.arrayBuffer();
 
