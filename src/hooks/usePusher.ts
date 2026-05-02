@@ -6,11 +6,13 @@ import { useTRPC } from "@/trpc/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { publicEnv } from "@/lib/env.public";
 
-// Custom hook to listen for Pusher events related to resume analysis completion.
-// It takes the ID of the resume being analyzed and a callback function to execute when the analysis is complete.
-// The hook sets up a Pusher client, subscribes to the relevant channel and event,
-// and handles cleanup when the component unmounts or when the analyzingId changes.
-
+/**
+ * Hook to listen for Pusher real-time events when resume analysis completes.
+ * Subscribes to the "resume-updates" channel and invalidates relevant queries on completion.
+ * Automatically cleans up Pusher connection on unmount or when analyzingId changes.
+ * @param analyzingId - ID of the resume being analyzed (null to skip listening)
+ * @param onSuccess - Callback function to execute when analysis completes
+ */
 export const useResumePusher = (
   analyzingId: string | null,
   onSuccess: () => void,
@@ -62,12 +64,13 @@ export const useResumePusher = (
   }, [analyzingId, onSuccess, trpc, queryClient]);
 };
 
-// Similar custom hook for job match analysis completion events. It listens for events on the "job-match" channel and invalidates the relevant queries when a job match analysis is complete.
-// This allows the UI to react to the completion of background analyses without needing to poll for updates, providing a more responsive user experience.
-// Note: The onSuccess callback can be used to perform additional actions, such as navigating to a results page or updating local state, when the analysis is complete.
-// The use of environment variables for the Pusher key and cluster ensures that sensitive information is not hardcoded and can be easily configured for different environments (development, staging, production).
-// Overall, these hooks abstract away the complexity of setting up real-time listeners for analysis completion events and provide a clean interface for components to react to these events in a user-friendly way.
-
+/**
+ * Hook to listen for Pusher real-time events when job match analysis completes.
+ * Subscribes to the "job-match" channel and invalidates relevant queries on completion.
+ * Similar to useResumePusher but for job matching functionality.
+ * @param applicationId - ID of the job application being analyzed (null to skip listening)
+ * @param onSuccess - Callback function to execute when job match analysis completes
+ */
 export const useJobMatchPusher = (
   applicationId: string | null,
   onSuccess: () => void,

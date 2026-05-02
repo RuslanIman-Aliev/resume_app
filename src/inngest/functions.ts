@@ -12,6 +12,13 @@ const client = Sentry.instrumentOpenAiClient(openai, {
   recordInputs: true,
   recordOutputs: true,
 });
+/**
+ * Inngest function that analyzes a resume against a target role using OpenAI.
+ * Generates AI-powered insights, calculates scores, and saves results to database.
+ * Notifies client via Pusher when analysis completes.
+ * @event app/resume.analyzed - Triggered with resumeId, postedRole, and parsedContent
+ * @returns Analysis result object with scores, keywords, strengths, and improvements
+ */
 export const analyzeResume = inngest.createFunction(
   { id: "analyze-resume", triggers: { event: "app/resume.analyzed" } },
   // The function receives the parsed resume content and the target role, then generates a prompt for the OpenAI API to analyze the resume against the target role. The result is returned after a brief pause.
@@ -87,6 +94,13 @@ export const analyzeResume = inngest.createFunction(
   },
 );
 
+/**
+ * Inngest function that analyzes job application match against a resume using OpenAI.
+ * Compares resume skills and experience to job requirements and generates tailored insights.
+ * Saves detailed match analysis to database and notifies client via Pusher.
+ * @event app/job-matched.analyzed - Triggered with applicationId, jobDescription, and parsedContent
+ * @returns Job match analysis with scores, skill gaps, requirements matching, and cover letter
+ */
 export const analyzeJobMatched = inngest.createFunction(
   {
     id: "analyze-job-matched",

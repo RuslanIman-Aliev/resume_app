@@ -2,7 +2,10 @@ import sanitizeHtml from "sanitize-html";
 import { JSDOM } from "jsdom";
 
 /**
- * Escapes HTML-sensitive characters in plain text.
+ * Escapes HTML-sensitive characters in plain text to prevent XSS attacks.
+ * Converts &, <, >, ", and ' to their HTML entity equivalents.
+ * @param value - Plain text string to escape
+ * @returns HTML-escaped string safe for rendering in HTML context
  */
 export const escapeHtml = (value: string) =>
   value
@@ -127,9 +130,10 @@ const plainTextToPreservedHtml = (text: string) => {
 
 /**
  * Converts user-controlled resume HTML or text into safe paragraph markup.
- *
- * This keeps the editor working with simple HTML while stripping scriptable
- * content and collapsing the result back into escaped <p> blocks.
+ * Sanitizes HTML by removing dangerous tags and attributes, then normalizes to <p> blocks.
+ * Handles both HTML input and plain text with list formatting.
+ * @param value - Resume content as HTML string, plain text, or null/undefined
+ * @returns Sanitized HTML string with safe paragraph markup, or null if empty
  */
 export const normalizeResumeParsedContent = (
   value: string | null | undefined,
@@ -170,7 +174,12 @@ export const normalizeResumeParsedContent = (
 };
 
 /**
- * Rewrites the stored parsed content with a safe replacement or append.
+ * Updates resume content by replacing old text with new text or appending if no match found.
+ * Uses DOM parsing to locate and replace exact text matches in the existing HTML structure.
+ * @param currentContent - The current resume HTML content
+ * @param previousText - The text to find and replace (optional)
+ * @param nextText - The new text to replace with
+ * @returns Updated resume HTML content, or null if empty
  */
 export const updateResumeParsedContent = (
   currentContent: string | null | undefined,

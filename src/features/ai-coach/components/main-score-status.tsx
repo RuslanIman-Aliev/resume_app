@@ -153,7 +153,12 @@ export const MainScorePending = () => {
   );
 };
 
-export const MainScoreError = () => {
+/**
+ * Error state component shown when resume analysis fails to load.
+ * Provides retry button to refetch the analysis data.
+ * @param onRetry - Callback function to refetch the failed analysis
+ */
+export const MainScoreError = ({ onRetry }: { onRetry: () => void }) => {
   return (
     <FeedbackState
       status="error"
@@ -163,7 +168,7 @@ export const MainScoreError = () => {
       description="Please try again in a moment."
       primaryAction={{
         label: "Try again",
-        onClick: () => {}, // TODO: Pass refetch
+        onClick: onRetry,
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
         variant: "secondary",
       }}

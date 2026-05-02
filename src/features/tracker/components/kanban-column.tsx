@@ -1,9 +1,22 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { Badge } from "@/components/ui/badge";
+import type { JobApplicationCard } from "@/lib/types";
 import { JobCard } from "./job-card";
 
-export const KanbanColumn = ({ title , status, allJobs, color }: { title: string; status: string; allJobs: any[]; color: string }) => {
+/**
+ * Kanban column component that groups job applications by status.
+ * Displays a filtered list of jobs for a specific status with header badge showing count.
+ */
+export const KanbanColumn = ({
+  title,
+  status,
+  allJobs,
+  color,
+}: {
+  title: string;
+  status: string;
+  allJobs: JobApplicationCard[];
+  color: string;
+}) => {
   const columnJobs = allJobs.filter((job) => job.status === status);
 
   return (

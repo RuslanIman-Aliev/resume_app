@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import type { JobApplicationCard } from "@/lib/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,22 +18,29 @@ import {
   Trash2,
 } from "lucide-react";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const JobCard = ({ application }: { application: any }) => {
+/**
+ * Job card component for displaying individual job application in kanban/list view.
+ * Shows company info, job title, match score, and action menu.
+ */
+export const JobCard = ({
+  application,
+}: {
+  application: JobApplicationCard;
+}) => {
   return (
     <>
       <div className="group bg-card/80 border border-border/50 rounded-lg p-3 hover:border-primary/30 transition-colors cursor-grab active:cursor-grabbing">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-sm font-bold">
-              {application.company.charAt(0)}
+              {application.company?.charAt(0) || "?"}
             </div>
             <div>
               <h4 className="font-medium text-sm leading-tight">
-                {application.company}
+                {application.company || "Unnamed Company"}
               </h4>
               <p className="text-xs text-muted-foreground truncate max-w-35">
-                {application.position}
+                {application.position || "Unnamed Position"}
               </p>
             </div>
           </div>
