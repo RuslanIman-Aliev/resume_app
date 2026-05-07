@@ -1,20 +1,13 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useEffect } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
-
-const escapeHtml = (value: string) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+import { getEditorInitialContent } from "@/lib/editor-utils";
 
 export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const trpc = useTRPC();
@@ -28,16 +21,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
 
   const parsedResumeText = data?.resume.parsedContent ?? "";
 
-  const editorInitialContent = useMemo(() => {
-    const text = parsedResumeText.trim();
-    if (text.startsWith("<")) {
-      return text;
-    }
-    return text
-      .split(/\r?\n/)
-      .map((line) => `<p>${escapeHtml(line) || "<br>"}</p>`)
-      .join("");
-  }, [parsedResumeText]);
+  const editorInitialContent = getEditorInitialContent(parsedResumeText);
 
   const editor = useEditor({
     extensions: [StarterKit],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -29,6 +29,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getErrorFeedback } from "@/lib/error-feedback";
+import { escapeHtml, getEditorInitialContent } from "@/lib/editor-utils";
 
 type SuggestionStatus = "pending" | "accepted" | "rejected";
 
@@ -95,17 +96,6 @@ const SuggestionMark = Mark.create({
     ];
   },
 });
-
-/**
- * Escapes user-controlled text before it is embedded into editor HTML.
- */
-const escapeHtml = (value: string) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 
 const getPriorityStyles = (priority: string) => {
   switch (priority.toLowerCase()) {
@@ -230,19 +220,7 @@ const AnalyzeResumeImprovements = ({
 
   const parsedResumeText = parsedResumeData?.resume.parsedContent ?? "";
 
-  const editorInitialContent = useMemo(() => {
-    const text = parsedResumeText.trim();
-    // Если текст уже содержит HTML (например, сохраненный DOCX -> HTML)
-    if (text.startsWith("<")) {
-      return text;
-    }
-    // Если это обычный текст (например, из PDF), заменяем переносы на теги <br>
-    // или разбиваем на параграфы, чтобы сохранить оригинальное визуальное форматирование
-    return text
-      .split("\n")
-      .map((line) => `<p>${escapeHtml(line) || "<br>"}</p>`)
-      .join("");
-  }, [parsedResumeText]);
+  const editorInitialContent = getEditorInitialContent(parsedResumeText);
 
   const editor = useEditor({
     extensions: [StarterKit, SuggestionMark],
