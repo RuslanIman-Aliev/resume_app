@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Loader2 } from "lucide-react";
@@ -21,7 +21,10 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
 
   const parsedResumeText = data?.resume.parsedContent ?? "";
 
-  const editorInitialContent = getEditorInitialContent(parsedResumeText);
+  const editorInitialContent = useMemo(
+    () => getEditorInitialContent(parsedResumeText),
+    [parsedResumeText],
+  );
 
   const editor = useEditor({
     extensions: [StarterKit],

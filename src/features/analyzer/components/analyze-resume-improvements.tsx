@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -220,7 +220,10 @@ const AnalyzeResumeImprovements = ({
 
   const parsedResumeText = parsedResumeData?.resume.parsedContent ?? "";
 
-  const editorInitialContent = getEditorInitialContent(parsedResumeText);
+  const editorInitialContent = useMemo(
+    () => getEditorInitialContent(parsedResumeText),
+    [parsedResumeText],
+  );
 
   const editor = useEditor({
     extensions: [StarterKit, SuggestionMark],
