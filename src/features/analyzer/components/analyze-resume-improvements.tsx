@@ -29,6 +29,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getErrorFeedback } from "@/lib/error-feedback";
+import { escapeHtml, getEditorInitialContent } from "@/lib/editor-utils";
 
 type SuggestionStatus = "pending" | "accepted" | "rejected";
 
@@ -95,17 +96,6 @@ const SuggestionMark = Mark.create({
     ];
   },
 });
-
-/**
- * Escapes user-controlled text before it is embedded into editor HTML.
- */
-const escapeHtml = (value: string) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 
 const getPriorityStyles = (priority: string) => {
   switch (priority.toLowerCase()) {
@@ -230,23 +220,20 @@ const AnalyzeResumeImprovements = ({
 
   const parsedResumeText = parsedResumeData?.resume.parsedContent ?? "";
 
-  const editorInitialContent = useMemo(() => {
-    const text = parsedResumeText.trim();
-    // ИСправить потом для пдф файлов
-    if (text.startsWith("<")) {
-      return text;
-    }
-    return text;
-    //plainTextToEditorHtml(text);
-  }, [parsedResumeText]);
+  const editorInitialContent = useMemo(
+    () => getEditorInitialContent(parsedResumeText),
+    [parsedResumeText],
+  );
+
   const editor = useEditor({
     extensions: [StarterKit, SuggestionMark],
-    content: "<p></p>",
+    content: "",
     immediatelyRender: false,
     editorProps: {
       attributes: {
+        // Добавлен whitespace-pre-wrap на случай, если стили все же сплющивают текст внутри параграфов
         class:
-          "prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[420px] max-h-[70vh] overflow-y-auto rounded-xl border border-border/60 bg-background px-8 py-6 shadow-sm",
+          "prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[420px] max-h-[70vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background px-8 py-6 shadow-sm",
       },
     },
   });

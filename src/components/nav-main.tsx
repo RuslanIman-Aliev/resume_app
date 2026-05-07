@@ -55,7 +55,7 @@ export function Header() {
     },
     { id: "resumes", label: "Resumes", icon: FolderOpen, href: "/resumes" },
     { id: "tracker", label: "Tracker", icon: ListChecks, href: "/tracker" },
-    { id: "coach", label: "AI Coach", icon: BrainCircuit, href: "/ai-coach" },
+    //{ id: "coach", label: "AI Coach", icon: BrainCircuit, href: "/ai-coach" },
   ];
 
   const { data: session, isPending } = authClient.useSession();

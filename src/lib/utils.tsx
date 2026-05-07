@@ -59,6 +59,8 @@ export function getPrompt(resumeText: string, targetRole: string) {
   Do not summarize, skip, or omit ANY bullet points, jobs, degrees, links, or skills from the raw text. 
   EVERY piece of experience, project, education, and personal info must be accurately mapped into the structuredData JSON object so a perfect visual reconstructed resume can be rendered purely from this data.
   
+  LANGUAGE REQUIREMENT: You must detect the language of the provided resume. All your generated content, including suggestions, descriptions, titles, tips, and rewritten text, MUST be exclusively in that same language. For example, if the resume is in English, write all your suggestions and analysis in English. If the resume is in Russian, write everything in Russian.
+
   You must eliminate weak verbs (e.g., "helped", "worked on") and replace them with strong action verbs (e.g., "architected", "scaled", "drove"). You must inject specific metrics, percentages, and business impact into your suggestions.
 
   You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
