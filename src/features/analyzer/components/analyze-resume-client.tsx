@@ -27,6 +27,8 @@ import AnalyzeSkillsGap from "./analyze-skills-gap";
 import AnalyzerResults from "./analyzer-results";
 import AnalyzeKeywords from "./analyze-keywords";
 import AnalyzeRequirementsMatch from "./analyze-requirements-match";
+import { AnalyzeOriginalResume } from "./analyze-original-resume";
+import { FileText } from "lucide-react";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -187,6 +189,13 @@ export const AnalyzeResumeClient = () => {
             <Sparkles className="h-4 w-4 mr-2" />
             Keywords
           </TabsTrigger>
+          <TabsTrigger
+            value="original"
+            className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Original Resume
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -203,7 +212,10 @@ export const AnalyzeResumeClient = () => {
             data={appData as unknown as ApplicationData}
             resumeId={appData.resumeId}
             applicationId={appData.id}
-          />{" "}
+          />
+        </TabsContent>
+        <TabsContent value="original" className="mt-4">
+          <AnalyzeOriginalResume resumeId={appData.resumeId} />
         </TabsContent>
         <TabsContent value="skills-gap" className="mt-4">
           <AnalyzeSkillsGap data={skillsGapData} />

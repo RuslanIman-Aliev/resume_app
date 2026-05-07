@@ -232,21 +232,27 @@ const AnalyzeResumeImprovements = ({
 
   const editorInitialContent = useMemo(() => {
     const text = parsedResumeText.trim();
-    // ИСправить потом для пдф файлов
+    // Если текст уже содержит HTML (например, сохраненный DOCX -> HTML)
     if (text.startsWith("<")) {
       return text;
     }
-    return text;
-    //plainTextToEditorHtml(text);
+    // Если это обычный текст (например, из PDF), заменяем переносы на теги <br>
+    // или разбиваем на параграфы, чтобы сохранить оригинальное визуальное форматирование
+    return text
+      .split("\n")
+      .map((line) => `<p>${escapeHtml(line) || "<br>"}</p>`)
+      .join("");
   }, [parsedResumeText]);
+
   const editor = useEditor({
     extensions: [StarterKit, SuggestionMark],
-    content: "<p></p>",
+    content: "",
     immediatelyRender: false,
     editorProps: {
       attributes: {
+        // Добавлен whitespace-pre-wrap на случай, если стили все же сплющивают текст внутри параграфов
         class:
-          "prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[420px] max-h-[70vh] overflow-y-auto rounded-xl border border-border/60 bg-background px-8 py-6 shadow-sm",
+          "prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[420px] max-h-[70vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background px-8 py-6 shadow-sm",
       },
     },
   });

@@ -32,53 +32,96 @@ export const signInFormSchema = z.object({
 
 export type SignInFormData = z.infer<typeof signInFormSchema>;
 
+/**
+ * Represents a single piece of actionable advice to improve a resume.
+ */
 export interface ImprovementTip {
+  /** Short title summarizing the improvement. */
   title: string;
+  /** Importance level: e.g., 'high', 'medium', 'low'. */
   priority: string;
+  /** Suggested improved text. */
   afterText: string;
+  /** Original text to be improved. */
   beforeText: string;
+  /** Detailed explanation of why the change is recommended. */
   description: string;
+  /** Additional variations or tips for applying the change. */
   suggestions: string[];
+  /** Estimated impact on the overall match score. */
   matchScoreBoost: number;
+  /** Broad area of the tip (e.g., 'formatting', 'content', 'keywords'). */
   category?: string;
+  /** The specific resume section this tip targets. */
   targetSection: "summary" | "experience" | "education" | "projects" | "skills";
+  /** The unique identifier of the exact item inside the target section (if applicable). */
   targetId?: string;
+  /** Tracks whether the user has applied this tip. */
   isApplied?: boolean;
 }
 
+/**
+ * Common data structure for a work experience entry in the resume.
+ */
 export interface ResumeBlockInfo {
+  /** Unique identifier for the experience block. */
   id: string;
+  /** Name of the organization. */
   company: string;
+  /** Job title held. */
   role: string;
+  /** Duration or timeframe of the role. */
   date: string;
+  /** List of achievements and responsibilities. */
   bullets: {
+    /** Unique identifier for the bullet point. */
     id: string;
+    /** The actual text of the accomplishment. */
     text: string;
   }[];
 }
 
+/**
+ * Data structure for an educational qualification in the resume.
+ */
 export interface EducationBlockInfo {
+  /** Unique identifier for the education block. */
   id: string;
+  /** Name of the academic institution. */
   institution: string;
+  /** Level of degree or certification acquired. */
   degree: string;
+  /** Date of graduation or timeframe. */
   date: string;
+  /** Relevant coursework, honors, or extracurriculars. */
   bullets: {
     id: string;
     text: string;
   }[];
 }
 
+/**
+ * Data structure for a notable project in the resume.
+ */
 export interface ProjectBlockInfo {
+  /** Unique identifier for the project block. */
   id: string;
+  /** Title of the project. */
   name: string;
+  /** Date or timeframe the project was completed. */
   date: string;
+  /** Details covering technologies used and impact. */
   bullets: {
     id: string;
     text: string;
   }[];
 }
 
+/**
+ * The complete, structured representation of a user's resume text.
+ */
 export interface StructuredResumeData {
+  /** Basic contact and profile details. */
   personalInfo: {
     name: string;
     email: string;
@@ -87,9 +130,13 @@ export interface StructuredResumeData {
     links?: string[];
     summary: string;
   };
+  /** Work history comprising various roles. */
   experience: ResumeBlockInfo[];
+  /** Academic background. */
   education: EducationBlockInfo[];
+  /** Highlighted portfolio items or side projects. */
   projects?: ProjectBlockInfo[];
+  /** Raw list of technical and soft skills. */
   skills: string[];
 }
 
@@ -156,38 +203,80 @@ export type JobApplicationCard = {
   };
 };
 
+/**
+ * Detailed analysis of how well a resume matches a job description.
+ */
 export type JobMatchAnalysis = z.infer<typeof jobMatchAnalysisSchema>;
+
+/**
+ * General analysis and scoring of a resume.
+ */
 export type ResumeAnalysis = z.infer<typeof resumeAnalysisSchema>;
 
+/**
+ * Level of importance for a specific skill in a job posting.
+ */
 export type SkillImportance = "Critical" | "High" | "Medium" | "Low";
 
+/**
+ * Represents a single skill and whether it was found in the user's resume.
+ */
 export type SkillGapItem = {
+  /** The name of the skill. */
   skill: string;
+  /** Whether the skill was found in the resume. */
   matched: boolean;
+  /** How important the skill is for the job. */
   importance: SkillImportance;
 };
 
+/**
+ * Comprehensive skills gap analysis categorizing soft and technical skills.
+ */
 export type SkillsGapData = {
+  /** Soft skills gap analysis. */
   soft: SkillGapItem[];
+  /** Technical skills gap analysis. */
   technical: SkillGapItem[];
+  /** List of critical skills missing from the resume. */
   missingCriticalSkills: string[];
 };
 
+/**
+ * Analysis of keywords found or missing from the resume based on the job posting.
+ */
 export type KeywordsGapData = {
+  /** Keywords successfully found in the resume. */
   found: string[];
+  /** Important keywords missing from the resume. */
   missing: string[];
 };
 
+/**
+ * Level of importance for a specific job requirement.
+ */
 export type RequirementImportance = "Critical" | "High" | "Medium" | "Low";
 
+/**
+ * Represents a single job requirement and whether the applicant meets it.
+ */
 export type RequirementItem = {
+  /** Whether the requirement is met by the applicant's resume. */
   matched: boolean;
+  /** Quote or section from the resume proving the requirement is met. */
   evidence: string | null;
+  /** How important the requirement is. */
   importance: RequirementImportance;
+  /** Description of the requirement. */
   requirement: string;
 };
 
+/**
+ * Comprehensive analysis of how well the applicant meets job requirements.
+ */
 export type RequirementsMatchData = {
+  /** Analysis of required/mandatory job qualifications. */
   required: RequirementItem[];
+  /** Analysis of preferred/nice-to-have job qualifications. */
   preferred: RequirementItem[];
 };
