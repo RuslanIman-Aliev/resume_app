@@ -34,7 +34,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
       return text;
     }
     return text
-      .split("\n")
+      .split(/\r?\n/)
       .map((line) => `<p>${escapeHtml(line) || "<br>"}</p>`)
       .join("");
   }, [parsedResumeText]);
