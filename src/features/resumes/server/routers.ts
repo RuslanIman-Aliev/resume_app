@@ -144,7 +144,12 @@ export const resumeRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const resume = await prisma.resume.findFirst({
         where: { id: input.resumeId, userId: ctx.auth.user.id },
-        select: { parsedContent: true, resumeName: true, postedRole: true },
+        select: {
+          parsedContent: true,
+          resumeName: true,
+          postedRole: true,
+          resumeLink: true,
+        },
       });
       if (!resume) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Resume not found" });
