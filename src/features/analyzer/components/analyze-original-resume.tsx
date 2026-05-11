@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
@@ -46,7 +46,15 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     return bytes;
   };
 
-  const extractSfdtFromZipBase64 = (value: string) => {
+  const decodeBase64ToText = useCallback((value: string) => {
+    try {
+      return strFromU8(decodeBase64ToBytes(value));
+    } catch {
+      return "";
+    }
+  }, []);
+
+  const extractSfdtFromZipBase64 = useCallback((value: string) => {
     const bytes = decodeBase64ToBytes(value);
     const files = unzipSync(bytes);
     const fileNames = Object.keys(files);
@@ -72,7 +80,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
       }
     }
     return result;
-  };
+  }, []);
 
   useEffect(() => {
     if (!editorRef.current || !resumeLink || isLoading || !isEditorReady) {
@@ -170,18 +178,23 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
               const sfdtText = extractSfdtFromZipBase64(openPayload);
               console.log("[SFDT] files extracted, length:", sfdtText.length);
               console.log("[SFDT] preview:", sfdtText.slice(0, 200));
+              const textRuns = sfdtText.match(/"t":"([^"]*)"/g) ?? [];
+              console.log(
+                "[SFDT] text runs:",
+                textRuns.length,
+                textRuns.slice(0, 3),
+              );
               if (!sfdtText) {
                 throw new Error("SFDT zip is empty");
               }
-              await editor.openAsync(sfdtText);
+              if (textRuns.length === 0) {
+                lastErrorMessage = "SFDT не содержит текстовых узлов";
+                return false;
+              }
+              editor.open(sfdtText);
               await new Promise((resolve) => setTimeout(resolve, 1000));
               const loaded = await ensureLoaded();
               console.log("[SFDT] loaded:", loaded);
-
-              if (loaded && editor.render) {
-                console.log("[SFDT] calling render()");
-                editor.render();
-              }
 
               const container = editorRef.current?.element;
               if (container) {
@@ -198,18 +211,33 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
               return loaded;
             } catch (decodeError) {
               console.warn("Failed to unzip base64 SFDT:", decodeError);
+              lastErrorMessage = "Не удалось распаковать SFDT zip";
+              return false;
             }
           }
 
-          await editor.openAsync(openPayload);
+          const looksLikeBase64 =
+            /^[A-Za-z0-9+/=]+$/.test(openPayload) && openPayload.length > 128;
+
+          if (looksLikeBase64) {
+            const decodedText = decodeBase64ToText(openPayload).trim();
+
+            if (decodedText.startsWith("{")) {
+              editor.open(decodedText);
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              const loaded = await ensureLoaded();
+              console.log("[SFDT] loaded from base64:", loaded);
+              return loaded;
+            }
+
+            lastErrorMessage = "Ответ похож на base64, но SFDT не распознан";
+            return false;
+          }
+
+          editor.open(openPayload);
           await new Promise((resolve) => setTimeout(resolve, 1000));
           const loaded = await ensureLoaded();
           console.log("[SFDT] loaded:", loaded);
-
-          if (loaded && editor.render) {
-            console.log("[SFDT] calling render()");
-            editor.render();
-          }
 
           const container = editorRef.current?.element;
           if (container) {
@@ -255,53 +283,26 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         console.log("[Document] View type:", editor.pageOutline);
         console.log("[Document] Has selection:", !!editor.selection);
 
-        // If zoom is 0 or very small, set it to 100%
-        if (!editor.zoomFactor || editor.zoomFactor < 10) {
-          console.log("[Document] Zoom is too low, setting to 100");
+        // If zoom is too small, normalize to 1 (100%)
+        if (!editor.zoomFactor || editor.zoomFactor < 0.2) {
+          console.log("[Document] Zoom is too low, setting to 1");
           try {
-            editor.zoomFactor = 100;
+            editor.zoomFactor = 1;
           } catch (zoomError) {
             console.warn("[Document] Failed to set zoom:", zoomError);
           }
         }
 
-        // Try to update scroll to ensure content is visible
+        // Force a layout pass so the internal iframe gets sized
         try {
-          if (editor.updateScrollPosition) {
-            editor.updateScrollPosition(0, 0);
+          if (editor.resize) {
+            editor.resize();
           }
-        } catch (scrollError) {
-          console.warn("[Document] Failed to update scroll:", scrollError);
-        }
-
-        // Try refresh/redraw if available
-        try {
-          if (editor.refresh) {
-            editor.refresh();
-            console.log("[Document] Called refresh()");
+          if (editorRef.current?.resize) {
+            editorRef.current.resize();
           }
-        } catch (refreshError) {
-          console.warn("[Document] Failed to refresh:", refreshError);
-        }
-
-        // Try to focus and trigger render
-        try {
-          if (editor.focusIn) {
-            editor.focusIn();
-            console.log("[Document] Called focusIn()");
-          }
-        } catch (focusError) {
-          console.warn("[Document] Failed to focusIn:", focusError);
-        }
-
-        // Try paint if available (some editors use this for rendering)
-        try {
-          if (editor.paint) {
-            editor.paint();
-            console.log("[Document] Called paint()");
-          }
-        } catch (paintError) {
-          console.warn("[Document] Failed to paint:", paintError);
+        } catch (resizeError) {
+          console.warn("[Document] Failed to resize:", resizeError);
         }
 
         const editorCanvas = document.querySelector(".e-de-page");
@@ -357,7 +358,14 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     };
 
     loadDocument();
-  }, [resumeLink, isLoading, parsedResumeText, isEditorReady]);
+  }, [
+    resumeLink,
+    isLoading,
+    parsedResumeText,
+    isEditorReady,
+    extractSfdtFromZipBase64,
+    decodeBase64ToText,
+  ]);
 
   const isGlobalLoading = isLoading || isDocumentLoading;
 
@@ -372,7 +380,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
       ) : null}
 
       {isGlobalLoading ? (
-        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-linear-to-br from-primary/10 via-card to-secondary/30 p-5 min-h-[500px] flex items-center justify-center">
+        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-linear-to-br from-primary/10 via-card to-secondary/30 p-5 min-h-125 flex items-center justify-center">
           <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
           <div className="flex flex-col items-center gap-4 z-10">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -384,7 +392,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           </div>
         </div>
       ) : (
-        <div className="h-[70vh] min-h-[600px] border border-border/60 rounded-xl overflow-hidden shadow-sm document-editor-container-wrapper">
+        <div className="h-[70vh] min-h-150 border border-border/60 rounded-xl overflow-hidden shadow-sm document-editor-container-wrapper">
           <style>{`
             .document-editor-container-wrapper .e-documenteditorcontainer {
               border-radius: 0.75rem;
@@ -392,6 +400,10 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             }
            
             .document-editor-container-wrapper .e-documenteditor {
+              height: 100% !important;
+            }
+            .document-editor-container-wrapper .e-documenteditor iframe {
+              width: 100% !important;
               height: 100% !important;
             }
             .document-editor-container-wrapper > div {
@@ -402,9 +414,20 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             ref={editorRef}
             height="100%"
             style={{ display: "block", height: "100%", width: "100%" }}
+            autoResizeOnVisibilityChange={true}
             enableToolbar={false}
             showPropertiesPane={false}
-            created={() => setIsEditorReady(true)}
+            created={() => {
+              const documentEditor = editorRef.current?.documentEditor;
+              if (documentEditor) {
+                documentEditor.serviceUrl = "";
+                documentEditor.serverActionSettingsImport = "/api/Import";
+                console.log(
+                  "[DocumentEditor] import endpoint set to /api/Import",
+                );
+              }
+              setIsEditorReady(true);
+            }}
           />
         </div>
       )}
