@@ -1,9 +1,60 @@
 import { NextResponse } from "next/server";
+import { strFromU8, unzipSync } from "fflate";
 
 const DOCUMENT_EDITOR_SERVICE_URL = process.env.DOCUMENT_EDITOR_SERVICE_URL;
 
 const normalizeServiceUrl = (value: string) =>
   value.endsWith("/") ? value : `${value}/`;
+
+const isSfdtLike = (value: unknown) => {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return Array.isArray(record.sec) || Array.isArray(record.sections);
+};
+
+const extractSfdtFromBase64Zip = (value: string) => {
+  const bytes = new Uint8Array(Buffer.from(value, "base64"));
+  const files = unzipSync(bytes);
+  const fileNames = Object.keys(files);
+
+  const candidates: Array<{ name: string; text: string; textRuns: number }> =
+    [];
+
+  for (const name of fileNames) {
+    const text = strFromU8(files[name]).trim();
+    if (!text.startsWith("{")) continue;
+
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      if (typeof parsed.sfdt === "string") {
+        return { kind: "sfdt", text: parsed.sfdt, sourceName: name };
+      }
+      if (isSfdtLike(parsed)) {
+        const textRuns = text.match(/"(t|tlp|text)":"[^"]*"/g)?.length ?? 0;
+        candidates.push({ name, text, textRuns });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => {
+      if (b.textRuns !== a.textRuns) return b.textRuns - a.textRuns;
+      return b.text.length - a.text.length;
+    });
+    const best = candidates[0];
+    return { kind: "sfdt", text: best.text, sourceName: best.name };
+  }
+
+  const hasWordDocument = Boolean(files["word/document.xml"]);
+  const hasContentTypes = Boolean(files["[Content_Types].xml"]);
+  if (hasWordDocument && hasContentTypes) {
+    return { kind: "docx", fileNames };
+  }
+
+  return { kind: "unknown", fileNames };
+};
 
 export async function POST(request: Request) {
   try {
@@ -101,10 +152,76 @@ export async function POST(request: Request) {
       );
     }
 
-    const sfdtText = await sfdtResponse.text();
+    let sfdtText = await sfdtResponse.text();
+    let trimmed = sfdtText.trim();
+    let sfdtSource = "raw";
+
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      try {
+        trimmed = JSON.parse(trimmed);
+      } catch {
+        // keep original
+      }
+    }
+
+    if (trimmed.startsWith("{")) {
+      sfdtSource = "json";
+      try {
+        const parsed = JSON.parse(trimmed) as { sfdt?: string } & Record<
+          string,
+          unknown
+        >;
+        if (typeof parsed.sfdt === "string") {
+          const sfdtValue = parsed.sfdt.trim();
+          if (sfdtValue.startsWith("UEsDB")) {
+            const extracted = extractSfdtFromBase64Zip(sfdtValue);
+            if (extracted.kind === "sfdt") {
+              sfdtText = extracted.text;
+              sfdtSource = "json:zip";
+            } else {
+              return NextResponse.json(
+                {
+                  error: "SFDT not found in Import response",
+                  details: extracted,
+                },
+                { status: 502 },
+              );
+            }
+          } else {
+            sfdtText = parsed.sfdt;
+            sfdtSource = "json:sfdt";
+          }
+        } else if (isSfdtLike(parsed)) {
+          sfdtText = trimmed;
+          sfdtSource = "json:sfdt-like";
+        }
+      } catch {
+        sfdtText = trimmed;
+      }
+    } else if (trimmed.startsWith("UEsDB")) {
+      const extracted = extractSfdtFromBase64Zip(trimmed);
+      if (extracted.kind === "sfdt") {
+        sfdtText = extracted.text;
+        sfdtSource = "zip:sfdt";
+      } else {
+        return NextResponse.json(
+          {
+            error: "SFDT not found in Import response",
+            details: extracted,
+          },
+          { status: 502 },
+        );
+      }
+    } else {
+      sfdtText = trimmed;
+    }
 
     return new NextResponse(sfdtText, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "x-sfdt-normalized": "1",
+        "x-sfdt-source": sfdtSource,
+      },
     });
   } catch (error) {
     console.error("docx-to-sfdt error:", error);

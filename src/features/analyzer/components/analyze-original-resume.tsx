@@ -16,7 +16,7 @@ registerLicense(
 );
 
 const SYNCFUSION_THEME_URL =
-  "https://cdn.syncfusion.com/ej2/24.1.41/material.css";
+  "https://cdn.syncfusion.com/ej2/33.2.5/material.css";
 
 DocumentEditorContainerComponent.Inject(Toolbar);
 
@@ -37,50 +37,112 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const resumeLink = data?.resume?.resumeLink;
   const parsedResumeText = data?.resume?.parsedContent ?? "";
 
-  const decodeBase64ToBytes = (value: string) => {
+  useEffect(() => {
+    if (resumeLink) {
+      console.log("[Resume] link:", resumeLink);
+    }
+  }, [resumeLink]);
+
+  const decodeBase64ToBytes = useCallback((value: string) => {
     const binary = atob(value);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i += 1) {
       bytes[i] = binary.charCodeAt(i);
     }
     return bytes;
+  }, []);
+
+  const decodeBase64ToText = useCallback(
+    (value: string) => {
+      try {
+        return strFromU8(decodeBase64ToBytes(value));
+      } catch {
+        return "";
+      }
+    },
+    [decodeBase64ToBytes],
+  );
+
+  type ZipExtractResult =
+    | { kind: "sfdt"; text: string; sourceName: string }
+    | { kind: "docx"; bytes: Uint8Array }
+    | { kind: "unknown"; reason: string };
+
+  const isSfdtLike = (value: unknown) => {
+    if (!value || typeof value !== "object") return false;
+    const record = value as Record<string, unknown>;
+    return Array.isArray(record.sec) || Array.isArray(record.sections);
   };
 
-  const decodeBase64ToText = useCallback((value: string) => {
-    try {
-      return strFromU8(decodeBase64ToBytes(value));
-    } catch {
-      return "";
-    }
-  }, []);
+  const extractSfdtFromZipBase64 = useCallback(
+    (value: string): ZipExtractResult => {
+      const bytes = decodeBase64ToBytes(value);
+      const files = unzipSync(bytes);
+      const fileNames = Object.keys(files);
+      console.log("[extractSfdtFromZipBase64] files in zip:", fileNames);
 
-  const extractSfdtFromZipBase64 = useCallback((value: string) => {
-    const bytes = decodeBase64ToBytes(value);
-    const files = unzipSync(bytes);
-    const fileNames = Object.keys(files);
-    console.log("[extractSfdtFromZipBase64] files in zip:", fileNames);
-    const sfdtName = fileNames.find((name) =>
-      name.toLowerCase().includes("sfdt"),
-    );
-    const candidate = sfdtName ? files[sfdtName] : files[fileNames[0]];
-    const result = candidate ? strFromU8(candidate) : "";
-    console.log(
-      "[extractSfdtFromZipBase64] extracted SFDT length:",
-      result.length,
-    );
-    if (result.length > 0) {
-      try {
-        const parsed = JSON.parse(result);
-        console.log(
-          "[extractSfdtFromZipBase64] SFDT is valid JSON, keys:",
-          Object.keys(parsed).slice(0, 5),
-        );
-      } catch {
-        console.warn("[extractSfdtFromZipBase64] SFDT is not JSON");
+      const sfdtCandidates: Array<{
+        name: string;
+        text: string;
+        textRuns: number;
+      }> = [];
+
+      for (const name of fileNames) {
+        const text = strFromU8(files[name]).trim();
+        if (!text.startsWith("{")) continue;
+
+        try {
+          const parsed = JSON.parse(text) as Record<string, unknown>;
+          if (typeof parsed.sfdt === "string") {
+            return { kind: "sfdt", text: parsed.sfdt, sourceName: name };
+          }
+          if (isSfdtLike(parsed)) {
+            const textRuns = text.match(/"(t|tlp|text)":"[^"]*"/g)?.length ?? 0;
+            sfdtCandidates.push({ name, text, textRuns });
+          }
+        } catch {
+          continue;
+        }
       }
-    }
-    return result;
-  }, []);
+
+      if (sfdtCandidates.length > 0) {
+        sfdtCandidates.sort((a, b) => {
+          if (b.textRuns !== a.textRuns) return b.textRuns - a.textRuns;
+          return b.text.length - a.text.length;
+        });
+        const best = sfdtCandidates[0];
+        console.log(
+          "[extractSfdtFromZipBase64] SFDT candidate selected:",
+          best.name,
+          "textRuns:",
+          best.textRuns,
+        );
+        return { kind: "sfdt", text: best.text, sourceName: best.name };
+      }
+
+      const hasWordDocument = Boolean(files["word/document.xml"]);
+      const hasContentTypes = Boolean(files["[Content_Types].xml"]);
+      if (hasWordDocument && hasContentTypes) {
+        return { kind: "docx", bytes };
+      }
+
+      const sfdtName = fileNames.find((name) =>
+        name.toLowerCase().match(/\.(sfdt|json)$/),
+      );
+      if (sfdtName) {
+        const fallbackText = strFromU8(files[sfdtName]).trim();
+        if (fallbackText) {
+          return { kind: "sfdt", text: fallbackText, sourceName: sfdtName };
+        }
+      }
+
+      return {
+        kind: "unknown",
+        reason: "SFDT не найден в архиве",
+      };
+    },
+    [decodeBase64ToBytes],
+  );
 
   useEffect(() => {
     if (!editorRef.current || !resumeLink || isLoading || !isEditorReady) {
@@ -112,6 +174,39 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           await new Promise((resolve) => setTimeout(resolve, 300));
         }
         return isEditorLoaded();
+      };
+
+      const hasDocumentText = () => {
+        try {
+          const serialized = editor.serialize();
+          return /"(t|tlp|text)":"[^\"]+"/.test(serialized);
+        } catch {
+          return false;
+        }
+      };
+
+      const openSfdtText = async (sfdtText: string) => {
+        editor.open(sfdtText);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const loaded = await ensureLoaded();
+        console.log("[SFDT] loaded:", loaded);
+        if (!hasDocumentText()) {
+          console.warn(
+            "[SFDT] no text detected after load; continuing to render",
+          );
+        }
+        return loaded;
+      };
+
+      const openDocxBytes = async (bytes: Uint8Array) => {
+        const blob = new Blob([bytes], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        });
+        editor.open(blob);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const loaded = await ensureLoaded();
+        console.log("[SFDT] loaded from DOCX:", loaded);
+        return loaded;
       };
 
       const tryOpenFromApi = async () => {
@@ -155,11 +250,22 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
 
           if (openPayload?.startsWith("{")) {
             try {
-              const parsed = JSON.parse(openPayload) as {
-                sfdt?: string;
-              };
+              const parsed = JSON.parse(openPayload) as Record<string, unknown>;
               if (typeof parsed.sfdt === "string") {
                 openPayload = parsed.sfdt;
+              } else if (isSfdtLike(parsed)) {
+                openPayload = JSON.stringify(parsed);
+              } else {
+                const errorMessage =
+                  typeof parsed.error === "string"
+                    ? parsed.error
+                    : "Ответ не является SFDT";
+                const details =
+                  typeof parsed.details === "string" ? parsed.details : "";
+                lastErrorMessage = [errorMessage, details]
+                  .filter(Boolean)
+                  .join(" ");
+                return false;
               }
             } catch {
               // Keep original payload if JSON parsing fails.
@@ -175,40 +281,22 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
 
           if (isLikelyBase64Zip) {
             try {
-              const sfdtText = extractSfdtFromZipBase64(openPayload);
-              console.log("[SFDT] files extracted, length:", sfdtText.length);
-              console.log("[SFDT] preview:", sfdtText.slice(0, 200));
-              const textRuns = sfdtText.match(/"t":"([^"]*)"/g) ?? [];
-              console.log(
-                "[SFDT] text runs:",
-                textRuns.length,
-                textRuns.slice(0, 3),
-              );
-              if (!sfdtText) {
-                throw new Error("SFDT zip is empty");
-              }
-              if (textRuns.length === 0) {
-                lastErrorMessage = "SFDT не содержит текстовых узлов";
-                return false;
-              }
-              editor.open(sfdtText);
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-              const loaded = await ensureLoaded();
-              console.log("[SFDT] loaded:", loaded);
-
-              const container = editorRef.current?.element;
-              if (container) {
-                const rect = container.getBoundingClientRect();
-                console.log("[SFDT] container visible:", {
-                  display: window.getComputedStyle(container).display,
-                  visibility: window.getComputedStyle(container).visibility,
-                  opacity: window.getComputedStyle(container).opacity,
-                  width: rect.width,
-                  height: rect.height,
-                });
+              const zipResult = extractSfdtFromZipBase64(openPayload);
+              if (zipResult.kind === "sfdt") {
+                const sfdtText = zipResult.text;
+                console.log("[SFDT] files extracted, length:", sfdtText.length);
+                console.log("[SFDT] source file:", zipResult.sourceName);
+                console.log("[SFDT] preview:", sfdtText.slice(0, 200));
+                return await openSfdtText(sfdtText);
               }
 
-              return loaded;
+              if (zipResult.kind === "docx") {
+                console.log("[SFDT] zip looks like DOCX, opening via Import");
+                return await openDocxBytes(zipResult.bytes);
+              }
+
+              lastErrorMessage = zipResult.reason;
+              return false;
             } catch (decodeError) {
               console.warn("Failed to unzip base64 SFDT:", decodeError);
               lastErrorMessage = "Не удалось распаковать SFDT zip";
@@ -223,21 +311,14 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             const decodedText = decodeBase64ToText(openPayload).trim();
 
             if (decodedText.startsWith("{")) {
-              editor.open(decodedText);
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-              const loaded = await ensureLoaded();
-              console.log("[SFDT] loaded from base64:", loaded);
-              return loaded;
+              return await openSfdtText(decodedText);
             }
 
             lastErrorMessage = "Ответ похож на base64, но SFDT не распознан";
             return false;
           }
 
-          editor.open(openPayload);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          const loaded = await ensureLoaded();
-          console.log("[SFDT] loaded:", loaded);
+          const loaded = await openSfdtText(openPayload);
 
           const container = editorRef.current?.element;
           if (container) {
@@ -405,6 +486,10 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             .document-editor-container-wrapper .e-documenteditor iframe {
               width: 100% !important;
               height: 100% !important;
+              background: transparent !important;
+            }
+            .document-editor-container-wrapper .e-de-text-target {
+              background: transparent !important;
             }
             .document-editor-container-wrapper > div {
               height: 100% !important;
@@ -421,7 +506,12 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
               const documentEditor = editorRef.current?.documentEditor;
               if (documentEditor) {
                 documentEditor.serviceUrl = "";
-                documentEditor.serverActionSettingsImport = "/api/Import";
+                documentEditor.serverActionSettings = {
+                  import: "/api/Import",
+                };
+                documentEditor.documentLoadFailed = (args) => {
+                  console.warn("[DocumentEditor] load failed:", args?.status);
+                };
                 console.log(
                   "[DocumentEditor] import endpoint set to /api/Import",
                 );
