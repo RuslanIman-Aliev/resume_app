@@ -77,17 +77,19 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className={`${manrope.variable} ${jetbrainsMono.variable}`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <SpeedInsights />
-          <Analytics />
-          <TRPCReactProvider>{children}</TRPCReactProvider>
-          <Toaster />
-        </ThemeProvider>
+        <TRPCReactProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <SpeedInsights />
+            <Analytics />
+            {children}
+            <Toaster />
+          </ThemeProvider>
+        </TRPCReactProvider>
       </body>
     </html>
   );

@@ -22,7 +22,6 @@ export const signUpFormSchema = z
 export type SignUpFormData = z.infer<typeof signUpFormSchema>;
 
 export const signInFormSchema = z.object({
-  name: z.string().max(50, "Name must be at most 50 characters.").optional(),
   email: z.string().email("Please enter a valid email address."),
   password: z
     .string()

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -21,81 +21,38 @@ import {
 } from "lucide-react";
 import { EmptyDataCard } from "./empty-data-card";
 import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { EditorContent, useEditor } from "@tiptap/react";
-import { Mark, mergeAttributes } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getErrorFeedback } from "@/lib/error-feedback";
-import { escapeHtml, getEditorInitialContent } from "@/lib/editor-utils";
+import { registerLicense } from "@syncfusion/ej2-base";
+import {
+  DocumentEditorContainerComponent,
+  Toolbar,
+} from "@syncfusion/ej2-react-documenteditor";
 
-type SuggestionStatus = "pending" | "accepted" | "rejected";
+registerLicense(process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE ?? "");
 
-type PendingSuggestion = {
-  id: string;
-  targetSection: ImprovementTip["targetSection"];
-  targetId?: string;
-  beforeText: string;
-  afterText: string;
-  status: SuggestionStatus;
+const SYNCFUSION_THEME_URL =
+  "https://cdn.syncfusion.com/ej2/33.2.3/material.css";
+
+DocumentEditorContainerComponent.Inject(Toolbar);
+
+type DocumentEditorLike = {
+  isDocumentLoaded?: boolean;
+  documentEditorSettings?: { optimizeSfdt?: boolean };
+  documentHelper?: { renderVisiblePages?: (force?: boolean) => void };
+  open: (data: string | Record<string, unknown>) => void;
+  openAsync?: (data: string | Record<string, unknown>) => Promise<void>;
+  openBlank?: () => void;
+  pageCount?: number;
+  resize?: () => void;
+  zoomFactor?: number;
 };
 
-type QueuedApply = {
-  improvement: ImprovementTip;
-  index: number;
+type SfdtVariant = {
+  kind: "object" | "rawString";
+  value: string | Record<string, unknown>;
 };
-
-const suggestionClassByStatus: Record<SuggestionStatus, string> = {
-  pending: "bg-green-500/15 ring-1 ring-green-500/40 rounded-sm",
-  accepted: "bg-green-500/10 ring-1 ring-green-500/20 rounded-sm",
-  rejected: "",
-};
-
-const SuggestionMark = Mark.create({
-  name: "suggestionMark",
-
-  addAttributes() {
-    return {
-      suggestionId: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-suggestion-id"),
-        renderHTML: (attributes) => {
-          if (!attributes.suggestionId) {
-            return {};
-          }
-
-          return { "data-suggestion-id": attributes.suggestionId };
-        },
-      },
-      status: {
-        default: "pending",
-        parseHTML: (element) =>
-          element.getAttribute("data-status") ?? "pending",
-        renderHTML: (attributes) => ({
-          "data-status": attributes.status ?? "pending",
-        }),
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "span[data-suggestion-id]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    const status = (HTMLAttributes.status as SuggestionStatus) ?? "pending";
-
-    return [
-      "span",
-      mergeAttributes(HTMLAttributes, {
-        class: suggestionClassByStatus[status],
-      }),
-      0,
-    ];
-  },
-});
 
 const getPriorityStyles = (priority: string) => {
   switch (priority.toLowerCase()) {
@@ -109,83 +66,225 @@ const getPriorityStyles = (priority: string) => {
   }
 };
 
-type TextRange = { from: number; to: number };
-
-const findRangeByTextNode = (
-  editor: NonNullable<ReturnType<typeof useEditor>>,
-  text: string,
-): TextRange | null => {
-  const searchValue = text.trim();
-  if (!searchValue) {
-    return null;
-  }
-
-  let found: TextRange | null = null;
-
-  editor.state.doc.descendants((node, pos) => {
-    if (found || !node.isText || !node.text) {
-      return !found;
-    }
-
-    const startIndex = node.text.indexOf(searchValue);
-    if (startIndex === -1) {
-      return true;
-    }
-
-    const from = pos + startIndex;
-    found = { from, to: from + searchValue.length };
-    return false;
-  });
-
-  return found;
+const isSfdtLike = (value: unknown) => {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return Array.isArray(record.sec) || Array.isArray(record.sections);
 };
 
-const findSuggestionMarkRange = (
-  editor: NonNullable<ReturnType<typeof useEditor>>,
-  suggestionId: string,
-): TextRange | null => {
-  const markType = editor.state.schema.marks.suggestionMark;
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  if (!markType) {
-    return null;
-  }
+const summarizeSfdtPayload = (payload: string) => {
+  const summary: Record<string, unknown> = {
+    length: payload.length,
+    isJson: false,
+  };
 
-  let from: number | null = null;
-  let to: number | null = null;
-
-  editor.state.doc.descendants((node, pos) => {
-    if (!node.isText || !node.text) {
-      return true;
-    }
-
-    const hasSuggestionMark = node.marks.some(
-      (mark) =>
-        mark.type === markType && mark.attrs.suggestionId === suggestionId,
+  try {
+    const parsed = JSON.parse(payload) as Record<string, unknown>;
+    summary.isJson = true;
+    summary.keys = Object.keys(parsed).slice(0, 8);
+    summary.optimizeSfdt = parsed.optimizeSfdt === true;
+    summary.hasSec = Array.isArray((parsed as { sec?: unknown }).sec);
+    summary.hasSections = Array.isArray(
+      (parsed as { sections?: unknown }).sections,
     );
-
-    if (!hasSuggestionMark) {
-      return true;
+    if (Array.isArray((parsed as { sec?: unknown[] }).sec)) {
+      summary.secCount = (parsed as { sec: unknown[] }).sec.length;
     }
-
-    if (from === null) {
-      from = pos;
+    if (Array.isArray((parsed as { sections?: unknown[] }).sections)) {
+      summary.sectionsCount = (
+        parsed as { sections: unknown[] }
+      ).sections.length;
     }
-
-    to = pos + node.nodeSize;
-    return true;
-  });
-
-  if (from === null || to === null) {
-    return null;
+  } catch {
+    // non-JSON payload
   }
 
-  return { from, to };
+  return summary;
+};
+
+const getEditorContainerElement = (
+  container: DocumentEditorContainerComponent | null,
+) => {
+  const maybe = container as unknown as { element?: HTMLElement };
+  return maybe?.element ?? null;
+};
+
+const logContainerState = (container: HTMLElement | null, label: string) => {
+  if (!container) {
+    console.log("[SFDT] container missing", label);
+    return;
+  }
+
+  const rect = container.getBoundingClientRect();
+  const style = window.getComputedStyle(container);
+  console.log(`[SFDT] container ${label}`, {
+    width: rect.width,
+    height: rect.height,
+    display: style.display,
+    visibility: style.visibility,
+    opacity: style.opacity,
+  });
+};
+
+const waitForContainerReady = async (
+  container: DocumentEditorContainerComponent | null,
+) => {
+  for (let i = 0; i < 10; i += 1) {
+    const element = getEditorContainerElement(container);
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        return true;
+      }
+    }
+    await delay(100);
+  }
+
+  return false;
+};
+
+const forceEditorRender = (
+  documentEditor: DocumentEditorLike,
+  container: DocumentEditorContainerComponent | null,
+) => {
+  try {
+    if (documentEditor.zoomFactor != null && documentEditor.zoomFactor < 0.2) {
+      documentEditor.zoomFactor = 1;
+    }
+  } catch {
+    // ignore zoom errors
+  }
+
+  try {
+    documentEditor.resize?.();
+  } catch {
+    // ignore resize errors
+  }
+
+  try {
+    container?.resize?.();
+  } catch {
+    // ignore container resize errors
+  }
+
+  try {
+    documentEditor.documentHelper?.renderVisiblePages?.(true);
+  } catch {
+    // ignore render errors
+  }
+};
+
+const ensureLoaded = async (documentEditor: DocumentEditorLike) => {
+  for (let i = 0; i < 10; i += 1) {
+    const loaded = !!documentEditor?.isDocumentLoaded;
+    const domPages = document.querySelectorAll(".e-de-page").length;
+    if (loaded && domPages > 0) return true;
+    await delay(250);
+  }
+  return !!documentEditor?.isDocumentLoaded;
+};
+
+const tryOpenVariants = async (
+  documentEditor: DocumentEditorLike,
+  sfdtText: string,
+  container: DocumentEditorContainerComponent | null,
+) => {
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    parsed = JSON.parse(sfdtText) as Record<string, unknown>;
+  } catch {
+    parsed = null;
+  }
+
+  const variants: Array<SfdtVariant> = [];
+  if (parsed) {
+    variants.push({ kind: "object", value: parsed });
+  }
+  variants.push({ kind: "rawString", value: sfdtText });
+
+  const optimizeOptions = [true, false];
+  const methods: Array<"open" | "openAsync"> = ["open", "openAsync"];
+
+  for (const variant of variants) {
+    for (const optimize of optimizeOptions) {
+      for (const method of methods) {
+        try {
+          if (documentEditor.documentEditorSettings) {
+            try {
+              documentEditor.documentEditorSettings.optimizeSfdt = optimize;
+            } catch {
+              // ignore optimize flag issues
+            }
+          }
+
+          if (method === "open") {
+            documentEditor.open(variant.value);
+          } else if (typeof documentEditor.openAsync === "function") {
+            await documentEditor.openAsync(variant.value);
+          }
+
+          await delay(900);
+          await ensureLoaded(documentEditor);
+          forceEditorRender(documentEditor, container);
+          await delay(200);
+          const domPages = document.querySelectorAll(".e-de-page").length;
+          const pageCount = documentEditor.pageCount || 0;
+
+          if (domPages > 0 || pageCount > 0) {
+            return true;
+          }
+
+          try {
+            documentEditor.openBlank();
+          } catch {
+            // ignore
+          }
+          await delay(200);
+        } catch {
+          // ignore variant errors
+        }
+      }
+    }
+  }
+
+  return false;
+};
+
+const extractSfdtPayload = (responseText: string) => {
+  let payload = responseText.trim();
+  if (!payload) return "";
+
+  if (payload.startsWith('"') && payload.endsWith('"')) {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      // keep original payload
+    }
+  }
+
+  if (payload.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(payload) as Record<string, unknown>;
+      if (typeof parsed.sfdt === "string") {
+        return parsed.sfdt;
+      }
+      if (isSfdtLike(parsed)) {
+        return JSON.stringify(parsed);
+      }
+    } catch {
+      // keep original payload
+    }
+  }
+
+  return payload;
 };
 
 const AnalyzeResumeImprovements = ({
   data,
   resumeId,
-  applicationId,
+  applicationId: _applicationId,
 }: {
   data: ApplicationData;
   resumeId: string;
@@ -196,17 +295,13 @@ const AnalyzeResumeImprovements = ({
   const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
   const hasImprovedScore = improvedScore != null;
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const applyImprovementMutation = useMutation(
-    trpc.resume.applyImprovement.mutationOptions(),
-  );
   const [applyingId] = useState<string | null>(null);
   const [isEditorDialogOpen, setIsEditorDialogOpen] = useState(false);
-  const [pendingActionId, setPendingActionId] = useState<string | null>(null);
-  const [pendingSuggestions, setPendingSuggestions] = useState<
-    Record<string, PendingSuggestion>
-  >({});
-  const queuedApplyRef = useRef<QueuedApply | null>(null);
+  const editorRef = useRef<DocumentEditorContainerComponent | null>(null);
+  const [isEditorReady, setIsEditorReady] = useState(false);
+  const [isDocumentLoading, setIsDocumentLoading] = useState(false);
+  const [isDocumentReady, setIsDocumentReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const { data: parsedResumeData, isLoading: isParsedResumeLoading } = useQuery(
     {
@@ -218,207 +313,185 @@ const AnalyzeResumeImprovements = ({
     },
   );
 
-  const parsedResumeText = parsedResumeData?.resume.parsedContent ?? "";
-
-  const editorInitialContent = useMemo(
-    () => getEditorInitialContent(parsedResumeText),
-    [parsedResumeText],
-  );
-
-  const editor = useEditor({
-    extensions: [StarterKit, SuggestionMark],
-    content: "",
-    immediatelyRender: false,
-    editorProps: {
-      attributes: {
-        // Добавлен whitespace-pre-wrap на случай, если стили все же сплющивают текст внутри параграфов
-        class:
-          "prose prose-sm sm:prose-base dark:prose-invert max-w-none focus:outline-none min-h-[420px] max-h-[70vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background px-8 py-6 shadow-sm",
-      },
-    },
-  });
-
-  const applySuggestionToEditor = useCallback(
-    (improvement: ImprovementTip, index: number) => {
-      if (!editor) {
-        return;
-      }
-
-      const suggestionId = `${improvement.targetId ?? "summary"}-${index}`;
-      const beforeText = (improvement.beforeText || "").trim();
-      const afterText = (improvement.afterText || "").trim();
-
-      if (!afterText) {
-        return;
-      }
-
-      const range = findRangeByTextNode(editor, beforeText);
-      const markType = editor.state.schema.marks.suggestionMark;
-
-      if (range) {
-        let tr = editor.state.tr.insertText(afterText, range.from, range.to);
-
-        if (markType) {
-          tr = tr.addMark(
-            range.from,
-            range.from + afterText.length,
-            markType.create({
-              suggestionId,
-              status: "pending",
-            }),
-          );
-        }
-
-        editor.view.dispatch(tr);
-      } else {
-        editor
-          .chain()
-          .focus()
-          .insertContent(
-            `<p><span data-suggestion-id="${escapeHtml(suggestionId)}" data-status="pending">${escapeHtml(afterText)}</span></p>`,
-          )
-          .run();
-      }
-
-      setPendingSuggestions((prev) => ({
-        ...prev,
-        [suggestionId]: {
-          id: suggestionId,
-          targetSection: improvement.targetSection,
-          targetId: improvement.targetId,
-          beforeText,
-          afterText,
-          status: "pending",
-        },
-      }));
-    },
-    [editor],
-  );
+  const resumeLink = parsedResumeData?.resume?.resumeLink;
+  const parsedResumeText = parsedResumeData?.resume?.parsedContent ?? "";
 
   useEffect(() => {
-    if (!editor || !isEditorDialogOpen || isParsedResumeLoading) {
+    if (!isEditorDialogOpen) {
+      setIsDocumentReady(false);
+      setLoadError(null);
+    }
+  }, [isEditorDialogOpen]);
+
+  useEffect(() => {
+    if (!isEditorDialogOpen) {
       return;
     }
 
-    editor.commands.setContent(editorInitialContent);
+    const intervalId = window.setInterval(() => {
+      const documentEditor = editorRef.current?.documentEditor as
+        | DocumentEditorLike
+        | undefined;
+      const domPages = document.querySelectorAll(".e-de-page").length;
+      const pageCount = documentEditor?.pageCount ?? 0;
 
-    const queuedApply = queuedApplyRef.current;
-    if (queuedApply) {
-      applySuggestionToEditor(queuedApply.improvement, queuedApply.index);
-      queuedApplyRef.current = null;
+      if (domPages > 0 || pageCount > 0) {
+        setIsDocumentReady(true);
+        setIsDocumentLoading(false);
+        window.clearInterval(intervalId);
+      }
+    }, 250);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isEditorDialogOpen]);
+
+  useEffect(() => {
+    if (
+      !isEditorDialogOpen ||
+      !resumeLink ||
+      isParsedResumeLoading ||
+      !editorRef.current ||
+      !isEditorReady
+    ) {
+      return;
     }
+
+    let cancelled = false;
+
+    const loadDocument = async () => {
+      const documentEditor = editorRef.current?.documentEditor as
+        | DocumentEditorLike
+        | undefined;
+      if (!documentEditor) {
+        return;
+      }
+
+      setIsDocumentLoading(true);
+      setIsDocumentReady(false);
+      setLoadError(null);
+
+      try {
+        const response = await fetch("/api/docx-to-sfdt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: resumeLink }),
+        });
+
+        const responseText = await response.text();
+
+        if (!response.ok) {
+          let errorMessage = `API error: ${response.status}`;
+          try {
+            const parsed = JSON.parse(responseText) as {
+              error?: string;
+              details?: string;
+              contentType?: string;
+            };
+            errorMessage =
+              [parsed.error, parsed.details, parsed.contentType]
+                .filter(Boolean)
+                .join(" ") || errorMessage;
+          } catch {
+            // keep fallback message
+          }
+          throw new Error(errorMessage);
+        }
+
+        const payload = extractSfdtPayload(responseText);
+        if (!payload) {
+          throw new Error("Empty SFDT payload");
+        }
+
+        console.log("[SFDT] payload summary:", summarizeSfdtPayload(payload));
+        logContainerState(
+          getEditorContainerElement(editorRef.current),
+          "before-open",
+        );
+
+        const containerReady = await waitForContainerReady(editorRef.current);
+        if (!containerReady) {
+          console.warn("[SFDT] container not ready before open");
+        }
+
+        const opened = await tryOpenVariants(
+          documentEditor,
+          payload,
+          editorRef.current,
+        );
+        if (!opened) {
+          throw new Error("Failed to render SFDT document");
+        }
+
+        if (!cancelled) {
+          forceEditorRender(documentEditor, editorRef.current);
+          await delay(200);
+          console.log("[SFDT] render state:", {
+            pageCount: documentEditor.pageCount ?? 0,
+            domPages: document.querySelectorAll(".e-de-page").length,
+          });
+          logContainerState(
+            getEditorContainerElement(editorRef.current),
+            "after-open",
+          );
+          setIsDocumentReady(true);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to load document";
+        console.warn("Failed to load SFDT:", error);
+
+        if (parsedResumeText && documentEditor?.editor) {
+          const cleanText = parsedResumeText.replace(/<[^>]*>?/gm, "\n").trim();
+          try {
+            documentEditor.openBlank();
+          } catch {
+            // ignore
+          }
+          try {
+            documentEditor.editor.insertText(cleanText);
+            forceEditorRender(documentEditor, editorRef.current);
+          } catch {
+            // ignore
+          }
+          if (!cancelled) {
+            setLoadError(null);
+            setIsDocumentReady(true);
+          }
+        } else if (!cancelled) {
+          setLoadError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsDocumentLoading(false);
+        }
+      }
+    };
+
+    loadDocument();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
-    applySuggestionToEditor,
-    editor,
-    editorInitialContent,
     isEditorDialogOpen,
+    resumeLink,
     isParsedResumeLoading,
+    isEditorReady,
+    parsedResumeText,
   ]);
 
-  const handleClick = (improvement: ImprovementTip, index: number) => {
+  const handleOpenEditor = () => {
     setIsEditorDialogOpen(true);
-
-    if (editor && !isParsedResumeLoading && isEditorDialogOpen) {
-      applySuggestionToEditor(improvement, index);
-      return;
-    }
-
-    queuedApplyRef.current = { improvement, index };
   };
-
-  const handleCancelPending = (suggestionId: string) => {
-    if (!editor) {
-      return;
-    }
-
-    const pending = pendingSuggestions[suggestionId];
-    if (!pending) {
-      return;
-    }
-
-    const range = findSuggestionMarkRange(editor, suggestionId);
-    if (range) {
-      const tr = editor.state.tr.insertText(
-        pending.beforeText,
-        range.from,
-        range.to,
-      );
-      editor.view.dispatch(tr);
-    }
-
-    setPendingSuggestions((prev) => {
-      const next = { ...prev };
-      delete next[suggestionId];
-      return next;
-    });
-  };
-
-  const handleApplyPending = async (suggestionId: string) => {
-    if (!editor) {
-      return;
-    }
-
-    const pending = pendingSuggestions[suggestionId];
-    if (!pending) {
-      return;
-    }
-
-    setPendingActionId(suggestionId);
-
-    try {
-      await applyImprovementMutation.mutateAsync({
-        resumeId,
-        applicationId,
-        targetSection: pending.targetSection,
-        targetId: pending.targetId,
-        previousText: pending.beforeText,
-        newText: pending.afterText,
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: trpc.resume.getParsedContent.queryKey({ resumeId }),
-      });
-
-      // Invalidate getJobMatchResult to refresh improvements with isApplied flag
-      if (applicationId) {
-        await queryClient.invalidateQueries({
-          queryKey: trpc.resume.getJobMatchResult.queryKey({
-            applicationId,
-          }),
-        });
-      }
-
-      const markType = editor.state.schema.marks.suggestionMark;
-      const range = findSuggestionMarkRange(editor, suggestionId);
-
-      if (markType && range) {
-        const tr = editor.state.tr.removeMark(range.from, range.to, markType);
-        editor.view.dispatch(tr);
-      }
-
-      setPendingSuggestions((prev) => {
-        const next = { ...prev };
-        delete next[suggestionId];
-        return next;
-      });
-      toast.success("Suggestion applied and saved.");
-    } catch (error) {
-      toast.error(
-        getErrorFeedback(error, {
-          fallbackMessage: "Failed to apply suggestion.",
-        }).message,
-      );
-    } finally {
-      setPendingActionId(null);
-    }
-  };
-
-  const pendingItems = Object.values(pendingSuggestions);
 
   const unappliedImprovements = improvementsList.filter(
     (imp) => !imp.isApplied,
   );
   const appliedImprovements = improvementsList.filter((imp) => imp.isApplied);
+  const isEditorLoading =
+    !isDocumentReady && (isParsedResumeLoading || isDocumentLoading);
 
   if (improvementsList.length === 0) {
     return (
@@ -433,6 +506,7 @@ const AnalyzeResumeImprovements = ({
 
   return (
     <section>
+      <link rel="stylesheet" href={SYNCFUSION_THEME_URL} />
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
           <p className="text-muted-foreground">
@@ -460,7 +534,6 @@ const AnalyzeResumeImprovements = ({
         {hasUnapplied && (
           <Accordion type="multiple" className="mt-4 space-y-6">
             {unappliedImprovements.map((improvement) => {
-              // Find the original index in the full improvements list
               const originalIndex = improvementsList.indexOf(improvement);
               const accordionItemValue = `${improvement.targetId}-${originalIndex}`;
               const isApplying = applyingId === accordionItemValue;
@@ -556,9 +629,7 @@ const AnalyzeResumeImprovements = ({
                           Copy Suggestion
                         </Button>
                         <Button
-                          onClick={() =>
-                            handleClick(improvement, originalIndex)
-                          }
+                          onClick={handleOpenEditor}
                           disabled={isApplying}
                         >
                           {isApplying ? (
@@ -660,95 +731,105 @@ const AnalyzeResumeImprovements = ({
         <Dialog open={isEditorDialogOpen} onOpenChange={setIsEditorDialogOpen}>
           <DialogTitle></DialogTitle>
           <DialogContent className="w-[95vw]! h-[95vh]! max-h-[95vh]! max-w-[95vw]! mx-auto">
-            <div className="space-y-3">
+            <div className="flex h-full flex-col space-y-3">
               <h3 className="text-base font-semibold">Resume Editor</h3>
-              {pendingItems.length > 0 ? (
-                <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
-                  <p className="text-xs font-medium text-foreground">
-                    Pending suggestions: {pendingItems.length}
-                  </p>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {pendingItems.map((item) => {
-                      const isPendingAction = pendingActionId === item.id;
-
-                      return (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-xs text-muted-foreground">
-                              {item.afterText}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleCancelPending(item.id)}
-                              disabled={isPendingAction}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleApplyPending(item.id)}
-                              disabled={isPendingAction}
-                            >
-                              {isPendingAction ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Apply"
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+              {loadError ? (
+                <div className="rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {loadError}
                 </div>
               ) : null}
-              {isParsedResumeLoading ? (
-                <div
-                  data-testid="resume-editor-loading"
-                  className="relative overflow-hidden rounded-2xl border border-border/70 bg-linear-to-br from-primary/10 via-card to-secondary/30 p-5"
-                >
-                  <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
-                  <div className="pointer-events-none absolute -right-16 -bottom-16 h-44 w-44 rounded-full bg-chart-2/15 blur-3xl" />
+              <div className="relative flex-1 min-h-0 rounded-xl border border-border/60 bg-card/60 shadow-sm document-editor-container-wrapper">
+                <style>{`
+                  .document-editor-container-wrapper .e-documenteditorcontainer {
+                    border-radius: 0.75rem;
+                    overflow: hidden;
+                  }
+                  .document-editor-container-wrapper .e-documenteditor {
+                    height: 100% !important;
+                  }
+                  .document-editor-container-wrapper .e-documenteditor iframe {
+                    width: 100% !important;
+                    height: 100% !important;
+                    background: transparent !important;
+                  }
+                  .document-editor-container-wrapper .e-de-text-target {
+                    background: transparent !important;
+                  }
+                  .document-editor-container-wrapper > div {
+                    height: 100% !important;
+                  }
+                `}</style>
+                <DocumentEditorContainerComponent
+                  ref={editorRef}
+                  height="100%"
+                  style={{ display: "block", height: "100%", width: "100%" }}
+                  autoResizeOnVisibilityChange={true}
+                  enableToolbar={false}
+                  showPropertiesPane={false}
+                  created={() => {
+                    const documentEditor = editorRef.current?.documentEditor;
+                    if (documentEditor) {
+                      documentEditor.serviceUrl = "";
+                      documentEditor.serverActionSettings = {
+                        import: "/api/Import",
+                      };
+                      try {
+                        if (documentEditor.documentEditorSettings) {
+                          documentEditor.documentEditorSettings.optimizeSfdt = false;
+                        }
+                      } catch {
+                        // ignore
+                      }
+                      documentEditor.documentLoadFailed = (args) => {
+                        console.warn(
+                          "[DocumentEditor] load failed:",
+                          args?.status,
+                        );
+                      };
+                    }
+                    setIsEditorReady(true);
+                  }}
+                />
+                {isEditorLoading ? (
+                  <div
+                    data-testid="resume-editor-loading"
+                    className="absolute inset-0 overflow-hidden rounded-2xl border border-border/70 bg-linear-to-br from-primary/10 via-card to-secondary/30 p-5"
+                  >
+                    <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
+                    <div className="pointer-events-none absolute -right-16 -bottom-16 h-44 w-44 rounded-full bg-chart-2/15 blur-3xl" />
 
-                  <div className="relative space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/40 bg-primary/15 text-primary shadow-sm">
-                          <Loader2 className="h-5 w-5 animate-spin" />
+                    <div className="relative space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/40 bg-primary/15 text-primary shadow-sm">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          </div>
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-44" />
+                            <Skeleton className="h-3 w-56" />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-44" />
-                          <Skeleton className="h-3 w-56" />
-                        </div>
+                        <Skeleton className="h-7 w-24 rounded-full" />
                       </div>
-                      <Skeleton className="h-7 w-24 rounded-full" />
-                    </div>
 
-                    <div className="rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
-                      <Skeleton className="h-4 w-1/3" />
-                      {Array.from({ length: 8 }).map((_, index) => (
-                        <Skeleton
-                          key={`editor-loading-line-${index}`}
-                          className="h-3 w-full"
-                        />
-                      ))}
-                    </div>
+                      <div className="rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
+                        <Skeleton className="h-4 w-1/3" />
+                        {Array.from({ length: 8 }).map((_, index) => (
+                          <Skeleton
+                            key={`editor-loading-line-${index}`}
+                            className="h-3 w-full"
+                          />
+                        ))}
+                      </div>
 
-                    <div className="flex justify-end gap-2">
-                      <Skeleton className="h-9 w-20 rounded-md" />
-                      <Skeleton className="h-9 w-24 rounded-md" />
+                      <div className="flex justify-end gap-2">
+                        <Skeleton className="h-9 w-20 rounded-md" />
+                        <Skeleton className="h-9 w-24 rounded-md" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <EditorContent editor={editor} />
-              )}
+                ) : null}
+              </div>
             </div>
           </DialogContent>
         </Dialog>

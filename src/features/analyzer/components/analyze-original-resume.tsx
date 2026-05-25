@@ -11,9 +11,7 @@ import {
 } from "@syncfusion/ej2-react-documenteditor";
 import { strFromU8, unzipSync } from "fflate";
 
-registerLicense(
-  "Ngo9BigBOggjHTQxAR8/V1JHaF1cXmhMYVJwWmFZfVhgdVdMYl9bQHFPIiBoS35RcEVmWXZfcnZWQmdUVUNxVEFe",
-);
+registerLicense(process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE ?? "");
 
 const SYNCFUSION_THEME_URL =
   "https://cdn.syncfusion.com/ej2/33.2.3/material.css";

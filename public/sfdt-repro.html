@@ -90,9 +90,7 @@
 
     <script src="https://cdn.syncfusion.com/ej2/33.2.3/dist/ej2.min.js"></script>
     <script>
-      ej.base.registerLicense(
-        "Ngo9BigBOggjHTQxAR8/V1JHaF1cXmhMYVJwWmFZfVhgdVdMYl9bQHFPIiBoS35RcEVmWXZfcnZWQmdUVUNxVEFe",
-      );
+      ej.base.registerLicense("Ngo9BigBOggjHTQxAR8/V1JHaF1cWmhIfEx1RHxQdld5ZFRHallYTnNWUj0eQnxTdENjXH1bcXBQTmFeUUxxWUleYA==");
       ej.documenteditor.DocumentEditorContainer.Inject(
         ej.documenteditor.Toolbar,
       );
@@ -240,6 +238,7 @@
           setStatus("Provide resume URL first");
           return;
         }
+        console.log("loading resume from URL", resumeUrl);
 
         logEl.textContent = "";
         setStatus("Loading...");
