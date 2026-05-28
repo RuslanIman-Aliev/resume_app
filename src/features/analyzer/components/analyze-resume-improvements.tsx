@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ApplicationData, ImprovementTip } from "@/lib/types";
+import { getErrorFeedback } from "@/lib/error-feedback";
 import { getScoreColor } from "@/lib/utils";
 import {
   CheckIcon,
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 import { EmptyDataCard } from "./empty-data-card";
 import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { registerLicense } from "@syncfusion/ej2-base";
@@ -29,6 +30,7 @@ import {
   DocumentEditorContainerComponent,
   Toolbar,
 } from "@syncfusion/ej2-react-documenteditor";
+import { toast } from "sonner";
 
 registerLicense(process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE ?? "");
 
@@ -39,8 +41,23 @@ DocumentEditorContainerComponent.Inject(Toolbar);
 
 type DocumentEditorLike = {
   isDocumentLoaded?: boolean;
-  documentEditorSettings?: { optimizeSfdt?: boolean };
-  documentHelper?: { renderVisiblePages?: (force?: boolean) => void };
+  documentEditorSettings?: {
+    optimizeSfdt?: boolean;
+    searchHighlightColor?: string;
+  };
+  documentHelper?: {
+    renderVisiblePages?: (force?: boolean) => void;
+    clearSelectionHighlight?: () => void;
+  };
+  search?: {
+    find?: (text: string) => void;
+    findAll?: (text: string) => void;
+  };
+  searchResults?: {
+    length?: number;
+    navigateTo?: (index: number) => void;
+    clear?: () => void;
+  };
   open: (data: string | Record<string, unknown>) => void;
   openAsync?: (data: string | Record<string, unknown>) => Promise<void>;
   openBlank?: () => void;
@@ -52,6 +69,14 @@ type DocumentEditorLike = {
 type SfdtVariant = {
   kind: "object" | "rawString";
   value: string | Record<string, unknown>;
+};
+
+type InsertionPreview = {
+  prefix: string;
+  match: string;
+  suffix: string;
+  isTruncated: boolean;
+  isFound: boolean;
 };
 
 const getPriorityStyles = (priority: string) => {
@@ -73,6 +98,94 @@ const isSfdtLike = (value: unknown) => {
 };
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const stripHtml = (value: string) =>
+  value
+    .replace(/<[^>]*>?/gm, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getInsertionPreview = (
+  resumeText: string,
+  beforeText: string,
+): InsertionPreview => {
+  if (!beforeText) {
+    return {
+      prefix: "",
+      match: "",
+      suffix: "",
+      isTruncated: false,
+      isFound: false,
+    };
+  }
+
+  const cleanText = stripHtml(resumeText);
+  if (!cleanText) {
+    return {
+      prefix: "",
+      match: beforeText,
+      suffix: "",
+      isTruncated: false,
+      isFound: false,
+    };
+  }
+
+  const index = cleanText.indexOf(beforeText);
+  if (index === -1) {
+    return {
+      prefix: "",
+      match: beforeText,
+      suffix: "",
+      isTruncated: false,
+      isFound: false,
+    };
+  }
+
+  const contextLength = 120;
+  const start = Math.max(0, index - contextLength);
+  const end = Math.min(
+    cleanText.length,
+    index + beforeText.length + contextLength,
+  );
+
+  return {
+    prefix: cleanText.slice(start, index),
+    match: beforeText,
+    suffix: cleanText.slice(index + beforeText.length, end),
+    isTruncated: start > 0 || end < cleanText.length,
+    isFound: true,
+  };
+};
+
+const clearEditorSearchHighlights = (documentEditor?: DocumentEditorLike) => {
+  try {
+    documentEditor?.searchResults?.clear?.();
+  } catch {
+    // ignore search clear errors
+  }
+};
+
+const highlightSuggestionInEditor = (
+  documentEditor: DocumentEditorLike | undefined,
+  beforeText: string,
+) => {
+  if (!documentEditor || !beforeText) return;
+
+  clearEditorSearchHighlights(documentEditor);
+
+  try {
+    if (documentEditor.search?.findAll) {
+      documentEditor.search.findAll(beforeText);
+    } else {
+      documentEditor.search?.find?.(beforeText);
+    }
+    documentEditor.searchResults?.navigateTo?.(1);
+    documentEditor.documentHelper?.clearSelectionHighlight?.();
+    documentEditor.documentHelper?.renderVisiblePages?.(true);
+  } catch {
+    // ignore search errors
+  }
+};
 
 const summarizeSfdtPayload = (payload: string) => {
   const summary: Record<string, unknown> = {
@@ -284,7 +397,7 @@ const extractSfdtPayload = (responseText: string) => {
 const AnalyzeResumeImprovements = ({
   data,
   resumeId,
-  applicationId: _applicationId,
+  applicationId,
 }: {
   data: ApplicationData;
   resumeId: string;
@@ -295,7 +408,11 @@ const AnalyzeResumeImprovements = ({
   const improvedScore = data.summary?.estimatedScoreWithAllImprovements;
   const hasImprovedScore = improvedScore != null;
   const trpc = useTRPC();
-  const [applyingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [pendingImprovement, setPendingImprovement] =
+    useState<ImprovementTip | null>(null);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const [isEditorDialogOpen, setIsEditorDialogOpen] = useState(false);
   const editorRef = useRef<DocumentEditorContainerComponent | null>(null);
   const [isEditorReady, setIsEditorReady] = useState(false);
@@ -315,13 +432,46 @@ const AnalyzeResumeImprovements = ({
 
   const resumeLink = parsedResumeData?.resume?.resumeLink;
   const parsedResumeText = parsedResumeData?.resume?.parsedContent ?? "";
+  const isEditorLoading =
+    !isDocumentReady && (isParsedResumeLoading || isDocumentLoading);
+
+  const { mutateAsync: applyImprovement } = useMutation(
+    trpc.resume.applyImprovement.mutationOptions(),
+  );
 
   useEffect(() => {
     if (!isEditorDialogOpen) {
       setIsDocumentReady(false);
       setLoadError(null);
+      setPendingImprovement(null);
+      setPendingKey(null);
+      setIsApplyingSuggestion(false);
+      clearEditorSearchHighlights(
+        editorRef.current?.documentEditor as DocumentEditorLike | undefined,
+      );
     }
   }, [isEditorDialogOpen]);
+
+  useEffect(() => {
+    if (!isEditorDialogOpen) {
+      return;
+    }
+
+    const documentEditor = editorRef.current?.documentEditor as
+      | DocumentEditorLike
+      | undefined;
+
+    if (!documentEditor) {
+      return;
+    }
+
+    clearEditorSearchHighlights(documentEditor);
+    if (!pendingImprovement?.beforeText || isEditorLoading) {
+      return;
+    }
+
+    highlightSuggestionInEditor(documentEditor, pendingImprovement.beforeText);
+  }, [isEditorDialogOpen, isEditorLoading, pendingImprovement?.beforeText]);
 
   useEffect(() => {
     if (!isEditorDialogOpen) {
@@ -482,16 +632,72 @@ const AnalyzeResumeImprovements = ({
     parsedResumeText,
   ]);
 
-  const handleOpenEditor = () => {
+  const handleQueueImprovement = (
+    improvement: ImprovementTip,
+    accordionKey: string,
+  ) => {
+    setPendingImprovement(improvement);
+    setPendingKey(accordionKey);
     setIsEditorDialogOpen(true);
+  };
+
+  const handleCancelPending = () => {
+    setPendingImprovement(null);
+    setPendingKey(null);
+  };
+
+  const handleApplyPending = async () => {
+    if (!pendingImprovement || isApplyingSuggestion) {
+      return;
+    }
+
+    setIsApplyingSuggestion(true);
+    try {
+      await applyImprovement({
+        resumeId,
+        applicationId,
+        targetSection: pendingImprovement.targetSection,
+        targetId: pendingImprovement.targetId,
+        previousText: pendingImprovement.beforeText,
+        newText: pendingImprovement.afterText,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: trpc.resume.getParsedContent.queryOptions({ resumeId })
+          .queryKey,
+      });
+
+      if (applicationId) {
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getJobMatchResult.queryOptions({
+            applicationId,
+          }).queryKey,
+        });
+      }
+
+      toast.success("Suggestion applied.");
+      setPendingImprovement(null);
+      setPendingKey(null);
+    } catch (error) {
+      toast.error(
+        getErrorFeedback(error, {
+          fallbackMessage: "Failed to apply suggestion.",
+        }).message,
+      );
+    } finally {
+      setIsApplyingSuggestion(false);
+    }
   };
 
   const unappliedImprovements = improvementsList.filter(
     (imp) => !imp.isApplied,
   );
   const appliedImprovements = improvementsList.filter((imp) => imp.isApplied);
-  const isEditorLoading =
-    !isDocumentReady && (isParsedResumeLoading || isDocumentLoading);
+  const pendingCount = pendingImprovement ? 1 : 0;
+  const isSuggestionLoading = !!pendingImprovement && isEditorLoading;
+  const insertionPreview = pendingImprovement
+    ? getInsertionPreview(parsedResumeText, pendingImprovement.beforeText)
+    : null;
 
   if (improvementsList.length === 0) {
     return (
@@ -536,7 +742,8 @@ const AnalyzeResumeImprovements = ({
             {unappliedImprovements.map((improvement) => {
               const originalIndex = improvementsList.indexOf(improvement);
               const accordionItemValue = `${improvement.targetId}-${originalIndex}`;
-              const isApplying = applyingId === accordionItemValue;
+              const isPendingSuggestion = pendingKey === accordionItemValue;
+              const isApplying = isApplyingSuggestion && isPendingSuggestion;
 
               return (
                 <AccordionItem
@@ -629,15 +836,24 @@ const AnalyzeResumeImprovements = ({
                           Copy Suggestion
                         </Button>
                         <Button
-                          onClick={handleOpenEditor}
-                          disabled={isApplying}
+                          onClick={() =>
+                            handleQueueImprovement(
+                              improvement,
+                              accordionItemValue,
+                            )
+                          }
+                          disabled={isApplyingSuggestion}
                         >
                           {isApplying ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           ) : (
                             <Wand2 className="h-4 w-4 mr-2" />
                           )}
-                          {isApplying ? "Applying..." : "Apply to Resume"}
+                          {isApplying
+                            ? "Applying..."
+                            : isPendingSuggestion
+                              ? "View Suggestion"
+                              : "Apply to Resume"}
                         </Button>
                       </div>
                     </div>
@@ -733,6 +949,93 @@ const AnalyzeResumeImprovements = ({
           <DialogContent className="w-[95vw]! h-[95vh]! max-h-[95vh]! max-w-[95vw]! mx-auto">
             <div className="flex h-full flex-col space-y-3">
               <h3 className="text-base font-semibold">Resume Editor</h3>
+              {isSuggestionLoading ? (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <Skeleton className="h-3 w-32" />
+                        <Skeleton className="h-4 w-80" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Skeleton className="h-9 w-20" />
+                        <Skeleton className="h-9 w-20" />
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                      <Skeleton className="h-3 w-24" />
+                      <div className="mt-2 space-y-2">
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-5/6" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : pendingImprovement ? (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold uppercase text-emerald-700">
+                          Pending suggestions: {pendingCount}
+                        </p>
+                        <p className="text-sm font-medium text-foreground whitespace-pre-wrap">
+                          {pendingImprovement.afterText}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleApplyPending}
+                          disabled={isApplyingSuggestion}
+                        >
+                          {isApplyingSuggestion ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <CheckIcon className="h-4 w-4 mr-2" />
+                          )}
+                          Apply
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleCancelPending}
+                          disabled={isApplyingSuggestion}
+                        >
+                          <XIcon className="h-4 w-4 mr-2" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                      <p className="text-xs font-semibold uppercase text-emerald-700/80">
+                        Insertion point
+                      </p>
+                      <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">
+                        {insertionPreview?.isTruncated ? (
+                          <span className="text-muted-foreground">...</span>
+                        ) : null}
+                        <span className="text-muted-foreground">
+                          {insertionPreview?.prefix}
+                        </span>
+                        <span className="rounded bg-emerald-200/80 px-1.5 py-0.5 text-emerald-900">
+                          {insertionPreview?.match ||
+                            "Target text not available."}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {insertionPreview?.suffix}
+                        </span>
+                        {insertionPreview?.isTruncated ? (
+                          <span className="text-muted-foreground">...</span>
+                        ) : null}
+                      </p>
+                      {!insertionPreview?.isFound ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Target text not found in the current resume preview.
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               {loadError ? (
                 <div className="rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   {loadError}
@@ -751,6 +1054,10 @@ const AnalyzeResumeImprovements = ({
                     width: 100% !important;
                     height: 100% !important;
                     background: transparent !important;
+                  }
+                  .document-editor-container-wrapper .e-de-search-highlight,
+                  .document-editor-container-wrapper .e-de-search-highlight-selected {
+                    background-color: rgba(16, 185, 129, 0.45) !important;
                   }
                   .document-editor-container-wrapper .e-de-text-target {
                     background: transparent !important;
@@ -776,6 +1083,8 @@ const AnalyzeResumeImprovements = ({
                       try {
                         if (documentEditor.documentEditorSettings) {
                           documentEditor.documentEditorSettings.optimizeSfdt = false;
+                          documentEditor.documentEditorSettings.searchHighlightColor =
+                            "rgba(167, 243, 208, 0.8)";
                         }
                       } catch {
                         // ignore
