@@ -39,12 +39,22 @@ const SYNCFUSION_THEME_URL =
 
 DocumentEditorContainerComponent.Inject(Toolbar);
 
+/**
+ * Narrow editor surface used by this component to avoid hard coupling
+ * to the full Syncfusion type definitions.
+ *
+ * All properties are optional to tolerate editor versions that may
+ * not expose the same API surface.
+ */
 type DocumentEditorLike = {
   isDocumentLoaded?: boolean;
   documentEditorSettings?: {
     optimizeSfdt?: boolean;
     searchHighlightColor?: string;
   };
+  serviceUrl?: string;
+  serverActionSettings?: Record<string, string>;
+  documentLoadFailed?: (args?: { status?: unknown }) => void;
   documentHelper?: {
     renderVisiblePages?: (force?: boolean) => void;
     clearSelectionHighlight?: () => void;
@@ -52,12 +62,19 @@ type DocumentEditorLike = {
   search?: {
     find?: (text: string) => void;
     findAll?: (text: string) => void;
+    replaceAll?: (searchText: string, replaceText: string) => void;
+    replace?: (searchText: string, replaceText: string) => void;
   };
   searchResults?: {
     length?: number;
     navigateTo?: (index: number) => void;
     clear?: () => void;
   };
+  editor?: {
+    insertText?: (text: string) => void;
+  };
+  saveAsBlob?: (format: string) => Promise<Blob>;
+  serialize?: () => string;
   open: (data: string | Record<string, unknown>) => void;
   openAsync?: (data: string | Record<string, unknown>) => Promise<void>;
   openBlank?: () => void;
@@ -184,6 +201,216 @@ const highlightSuggestionInEditor = (
     documentEditor.documentHelper?.renderVisiblePages?.(true);
   } catch {
     // ignore search errors
+  }
+};
+
+/**
+ * Applies a suggestion directly into the editor content.
+ *
+ * @param documentEditor - Editor instance (may be undefined while mounting)
+ * @param beforeText - Text to find in the editor (must be non-empty)
+ * @param afterText - Replacement text (must be non-empty)
+ * @returns True when a replacement was executed, otherwise false
+ *
+ * Behavior:
+ * - Prefers search.replaceAll when available.
+ * - Falls back to findAll + insertText at the first match.
+ * - Does not persist changes to the backend; caller must save separately.
+ */
+const applySuggestionToEditor = (
+  documentEditor: DocumentEditorLike | undefined,
+  beforeText: string,
+  afterText: string,
+) => {
+  if (!documentEditor || !beforeText || !afterText) return false;
+
+  try {
+    if (typeof documentEditor.search?.replaceAll === "function") {
+      documentEditor.search.replaceAll(beforeText, afterText);
+      return true;
+    }
+  } catch {
+    // ignore replaceAll errors
+  }
+
+  try {
+    if (typeof documentEditor.search?.replace === "function") {
+      documentEditor.search.replace(beforeText, afterText);
+      return true;
+    }
+  } catch {
+    // ignore replace errors
+  }
+
+  try {
+    documentEditor.search?.findAll?.(beforeText);
+    const resultsLength = documentEditor.searchResults?.length ?? 0;
+    if (resultsLength > 0) {
+      documentEditor.searchResults?.navigateTo?.(1);
+      documentEditor.editor?.insertText?.(afterText);
+      documentEditor.searchResults?.clear?.();
+      return true;
+    }
+  } catch {
+    // ignore fallback replace errors
+  }
+
+  return false;
+};
+
+const replaceInSfdtNode = (
+  node: unknown,
+  beforeText: string,
+  afterText: string,
+): { next: unknown; changed: boolean } => {
+  if (typeof node === "string") {
+    if (!node.includes(beforeText)) {
+      return { next: node, changed: false };
+    }
+    return {
+      next: node.split(beforeText).join(afterText),
+      changed: true,
+    };
+  }
+
+  if (Array.isArray(node)) {
+    let changed = false;
+    const next = node.map((item) => {
+      const result = replaceInSfdtNode(item, beforeText, afterText);
+      changed = changed || result.changed;
+      return result.next;
+    });
+    return { next, changed };
+  }
+
+  if (node && typeof node === "object") {
+    let changed = false;
+    const record = node as Record<string, unknown>;
+    const nextRecord: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(record)) {
+      const result = replaceInSfdtNode(value, beforeText, afterText);
+      nextRecord[key] = result.next;
+      changed = changed || result.changed;
+    }
+
+    return { next: nextRecord, changed };
+  }
+
+  return { next: node, changed: false };
+};
+
+const applySuggestionViaSfdtRewrite = async (
+  documentEditor: DocumentEditorLike | undefined,
+  beforeText: string,
+  afterText: string,
+) => {
+  if (!documentEditor || !beforeText || !afterText) return false;
+
+  if (typeof documentEditor.serialize !== "function") return false;
+
+  try {
+    const sfdtText = documentEditor.serialize();
+    if (!sfdtText?.trim()) return false;
+
+    const sfdt = JSON.parse(sfdtText) as Record<string, unknown>;
+    const result = replaceInSfdtNode(sfdt, beforeText, afterText);
+    if (!result.changed) return false;
+
+    if (typeof documentEditor.openAsync === "function") {
+      await documentEditor.openAsync(result.next as Record<string, unknown>);
+    } else {
+      documentEditor.open(result.next as Record<string, unknown>);
+    }
+
+    await delay(250);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Exports the current editor content as DOCX and uploads it.
+ *
+ * @param documentEditor - Editor instance with saveAsBlob support
+ * @param resumeId - Resume id used by the API to update resumeLink
+ * @returns API response JSON (expected { resumeLink: string }) or
+ *   { skipped: true } when export is not supported.
+ * @throws When DOCX export fails or the API responds with an error.
+ */
+const saveEditorDocx = async (
+  documentEditor: DocumentEditorLike | undefined,
+  resumeId: string,
+) => {
+  if (!documentEditor?.saveAsBlob) {
+    return { skipped: true };
+  }
+
+  let blob: Blob | null = null;
+  try {
+    blob = await documentEditor.saveAsBlob("Docx");
+  } catch {
+    try {
+      blob = await documentEditor.saveAsBlob("docx");
+    } catch {
+      blob = null;
+    }
+  }
+
+  if (!blob) {
+    throw new Error("Failed to export DOCX from editor.");
+  }
+
+  const formData = new FormData();
+  formData.append("resumeId", resumeId);
+  formData.append("file", blob, `resume-${resumeId}.docx`);
+
+  // Log blob info to help debug upload content vs saved file mismatch.
+  try {
+    console.log("[SFDT] saveEditorDocx uploading blob info", {
+      size: (blob as Blob).size,
+      type: (blob as Blob).type,
+      name: `resume-${resumeId}.docx`,
+    });
+  } catch {
+    // ignore logging errors
+  }
+
+  const response = await fetch("/api/resume/save-docx", {
+    method: "POST",
+    body: formData,
+  });
+
+  const responseText = await response.text();
+
+  try {
+    console.log("[SFDT] saveEditorDocx response", {
+      status: response.status,
+      ok: response.ok,
+      body: responseText,
+    });
+  } catch {
+    // ignore logging errors
+  }
+
+  if (!response.ok) {
+    let errorMessage = "Failed to update resume file.";
+    try {
+      const parsed = JSON.parse(responseText) as { error?: string };
+      errorMessage = parsed.error || errorMessage;
+    } catch {
+      if (responseText) {
+        errorMessage = responseText;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+
+  try {
+    return responseText ? JSON.parse(responseText) : { success: true };
+  } catch {
+    return { success: true };
   }
 };
 
@@ -350,7 +577,7 @@ const tryOpenVariants = async (
           }
 
           try {
-            documentEditor.openBlank();
+            documentEditor.openBlank?.();
           } catch {
             // ignore
           }
@@ -415,6 +642,7 @@ const AnalyzeResumeImprovements = ({
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const [isEditorDialogOpen, setIsEditorDialogOpen] = useState(false);
   const editorRef = useRef<DocumentEditorContainerComponent | null>(null);
+  const lastLoadedResumeLinkRef = useRef<string | null>(null);
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [isDocumentLoading, setIsDocumentLoading] = useState(false);
   const [isDocumentReady, setIsDocumentReady] = useState(false);
@@ -440,17 +668,35 @@ const AnalyzeResumeImprovements = ({
   );
 
   useEffect(() => {
-    if (!isEditorDialogOpen) {
-      setIsDocumentReady(false);
-      setLoadError(null);
-      setPendingImprovement(null);
-      setPendingKey(null);
-      setIsApplyingSuggestion(false);
-      clearEditorSearchHighlights(
-        editorRef.current?.documentEditor as DocumentEditorLike | undefined,
-      );
+    if (!isEditorReady) {
+      return;
     }
-  }, [isEditorDialogOpen]);
+
+    const documentEditor = editorRef.current?.documentEditor as
+      | DocumentEditorLike
+      | undefined;
+
+    if (!documentEditor) {
+      return;
+    }
+
+    documentEditor.serviceUrl = "";
+    documentEditor.serverActionSettings = { import: "/api/Import" };
+
+    try {
+      if (documentEditor.documentEditorSettings) {
+        documentEditor.documentEditorSettings.optimizeSfdt = false;
+        documentEditor.documentEditorSettings.searchHighlightColor =
+          "rgba(167, 243, 208, 0.8)";
+      }
+    } catch {
+      // ignore
+    }
+
+    documentEditor.documentLoadFailed = (args) => {
+      console.warn("[DocumentEditor] load failed:", args?.status);
+    };
+  }, [isEditorReady]);
 
   useEffect(() => {
     if (!isEditorDialogOpen) {
@@ -505,6 +751,10 @@ const AnalyzeResumeImprovements = ({
       !editorRef.current ||
       !isEditorReady
     ) {
+      return;
+    }
+
+    if (isDocumentReady && resumeLink === lastLoadedResumeLinkRef.current) {
       return;
     }
 
@@ -585,6 +835,7 @@ const AnalyzeResumeImprovements = ({
             getEditorContainerElement(editorRef.current),
             "after-open",
           );
+          lastLoadedResumeLinkRef.current = resumeLink;
           setIsDocumentReady(true);
         }
       } catch (error) {
@@ -595,17 +846,18 @@ const AnalyzeResumeImprovements = ({
         if (parsedResumeText && documentEditor?.editor) {
           const cleanText = parsedResumeText.replace(/<[^>]*>?/gm, "\n").trim();
           try {
-            documentEditor.openBlank();
+            documentEditor.openBlank?.();
           } catch {
             // ignore
           }
           try {
-            documentEditor.editor.insertText(cleanText);
+            documentEditor.editor?.insertText?.(cleanText);
             forceEditorRender(documentEditor, editorRef.current);
           } catch {
             // ignore
           }
           if (!cancelled) {
+            lastLoadedResumeLinkRef.current = resumeLink;
             setLoadError(null);
             setIsDocumentReady(true);
           }
@@ -629,6 +881,7 @@ const AnalyzeResumeImprovements = ({
     resumeLink,
     isParsedResumeLoading,
     isEditorReady,
+    isDocumentReady,
     parsedResumeText,
   ]);
 
@@ -639,6 +892,25 @@ const AnalyzeResumeImprovements = ({
     setPendingImprovement(improvement);
     setPendingKey(accordionKey);
     setIsEditorDialogOpen(true);
+  };
+
+  const handleEditorDialogOpenChange = (open: boolean) => {
+    setIsEditorDialogOpen(open);
+
+    if (!open) {
+      setIsDocumentReady(false);
+      setIsDocumentLoading(false);
+      setLoadError(null);
+      setPendingImprovement(null);
+      setPendingKey(null);
+      setIsApplyingSuggestion(false);
+      clearEditorSearchHighlights(
+        editorRef.current?.documentEditor as DocumentEditorLike | undefined,
+      );
+      setIsEditorReady(false);
+      lastLoadedResumeLinkRef.current = null;
+      editorRef.current = null;
+    }
   };
 
   const handleCancelPending = () => {
@@ -652,6 +924,8 @@ const AnalyzeResumeImprovements = ({
     }
 
     setIsApplyingSuggestion(true);
+    let fileSaveError: string | null = null;
+    let fileWasUpdated = false;
     try {
       await applyImprovement({
         resumeId,
@@ -661,6 +935,78 @@ const AnalyzeResumeImprovements = ({
         previousText: pendingImprovement.beforeText,
         newText: pendingImprovement.afterText,
       });
+
+      const documentEditor = editorRef.current?.documentEditor as
+        | DocumentEditorLike
+        | undefined;
+
+      if (documentEditor) {
+        let appliedInEditor = applySuggestionToEditor(
+          documentEditor,
+          pendingImprovement.beforeText,
+          pendingImprovement.afterText,
+        );
+
+        if (!appliedInEditor) {
+          appliedInEditor = await applySuggestionViaSfdtRewrite(
+            documentEditor,
+            pendingImprovement.beforeText,
+            pendingImprovement.afterText,
+          );
+        }
+
+        if (!appliedInEditor) {
+          throw new Error(
+            "Could not apply suggestion to the editor document. Try another suggestion text.",
+          );
+        }
+
+        try {
+          // Debug: inspect editor serialization for presence of applied text
+          if (typeof documentEditor.serialize === "function") {
+            const serialized = documentEditor.serialize();
+
+            console.log("[SFDT] appliedInEditor", {
+              appliedInEditor,
+              serializedLength: serialized?.length ?? 0,
+              containsAfterText: !!pendingImprovement.afterText
+                ? serialized.indexOf(pendingImprovement.afterText) !== -1
+                : false,
+              containsBeforeText: !!pendingImprovement.beforeText
+                ? serialized.indexOf(pendingImprovement.beforeText) !== -1
+                : false,
+            });
+          }
+        } catch {
+          // ignore logging errors
+        }
+
+        await delay(200);
+        forceEditorRender(documentEditor, editorRef.current);
+        documentEditor.documentHelper?.renderVisiblePages?.(true);
+        await delay(150);
+
+        try {
+          const saveResult = await saveEditorDocx(documentEditor, resumeId);
+          if (saveResult && typeof saveResult.resumeLink === "string") {
+            fileWasUpdated = true;
+            lastLoadedResumeLinkRef.current = saveResult.resumeLink;
+          }
+        } catch (error) {
+          fileSaveError =
+            error instanceof Error
+              ? error.message
+              : "Failed to update resume file.";
+        }
+      }
+
+      // Prevent the editor from being reloaded by the load effect while we
+      // refresh parsed content. If we uploaded a new file, preserve the
+      // returned resume link (already set above). Otherwise, mark the
+      // current resumeLink as loaded so the effect will skip re-opening it.
+      if (!fileWasUpdated) {
+        lastLoadedResumeLinkRef.current = resumeLink ?? null;
+      }
 
       queryClient.invalidateQueries({
         queryKey: trpc.resume.getParsedContent.queryOptions({ resumeId })
@@ -675,7 +1021,14 @@ const AnalyzeResumeImprovements = ({
         });
       }
 
-      toast.success("Suggestion applied.");
+      if (fileSaveError) {
+        toast.error(fileSaveError);
+        toast.success("Suggestion applied.");
+      } else if (fileWasUpdated) {
+        toast.success("Suggestion applied and resume file updated.");
+      } else {
+        toast.success("Suggestion applied.");
+      }
       setPendingImprovement(null);
       setPendingKey(null);
     } catch (error) {
@@ -944,7 +1297,10 @@ const AnalyzeResumeImprovements = ({
             </Accordion>
           </div>
         )}
-        <Dialog open={isEditorDialogOpen} onOpenChange={setIsEditorDialogOpen}>
+        <Dialog
+          open={isEditorDialogOpen}
+          onOpenChange={handleEditorDialogOpenChange}
+        >
           <DialogTitle></DialogTitle>
           <DialogContent className="w-[95vw]! h-[95vh]! max-h-[95vh]! max-w-[95vw]! mx-auto">
             <div className="flex h-full flex-col space-y-3">
@@ -1074,28 +1430,6 @@ const AnalyzeResumeImprovements = ({
                   enableToolbar={false}
                   showPropertiesPane={false}
                   created={() => {
-                    const documentEditor = editorRef.current?.documentEditor;
-                    if (documentEditor) {
-                      documentEditor.serviceUrl = "";
-                      documentEditor.serverActionSettings = {
-                        import: "/api/Import",
-                      };
-                      try {
-                        if (documentEditor.documentEditorSettings) {
-                          documentEditor.documentEditorSettings.optimizeSfdt = false;
-                          documentEditor.documentEditorSettings.searchHighlightColor =
-                            "rgba(167, 243, 208, 0.8)";
-                        }
-                      } catch {
-                        // ignore
-                      }
-                      documentEditor.documentLoadFailed = (args) => {
-                        console.warn(
-                          "[DocumentEditor] load failed:",
-                          args?.status,
-                        );
-                      };
-                    }
                     setIsEditorReady(true);
                   }}
                 />

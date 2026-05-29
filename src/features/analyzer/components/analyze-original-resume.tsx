@@ -18,6 +18,38 @@ const SYNCFUSION_THEME_URL =
 
 DocumentEditorContainerComponent.Inject(Toolbar);
 
+type DocumentEditorLike = {
+  isDocumentLoaded?: boolean;
+  documentEditorSettings?: {
+    optimizeSfdt?: boolean;
+  };
+  documentHelper?: {
+    viewer?: { pages?: unknown[] };
+    renderVisiblePages?: (force?: boolean) => void;
+    cachedPages?: unknown[];
+  };
+  selection?: { toString?: () => string };
+  pageCount?: number;
+  zoomFactor?: number;
+  pageOutline?: unknown;
+  open: (data: string | Record<string, unknown> | Blob) => void;
+  openAsync?: (data: string | Record<string, unknown> | Blob) => Promise<void>;
+  openBlank?: () => void;
+  resize?: () => void;
+  serialize: () => string;
+  editor?: { insertText: (text: string) => void };
+  serviceUrl?: string;
+  serverActionSettings?: Record<string, string>;
+  documentLoadFailed?: (args?: { status?: unknown }) => void;
+};
+
+type SfdtPayload = string | Record<string, unknown>;
+
+type SfdtVariantInput = {
+  kind: "object" | "normalizedString" | "rawString";
+  value: SfdtPayload;
+};
+
 export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const trpc = useTRPC();
   const editorRef = useRef<DocumentEditorContainerComponent | null>(null);
@@ -61,28 +93,32 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   );
 
   const normalizeSfdtValue = useCallback((value: unknown): unknown => {
-    if (Array.isArray(value)) {
-      return value.map((item) => normalizeSfdtValue(item));
-    }
+    const normalizeValue = (input: unknown): unknown => {
+      if (Array.isArray(input)) {
+        return input.map((item) => normalizeValue(item));
+      }
 
-    if (!value || typeof value !== "object") {
-      return value;
-    }
+      if (!input || typeof input !== "object") {
+        return input;
+      }
 
-    const normalized: Record<string, unknown> = {};
+      const normalized: Record<string, unknown> = {};
 
-    for (const [key, nestedValue] of Object.entries(
-      value as Record<string, unknown>,
-    )) {
-      const normalizedKey = key === "tlp" ? "t" : key;
-      normalized[normalizedKey] = normalizeSfdtValue(nestedValue);
-    }
+      for (const [key, nestedValue] of Object.entries(
+        input as Record<string, unknown>,
+      )) {
+        const normalizedKey = key === "tlp" ? "t" : key;
+        normalized[normalizedKey] = normalizeValue(nestedValue);
+      }
 
-    if (normalized.optimizeSfdt === true) {
-      delete normalized.optimizeSfdt;
-    }
+      if (normalized.optimizeSfdt === true) {
+        delete normalized.optimizeSfdt;
+      }
 
-    return normalized;
+      return normalized;
+    };
+
+    return normalizeValue(value);
   }, []);
 
   const normalizeSfdtText = useCallback(
@@ -180,19 +216,54 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   );
 
   useEffect(() => {
+    if (!isEditorReady) {
+      return;
+    }
+
+    const documentEditor = editorRef.current?.documentEditor as
+      | DocumentEditorLike
+      | undefined;
+
+    if (!documentEditor) {
+      return;
+    }
+
+    documentEditor.serviceUrl = "";
+    documentEditor.serverActionSettings = { import: "/api/Import" };
+
+    try {
+      if (documentEditor.documentEditorSettings) {
+        documentEditor.documentEditorSettings.optimizeSfdt = false;
+        console.log(
+          "[DocumentEditor] documentEditorSettings.optimizeSfdt forced to false on create",
+        );
+      }
+    } catch {
+      console.warn("[DocumentEditor] failed to force optimizeSfdt");
+    }
+
+    documentEditor.documentLoadFailed = (args) => {
+      console.warn("[DocumentEditor] load failed:", args?.status);
+    };
+    console.log("[DocumentEditor] import endpoint set to /api/Import");
+  }, [isEditorReady]);
+
+  useEffect(() => {
     if (!editorRef.current || !resumeLink || isLoading || !isEditorReady) {
       return;
     }
 
     const loadDocument = async () => {
-      const editor = editorRef.current?.documentEditor;
+      const editor = editorRef.current?.documentEditor as
+        | DocumentEditorLike
+        | undefined;
       if (!editor) return;
 
       let lastErrorMessage = "Не удалось открыть документ";
 
       const isEditorLoaded = () => {
         try {
-          return editor.isDocumentLoaded;
+          return !!editor.isDocumentLoaded;
         } catch {
           return false;
         }
@@ -208,7 +279,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           if (loaded) return true;
           await new Promise((resolve) => setTimeout(resolve, 300));
         }
-        return isEditorLoaded();
+        return !!isEditorLoaded();
       };
 
       const hasDocumentText = () => {
@@ -223,7 +294,10 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
       const openSfdtText = async (sfdtText: string) => {
         // If incoming SFDT declares optimization, tell the editor to parse optimized form
         try {
-          const parsedIncoming = JSON.parse(sfdtText);
+          const parsedIncoming = JSON.parse(sfdtText) as Record<
+            string,
+            unknown
+          >;
           try {
             if (editor.documentEditorSettings) {
               editor.documentEditorSettings.optimizeSfdt = !!(
@@ -240,18 +314,21 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
               setErr,
             );
           }
-        } catch (e) {
+        } catch {
           // non-JSON or already normalized
         }
 
         // If the incoming SFDT is optimized, don't normalize its keys — keep shape consistent
         let payloadForOpen = sfdtText;
         try {
-          const parsedIncoming2 = JSON.parse(sfdtText);
+          const parsedIncoming2 = JSON.parse(sfdtText) as Record<
+            string,
+            unknown
+          >;
           if (!parsedIncoming2 || parsedIncoming2.optimizeSfdt !== true) {
             payloadForOpen = normalizeSfdtText(sfdtText);
           }
-        } catch (e) {
+        } catch {
           // if not JSON, fall back to normalizing attempt
           payloadForOpen = normalizeSfdtText(sfdtText);
         }
@@ -271,7 +348,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             "[SFDT] payloadForOpen preview:",
             JSON.stringify(maybeParsed).slice(0, 200),
           );
-        } catch (e) {
+        } catch {
           console.log(
             "[SFDT] payloadForOpen is not JSON string; preview:",
             (payloadForOpen as string)?.slice?.(0, 200),
@@ -279,16 +356,28 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         }
         // If payload is optimized JSON, pass object to openAsync to preserve structure
         try {
-          const parsedPayload = JSON.parse(payloadForOpen);
-          if (parsedPayload && parsedPayload.optimizeSfdt === true) {
+          const parsedPayload = JSON.parse(payloadForOpen) as unknown;
+          const parsedRecord =
+            parsedPayload && typeof parsedPayload === "object"
+              ? (parsedPayload as Record<string, unknown>)
+              : null;
+          if (parsedRecord && parsedRecord.optimizeSfdt === true) {
             try {
-              editor.open(parsedPayload as any);
+              editor.open(parsedRecord);
             } catch (e) {
               console.warn("[SFDT] editor.open(parsed) failed:", e);
             }
-            return;
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            const loaded = await ensureLoaded();
+            console.log("[SFDT] loaded:", loaded);
+            if (!hasDocumentText()) {
+              console.warn(
+                "[SFDT] no text detected after load; continuing to render",
+              );
+            }
+            return loaded;
           }
-        } catch (e) {
+        } catch {
           // not JSON — continue with string
         }
 
@@ -301,7 +390,6 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           );
           try {
             // try async fallback
-            // @ts-ignore
             await editor.openAsync?.(payloadForOpen);
           } catch (ee) {
             console.warn("[SFDT] editor.openAsync fallback failed:", ee);
@@ -319,7 +407,11 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
       };
 
       const openDocxBytes = async (bytes: Uint8Array) => {
-        const blob = new Blob([bytes], {
+        const buffer =
+          bytes.buffer instanceof ArrayBuffer
+            ? bytes.buffer
+            : bytes.slice().buffer;
+        const blob = new Blob([buffer], {
           type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         });
         editor.open(blob);
@@ -338,8 +430,13 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           parsed = null;
         }
 
-        const inputs: Array<{ kind: string; value: any }> = [];
-        if (parsed) inputs.push({ kind: "object", value: parsed });
+        const inputs: SfdtVariantInput[] = [];
+        if (parsed && typeof parsed === "object") {
+          inputs.push({
+            kind: "object",
+            value: parsed as Record<string, unknown>,
+          });
+        }
         try {
           inputs.push({
             kind: "normalizedString",
@@ -372,7 +469,6 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
                   if (method === "open") {
                     editor.open(input.value);
                   } else {
-                    // @ts-ignore
                     await editor.openAsync?.(input.value);
                   }
                 } catch (openErr) {
@@ -416,8 +512,8 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
                 }
 
                 try {
-                  editor.openBlank();
-                } catch (blankErr) {
+                  editor.openBlank?.();
+                } catch {
                   // ignore
                 }
                 await new Promise((r) => setTimeout(r, 200));
@@ -642,15 +738,12 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
 
         // Try forcing rendering of visible pages
         try {
-          // @ts-ignore
           editor.documentHelper?.renderVisiblePages?.(true);
           await new Promise((resolve) => setTimeout(resolve, 500));
-          // @ts-ignore
           console.log(
             "[Document] after renderVisiblePages, cachedPages:",
             editor.documentHelper?.cachedPages,
           );
-          // @ts-ignore
           console.log(
             "[Document] viewer.pages.length:",
             editor.documentHelper?.viewer?.pages?.length,
@@ -697,7 +790,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         if (parsedResumeText && editor.editor) {
           const cleanText = parsedResumeText.replace(/<[^>]*>?/gm, "\n").trim();
           try {
-            editor.openBlank();
+            editor.openBlank?.();
           } catch (blankError) {
             console.warn("openBlank failed:", blankError);
           }
@@ -721,6 +814,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     isEditorReady,
     extractSfdtFromZipBase64,
     decodeBase64ToText,
+    normalizeSfdtText,
   ]);
 
   const isGlobalLoading = isLoading || isDocumentLoading;
@@ -778,32 +872,6 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             enableToolbar={false}
             showPropertiesPane={false}
             created={() => {
-              const documentEditor = editorRef.current?.documentEditor;
-              if (documentEditor) {
-                documentEditor.serviceUrl = "";
-                documentEditor.serverActionSettings = {
-                  import: "/api/Import",
-                };
-                try {
-                  if (documentEditor.documentEditorSettings) {
-                    documentEditor.documentEditorSettings.optimizeSfdt = false;
-                    console.log(
-                      "[DocumentEditor] documentEditorSettings.optimizeSfdt forced to false on create",
-                    );
-                  }
-                } catch (e) {
-                  console.warn(
-                    "[DocumentEditor] failed to force optimizeSfdt:",
-                    e,
-                  );
-                }
-                documentEditor.documentLoadFailed = (args) => {
-                  console.warn("[DocumentEditor] load failed:", args?.status);
-                };
-                console.log(
-                  "[DocumentEditor] import endpoint set to /api/Import",
-                );
-              }
               setIsEditorReady(true);
             }}
           />

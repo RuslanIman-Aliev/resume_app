@@ -12,7 +12,12 @@ const isSfdtLike = (value: unknown) => {
   return Array.isArray(record.sec) || Array.isArray(record.sections);
 };
 
-const extractSfdtFromBase64Zip = (value: string) => {
+type ExtractedSfdtResult =
+  | { kind: "sfdt"; text: string; sourceName?: string }
+  | { kind: "docx"; fileNames: string[] }
+  | { kind: "unknown"; fileNames: string[] };
+
+const extractSfdtFromBase64Zip = (value: string): ExtractedSfdtResult => {
   const bytes = new Uint8Array(Buffer.from(value, "base64"));
   const files = unzipSync(bytes);
   const fileNames = Object.keys(files);
