@@ -11,6 +11,7 @@ import {
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { Sparkles, Target, TrendingUp, Zap } from "lucide-react";
+import dynamic from "next/dynamic";
 import {
   useParams,
   useRouter,
@@ -18,7 +19,6 @@ import {
   useSearchParams,
 } from "next/navigation";
 import { useCallback } from "react";
-import AnalyzeResumeImprovements from "./analyze-resume-improvements";
 import {
   AnalyzeResumeError,
   AnalyzeResumeLoading,
@@ -27,8 +27,24 @@ import AnalyzeSkillsGap from "./analyze-skills-gap";
 import AnalyzerResults from "./analyzer-results";
 import AnalyzeKeywords from "./analyze-keywords";
 import AnalyzeRequirementsMatch from "./analyze-requirements-match";
-import { AnalyzeOriginalResume } from "./analyze-original-resume";
 import { FileText } from "lucide-react";
+
+const AnalyzeResumeImprovements = dynamic(
+  () => import("./analyze-resume-improvements"),
+  {
+    ssr: false,
+  },
+);
+
+const AnalyzeOriginalResume = dynamic(
+  () =>
+    import("./analyze-original-resume").then(
+      (mod) => mod.AnalyzeOriginalResume,
+    ),
+  {
+    ssr: false,
+  },
+);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
