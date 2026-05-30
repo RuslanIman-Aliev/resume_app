@@ -182,6 +182,28 @@ const clearEditorSearchHighlights = (documentEditor?: DocumentEditorLike) => {
   }
 };
 
+const serializedDocumentHasSuggestion = (
+  documentEditor: DocumentEditorLike,
+  beforeText: string,
+  afterText: string,
+) => {
+  try {
+    const serialized = documentEditor.serialize?.();
+    if (typeof serialized !== "string" || !serialized.trim()) {
+      return false;
+    }
+
+    const containsAfterText = serialized.includes(afterText);
+    const stillContainsBeforeText = beforeText
+      ? serialized.includes(beforeText)
+      : false;
+
+    return containsAfterText && (!beforeText || !stillContainsBeforeText);
+  } catch {
+    return false;
+  }
+};
+
 const highlightSuggestionInEditor = (
   documentEditor: DocumentEditorLike | undefined,
   beforeText: string,
@@ -227,7 +249,11 @@ const applySuggestionToEditor = (
   try {
     if (typeof documentEditor.search?.replaceAll === "function") {
       documentEditor.search.replaceAll(beforeText, afterText);
-      return true;
+      if (
+        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
+      ) {
+        return true;
+      }
     }
   } catch {
     // ignore replaceAll errors
@@ -236,7 +262,11 @@ const applySuggestionToEditor = (
   try {
     if (typeof documentEditor.search?.replace === "function") {
       documentEditor.search.replace(beforeText, afterText);
-      return true;
+      if (
+        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
+      ) {
+        return true;
+      }
     }
   } catch {
     // ignore replace errors
@@ -249,7 +279,11 @@ const applySuggestionToEditor = (
       documentEditor.searchResults?.navigateTo?.(1);
       documentEditor.editor?.insertText?.(afterText);
       documentEditor.searchResults?.clear?.();
-      return true;
+      if (
+        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
+      ) {
+        return true;
+      }
     }
   } catch {
     // ignore fallback replace errors
@@ -348,6 +382,11 @@ const saveEditorDocx = async (
   }
 
   let blob: Blob | null = null;
+  /**
+   * Resume-improvements editor keeps the same document loading and upload flow
+   * as the original editor, but it also coordinates suggestion application,
+   * in-editor text replacement, and per-suggestion save to the backend.
+   */
   try {
     blob = await documentEditor.saveAsBlob("Docx");
   } catch {
@@ -520,7 +559,7 @@ const ensureLoaded = async (documentEditor: DocumentEditorLike) => {
   for (let i = 0; i < 10; i += 1) {
     const loaded = !!documentEditor?.isDocumentLoaded;
     const domPages = document.querySelectorAll(".e-de-page").length;
-    if (loaded && domPages > 0) return true;
+    if (loaded || domPages > 0) return true;
     await delay(250);
   }
   return !!documentEditor?.isDocumentLoaded;
@@ -572,7 +611,11 @@ const tryOpenVariants = async (
           const domPages = document.querySelectorAll(".e-de-page").length;
           const pageCount = documentEditor.pageCount || 0;
 
-          if (domPages > 0 || pageCount > 0) {
+          if (
+            documentEditor.isDocumentLoaded ||
+            domPages > 0 ||
+            pageCount > 0
+          ) {
             return true;
           }
 
@@ -660,8 +703,9 @@ const AnalyzeResumeImprovements = ({
 
   const resumeLink = parsedResumeData?.resume?.resumeLink;
   const parsedResumeText = parsedResumeData?.resume?.parsedContent ?? "";
-  const isEditorLoading =
-    !isDocumentReady && (isParsedResumeLoading || isDocumentLoading);
+  const isDocumentOverlayLoading = !isDocumentReady && isDocumentLoading;
+  const isSuggestionLoading =
+    !!pendingImprovement && (isParsedResumeLoading || isDocumentLoading);
 
   const { mutateAsync: applyImprovement } = useMutation(
     trpc.resume.applyImprovement.mutationOptions(),
@@ -698,6 +742,10 @@ const AnalyzeResumeImprovements = ({
     };
   }, [isEditorReady]);
 
+  /**
+   * Keep the suggestion preview synchronized with the currently loaded resume
+   * once the document is ready, and clear highlights while the editor reloads.
+   */
   useEffect(() => {
     if (!isEditorDialogOpen) {
       return;
@@ -712,13 +760,26 @@ const AnalyzeResumeImprovements = ({
     }
 
     clearEditorSearchHighlights(documentEditor);
-    if (!pendingImprovement?.beforeText || isEditorLoading) {
+    if (
+      !pendingImprovement?.beforeText ||
+      isParsedResumeLoading ||
+      isDocumentLoading
+    ) {
       return;
     }
 
     highlightSuggestionInEditor(documentEditor, pendingImprovement.beforeText);
-  }, [isEditorDialogOpen, isEditorLoading, pendingImprovement?.beforeText]);
+  }, [
+    isEditorDialogOpen,
+    isParsedResumeLoading,
+    isDocumentLoading,
+    pendingImprovement?.beforeText,
+  ]);
 
+  /**
+   * Loads the resume into Syncfusion, preferring the API-converted SFDT but
+   * falling back to plain text when the conversion output cannot be rendered.
+   */
   useEffect(() => {
     if (!isEditorDialogOpen) {
       return;
@@ -836,6 +897,7 @@ const AnalyzeResumeImprovements = ({
             "after-open",
           );
           lastLoadedResumeLinkRef.current = resumeLink;
+          setIsDocumentLoading(false);
           setIsDocumentReady(true);
         }
       } catch (error) {
@@ -891,11 +953,23 @@ const AnalyzeResumeImprovements = ({
   ) => {
     setPendingImprovement(improvement);
     setPendingKey(accordionKey);
+    // Show loading overlay immediately when opening the editor dialog
+    setIsDocumentReady(false);
+    setLoadError(null);
+    setIsDocumentLoading(true);
     setIsEditorDialogOpen(true);
   };
 
   const handleEditorDialogOpenChange = (open: boolean) => {
     setIsEditorDialogOpen(open);
+
+    if (open) {
+      // Ensure loading overlay appears immediately while the editor and
+      // document begin initialization and network fetches.
+      setIsDocumentReady(false);
+      setLoadError(null);
+      setIsDocumentLoading(true);
+    }
 
     if (!open) {
       setIsDocumentReady(false);
@@ -909,6 +983,11 @@ const AnalyzeResumeImprovements = ({
       );
       setIsEditorReady(false);
       lastLoadedResumeLinkRef.current = null;
+      /**
+       * Apply the selected suggestion, persist the structured resume update, and
+       * upload the edited DOCX so the stored resumeLink always points at the
+       * latest file version.
+       */
       editorRef.current = null;
     }
   };
@@ -1047,7 +1126,6 @@ const AnalyzeResumeImprovements = ({
   );
   const appliedImprovements = improvementsList.filter((imp) => imp.isApplied);
   const pendingCount = pendingImprovement ? 1 : 0;
-  const isSuggestionLoading = !!pendingImprovement && isEditorLoading;
   const insertionPreview = pendingImprovement
     ? getInsertionPreview(parsedResumeText, pendingImprovement.beforeText)
     : null;
@@ -1425,7 +1503,12 @@ const AnalyzeResumeImprovements = ({
                 <DocumentEditorContainerComponent
                   ref={editorRef}
                   height="100%"
-                  style={{ display: "block", height: "100%", width: "100%" }}
+                  style={{
+                    display: "block",
+                    height: "100%",
+                    width: "100%",
+                    visibility: isDocumentOverlayLoading ? "hidden" : "visible",
+                  }}
                   autoResizeOnVisibilityChange={true}
                   enableToolbar={false}
                   showPropertiesPane={false}
@@ -1433,15 +1516,15 @@ const AnalyzeResumeImprovements = ({
                     setIsEditorReady(true);
                   }}
                 />
-                {isEditorLoading ? (
+                {isDocumentOverlayLoading ? (
                   <div
                     data-testid="resume-editor-loading"
-                    className="absolute inset-0 overflow-hidden rounded-2xl border border-border/70 bg-linear-to-br from-primary/10 via-card to-secondary/30 p-5"
+                    className="absolute inset-0 z-20 flex h-full min-h-full overflow-hidden rounded-2xl border border-border/70 bg-card/90 p-5"
                   >
-                    <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
-                    <div className="pointer-events-none absolute -right-16 -bottom-16 h-44 w-44 rounded-full bg-chart-2/15 blur-3xl" />
+                    <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-primary/15 blur-3xl" />
+                    <div className="pointer-events-none absolute -right-16 -bottom-16 h-44 w-44 rounded-full bg-chart-2/10 blur-3xl" />
 
-                    <div className="relative space-y-4">
+                    <div className="relative flex h-full w-full flex-1 flex-col justify-between space-y-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/40 bg-primary/15 text-primary shadow-sm">
@@ -1455,7 +1538,7 @@ const AnalyzeResumeImprovements = ({
                         <Skeleton className="h-7 w-24 rounded-full" />
                       </div>
 
-                      <div className="rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
+                      <div className="flex-1 rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
                         <Skeleton className="h-4 w-1/3" />
                         {Array.from({ length: 8 }).map((_, index) => (
                           <Skeleton
@@ -1465,7 +1548,7 @@ const AnalyzeResumeImprovements = ({
                         ))}
                       </div>
 
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2 pt-2">
                         <Skeleton className="h-9 w-20 rounded-md" />
                         <Skeleton className="h-9 w-24 rounded-md" />
                       </div>

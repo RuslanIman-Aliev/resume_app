@@ -57,7 +57,7 @@ export async function generateMetadata({
 
 const AnalyzeResume = () => {
   return (
-    <div className="space-y-8 max-w-7xl mx-auto gap-4 ">
+    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 pb-6">
       <Button
         variant={"ghost"}
         asChild
@@ -68,7 +68,9 @@ const AnalyzeResume = () => {
         </Link>
       </Button>
 
-      <AnalyzeResumeClient />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <AnalyzeResumeClient />
+      </div>
 
       {/* CTA
       <Card className="border-border/50 bg-card/50 backdrop-blur">

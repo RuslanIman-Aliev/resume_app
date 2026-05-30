@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { registerLicense } from "@syncfusion/ej2-base";
 import {
   DocumentEditorContainerComponent,
   Toolbar,
 } from "@syncfusion/ej2-react-documenteditor";
 import { strFromU8, unzipSync } from "fflate";
+import { toast } from "sonner";
 
 registerLicense(process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE ?? "");
 
@@ -37,6 +39,7 @@ type DocumentEditorLike = {
   openBlank?: () => void;
   resize?: () => void;
   serialize: () => string;
+  saveAsBlob?: (format: string) => Promise<Blob>;
   editor?: { insertText: (text: string) => void };
   serviceUrl?: string;
   serverActionSettings?: Record<string, string>;
@@ -50,12 +53,77 @@ type SfdtVariantInput = {
   value: SfdtPayload;
 };
 
+/**
+ * Exports the current editor contents as DOCX and persists the new file
+ * through the same UploadThing-backed API used by the improvements editor.
+ *
+ * The API updates both the uploaded file and the stored `resumeLink`, so the
+ * next refresh reads the newly saved version instead of the previous one.
+ */
+const saveEditorDocx = async (
+  documentEditor: DocumentEditorLike | undefined,
+  resumeId: string,
+) => {
+  if (!documentEditor?.saveAsBlob) {
+    return { skipped: true };
+  }
+
+  let blob: Blob | null = null;
+  try {
+    blob = await documentEditor.saveAsBlob("Docx");
+  } catch {
+    try {
+      blob = await documentEditor.saveAsBlob("docx");
+    } catch {
+      blob = null;
+    }
+  }
+
+  if (!blob) {
+    throw new Error("Failed to export DOCX from editor.");
+  }
+
+  const formData = new FormData();
+  formData.append("resumeId", resumeId);
+  formData.append("file", blob, `resume-${resumeId}.docx`);
+
+  const response = await fetch("/api/resume/save-docx", {
+    method: "POST",
+    body: formData,
+  });
+
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    let errorMessage = "Failed to update resume file.";
+    try {
+      const parsed = JSON.parse(responseText) as { error?: string };
+      errorMessage = parsed.error || errorMessage;
+    } catch {
+      if (responseText) {
+        errorMessage = responseText;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+
+  try {
+    return responseText ? JSON.parse(responseText) : { success: true };
+  } catch {
+    return { success: true };
+  }
+};
+
 export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const editorRef = useRef<DocumentEditorContainerComponent | null>(null);
+  const lastLoadedResumeLinkRef = useRef<string | null>(null);
   const [isDocumentLoading, setIsDocumentLoading] = useState(false);
+  const [isDocumentReady, setIsDocumentReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isEditorReady, setIsEditorReady] = useState(false);
+  const [isSavingDocument, setIsSavingDocument] = useState(false);
 
   const { data, isLoading } = useQuery({
     ...trpc.resume.getParsedContent.queryOptions({ resumeId }),
@@ -66,6 +134,12 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
 
   const resumeLink = data?.resume?.resumeLink;
   const parsedResumeText = data?.resume?.parsedContent ?? "";
+
+  /**
+   * The original resume editor follows the same Syncfusion loading model as
+   * the improvements flow, but it omits suggestion UI and exposes Save/Cancel
+   * controls for manual editing.
+   */
   useEffect(() => {
     if (resumeLink) {
       console.log("[Resume] link:", resumeLink);
@@ -248,8 +322,68 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     console.log("[DocumentEditor] import endpoint set to /api/Import");
   }, [isEditorReady]);
 
+  /**
+   * Save the current DOCX to UploadThing and invalidate parsed-content cache
+   * so the UI reflects the newly uploaded resume immediately.
+   */
+  const handleSaveDocument = useCallback(async () => {
+    if (isSavingDocument) {
+      return;
+    }
+
+    const editor = editorRef.current?.documentEditor as
+      | DocumentEditorLike
+      | undefined;
+
+    if (!editor) {
+      return;
+    }
+
+    setIsSavingDocument(true);
+
+    try {
+      const saveResult = await saveEditorDocx(editor, resumeId);
+
+      if (saveResult && typeof saveResult.resumeLink === "string") {
+        lastLoadedResumeLinkRef.current = saveResult.resumeLink;
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: trpc.resume.getParsedContent.queryOptions({ resumeId })
+          .queryKey,
+      });
+
+      toast.success("Resume saved and uploaded.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save resume.",
+      );
+    } finally {
+      setIsSavingDocument(false);
+    }
+  }, [isSavingDocument, queryClient, resumeId, trpc]);
+
+  /**
+   * Cancel discards the in-memory editor state and forces the file to be
+   * reloaded from the last persisted resumeLink on the next open.
+   */
+  const handleCancelDocument = useCallback(() => {
+    if (isDocumentLoading || isSavingDocument) {
+      return;
+    }
+
+    lastLoadedResumeLinkRef.current = null;
+    setLoadError(null);
+    setIsDocumentReady(false);
+    setIsDocumentLoading(true);
+  }, [isDocumentLoading, isSavingDocument]);
+
   useEffect(() => {
     if (!editorRef.current || !resumeLink || isLoading || !isEditorReady) {
+      return;
+    }
+
+    if (isDocumentReady && resumeLink === lastLoadedResumeLinkRef.current) {
       return;
     }
 
@@ -784,6 +918,9 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             left: rect.left,
           });
         }
+
+        lastLoadedResumeLinkRef.current = resumeLink;
+        setIsDocumentReady(true);
       } catch (error) {
         console.error("Ошибка при загрузке документа:", error);
 
@@ -796,6 +933,8 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           }
           editor.editor.insertText(cleanText);
           setLoadError(null);
+          lastLoadedResumeLinkRef.current = resumeLink;
+          setIsDocumentReady(true);
         } else {
           setLoadError(
             `${lastErrorMessage}. Проверьте, что SFDT успешно распакован.`,
@@ -812,6 +951,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     isLoading,
     parsedResumeText,
     isEditorReady,
+    isDocumentReady,
     extractSfdtFromZipBase64,
     decodeBase64ToText,
     normalizeSfdtText,
@@ -820,7 +960,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const isGlobalLoading = isLoading || isDocumentLoading;
 
   return (
-    <div className="flex flex-col h-full space-y-3">
+    <div className="flex h-full flex-col space-y-3">
       <link rel="stylesheet" href={SYNCFUSION_THEME_URL} />
 
       {loadError ? (
@@ -829,54 +969,121 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         </div>
       ) : null}
 
-      {isGlobalLoading ? (
-        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-linear-to-br from-primary/10 via-card to-secondary/30 p-5 min-h-125 flex items-center justify-center">
-          <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
-          <div className="flex flex-col items-center gap-4 z-10">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground font-medium animate-pulse">
-              {isLoading
-                ? "Загрузка данных резюме..."
-                : "Подготовка документа Word..."}
-            </p>
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 shadow-sm">
+        <div>
+          <h3 className="text-sm font-semibold">Resume Editor</h3>
+          <p className="text-xs text-muted-foreground">
+            Edit the original resume and save the updated file back to
+            UploadThing.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleCancelDocument}
+            disabled={isGlobalLoading || isSavingDocument}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveDocument}
+            disabled={isGlobalLoading || isSavingDocument || !resumeLink}
+          >
+            {isSavingDocument ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : null}
+            Save
+          </Button>
+        </div>
+      </div>
+
+      <div
+        className="relative flex-1 overflow-hidden rounded-xl border border-border/60 shadow-sm document-editor-container-wrapper"
+        style={{ minHeight: "calc(100vh - 10rem)" }}
+      >
+        <style>{`
+          .document-editor-container-wrapper .e-documenteditorcontainer {
+            border-radius: 0.75rem;
+            overflow: hidden;
+            height: 100% !important; 
+            width: 100% !important;
+          }
+
+          .document-editor-container-wrapper .e-documenteditor {
+            height: 100% !important;
+          }
+
+          .document-editor-container-wrapper .e-documenteditor iframe {
+            width: 100% !important;
+            height: 100% !important;
+            background: transparent !important;
+          }
+
+          .document-editor-container-wrapper .e-de-text-target {
+            background: transparent !important;
+          }
+
+          .document-editor-container-wrapper > div {
+            height: 100% !important;
+          }
+        `}</style>
+
+        <div className="absolute inset-0">
+    <DocumentEditorContainerComponent
+      ref={editorRef}
+      height="100%"
+      style={{
+        display: "block",
+        height: "100%",
+        width: "100%",
+        visibility: isGlobalLoading ? "hidden" : "visible",
+      }}
+      autoResizeOnVisibilityChange={true}
+      enableToolbar={false}
+      showPropertiesPane={false}
+      created={() => {
+        setIsEditorReady(true);
+      }}
+    />
+  </div>
+
+        {isGlobalLoading ? (
+          <div className="absolute inset-0 z-20 flex h-full min-h-full overflow-hidden rounded-2xl border border-border/70 bg-card p-5">
+            <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-primary/15 blur-3xl" />
+            <div className="pointer-events-none absolute -right-16 -bottom-16 h-44 w-44 rounded-full bg-chart-2/10 blur-3xl" />
+
+            <div className="relative flex h-full w-full flex-1 flex-col justify-between space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/40 bg-primary/15 text-primary shadow-sm">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-44 rounded bg-muted/70" />
+                    <div className="h-3 w-56 rounded bg-muted/60" />
+                  </div>
+                </div>
+                <div className="h-7 w-24 rounded-full bg-muted/70" />
+              </div>
+
+              <div className="flex-1 rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
+                <div className="h-4 w-1/3 rounded bg-muted/70" />
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <div
+                    key={`editor-loading-line-${index}`}
+                    className="h-3 w-full rounded bg-muted/60"
+                  />
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <div className="h-9 w-20 rounded-md bg-muted/70" />
+                <div className="h-9 w-24 rounded-md bg-muted/70" />
+              </div>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="h-[70vh] min-h-150 border border-border/60 rounded-xl overflow-hidden shadow-sm document-editor-container-wrapper">
-          <style>{`
-            .document-editor-container-wrapper .e-documenteditorcontainer {
-              border-radius: 0.75rem;
-              overflow: hidden;
-            }
-           
-            .document-editor-container-wrapper .e-documenteditor {
-              height: 100% !important;
-            }
-            .document-editor-container-wrapper .e-documenteditor iframe {
-              width: 100% !important;
-              height: 100% !important;
-              background: transparent !important;
-            }
-            .document-editor-container-wrapper .e-de-text-target {
-              background: transparent !important;
-            }
-            .document-editor-container-wrapper > div {
-              height: 100% !important;
-            }
-          `}</style>
-          <DocumentEditorContainerComponent
-            ref={editorRef}
-            height="100%"
-            style={{ display: "block", height: "100%", width: "100%" }}
-            autoResizeOnVisibilityChange={true}
-            enableToolbar={false}
-            showPropertiesPane={false}
-            created={() => {
-              setIsEditorReady(true);
-            }}
-          />
-        </div>
-      )}
+        ) : null}
+      </div>
     </div>
   );
 };
