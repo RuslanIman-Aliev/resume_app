@@ -37,6 +37,21 @@ if (typeof window !== "undefined") {
     window as unknown as { getComputedStyle: typeof patchedGetComputedStyle }
   ).getComputedStyle = patchedGetComputedStyle;
 
+  if (!("ResizeObserver" in window)) {
+    class ResizeObserverMock {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+
+    (
+      window as unknown as { ResizeObserver: typeof ResizeObserverMock }
+    ).ResizeObserver = ResizeObserverMock;
+    (
+      globalThis as unknown as { ResizeObserver: typeof ResizeObserverMock }
+    ).ResizeObserver = ResizeObserverMock;
+  }
+
   // Provide a minimal 2D canvas context implementation to satisfy libraries
   // that call canvas.getContext('2d').save() / restore() etc.
   const maybeProto = (
