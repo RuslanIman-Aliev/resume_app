@@ -132,7 +132,16 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     refetchOnWindowFocus: false,
   });
 
-  const resumeLink = data?.resume?.resumeLink;
+  // `getParsedContent` response may omit `resumeLink`; narrow locally
+  type MaybeResumeWithLink = {
+    parsedContent?: string | null;
+    resumeName?: string | null;
+    postedRole?: string | null;
+    resumeLink?: string | null;
+  };
+
+  const resumeLink = (data?.resume as MaybeResumeWithLink | undefined)
+    ?.resumeLink;
   const parsedResumeText = data?.resume?.parsedContent ?? "";
 
   /**
@@ -1029,23 +1038,23 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         `}</style>
 
         <div className="absolute inset-0">
-    <DocumentEditorContainerComponent
-      ref={editorRef}
-      height="100%"
-      style={{
-        display: "block",
-        height: "100%",
-        width: "100%",
-        visibility: isGlobalLoading ? "hidden" : "visible",
-      }}
-      autoResizeOnVisibilityChange={true}
-      enableToolbar={false}
-      showPropertiesPane={false}
-      created={() => {
-        setIsEditorReady(true);
-      }}
-    />
-  </div>
+          <DocumentEditorContainerComponent
+            ref={editorRef}
+            height="100%"
+            style={{
+              display: "block",
+              height: "100%",
+              width: "100%",
+              visibility: isGlobalLoading ? "hidden" : "visible",
+            }}
+            autoResizeOnVisibilityChange={true}
+            enableToolbar={false}
+            showPropertiesPane={false}
+            created={() => {
+              setIsEditorReady(true);
+            }}
+          />
+        </div>
 
         {isGlobalLoading ? (
           <div className="absolute inset-0 z-20 flex h-full min-h-full overflow-hidden rounded-2xl border border-border/70 bg-card p-5">

@@ -113,6 +113,7 @@ const MainScoreCard = () => {
     isAwaitingAnalysis,
     clearAnalysisParams,
     data?.analysis?.createdAt,
+    data?.analysis,
   ]);
 
   useResumePusher(isAwaitingAnalysis ? resumeId : null, handleAnalysisReady);
@@ -124,7 +125,7 @@ const MainScoreCard = () => {
       queryKey: trpc.resume.getAll.queryKey(),
       refetchType: "active",
     });
-  }, [data?.analysis?.id, queryClient, trpc]);
+  }, [data?.analysis, queryClient, trpc]);
 
   if (isLoading) {
     return <MainScoreSkeleton />;

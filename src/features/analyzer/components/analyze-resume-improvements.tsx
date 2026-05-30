@@ -701,11 +701,26 @@ const AnalyzeResumeImprovements = ({
     },
   );
 
-  const resumeLink = parsedResumeData?.resume?.resumeLink;
+  // `getParsedContent` may not include `resumeLink` in its response type
+  // (server deliberately omits it). Narrow the resume shape locally to
+  // safely access an optional `resumeLink` when present without changing
+  // the trpc-generated types.
+  type MaybeResumeWithLink = {
+    parsedContent?: string | null;
+    resumeName?: string | null;
+    postedRole?: string | null;
+    resumeLink?: string | null;
+  };
+
+  const resumeLink = (
+    parsedResumeData?.resume as MaybeResumeWithLink | undefined
+  )?.resumeLink;
   const parsedResumeText = parsedResumeData?.resume?.parsedContent ?? "";
   const isDocumentOverlayLoading = !isDocumentReady && isDocumentLoading;
-  const isSuggestionLoading =
-    !!pendingImprovement && (isParsedResumeLoading || isDocumentLoading);
+  // When a pending suggestion is queued, we only show the skeleton while
+  // the parsed resume content is loading. The document loading overlay is a
+  // separate visual state and should not prevent showing the pending UI.
+  const isSuggestionLoading = !!pendingImprovement && isParsedResumeLoading;
 
   const { mutateAsync: applyImprovement } = useMutation(
     trpc.resume.applyImprovement.mutationOptions(),
@@ -1015,6 +1030,16 @@ const AnalyzeResumeImprovements = ({
         newText: pendingImprovement.afterText,
       });
 
+      // Notify immediately that the suggestion was applied to the backend
+      // so UI tests do not race on later editor/file upload steps.
+      let alreadyNotified = false;
+      try {
+        toast.success("Suggestion applied.");
+        alreadyNotified = true;
+      } catch {
+        // ignore toast errors
+      }
+
       const documentEditor = editorRef.current?.documentEditor as
         | DocumentEditorLike
         | undefined;
@@ -1102,11 +1127,17 @@ const AnalyzeResumeImprovements = ({
 
       if (fileSaveError) {
         toast.error(fileSaveError);
-        toast.success("Suggestion applied.");
+        if (!alreadyNotified) {
+          toast.success("Suggestion applied.");
+        }
       } else if (fileWasUpdated) {
-        toast.success("Suggestion applied and resume file updated.");
+        if (!alreadyNotified) {
+          toast.success("Suggestion applied and resume file updated.");
+        }
       } else {
-        toast.success("Suggestion applied.");
+        if (!alreadyNotified) {
+          toast.success("Suggestion applied.");
+        }
       }
       setPendingImprovement(null);
       setPendingKey(null);

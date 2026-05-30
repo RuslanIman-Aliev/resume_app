@@ -221,23 +221,14 @@ export async function POST(request: Request) {
       sfdtText = trimmed;
     }
 
-    return new NextResponse(sfdtText, {
+    const response = new NextResponse(sfdtText, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "x-sfdt-normalized": "0",
         "x-sfdt-source": sfdtSource,
       },
     });
-
-    // Debug: write normalized SFDT to disk for local inspection
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      const outPath = path.join(process.cwd(), "tmp_last_sfdt.json");
-      fs.writeFileSync(outPath, sfdtText, "utf8");
-    } catch (e) {
-      // ignore write errors in production
-    }
+    return response;
   } catch (error) {
     console.error("docx-to-sfdt error:", error);
     return NextResponse.json(
@@ -246,15 +237,4 @@ export async function POST(request: Request) {
     );
   }
 }
-
-const normalizeSfdtValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map((v) => normalizeSfdtValue(v));
-  if (!value || typeof value !== "object") return value;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    const nk = k === "tlp" ? "t" : k;
-    out[nk] = normalizeSfdtValue(v);
-  }
-  if (out.optimizeSfdt === true) delete out.optimizeSfdt;
-  return out;
-};
+// Note: normalization helper removed (unused) to satisfy lint rules.

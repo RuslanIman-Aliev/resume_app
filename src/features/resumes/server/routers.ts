@@ -148,7 +148,6 @@ export const resumeRouter = createTRPCRouter({
           parsedContent: true,
           resumeName: true,
           postedRole: true,
-          resumeLink: true,
         },
       });
       if (!resume) {
