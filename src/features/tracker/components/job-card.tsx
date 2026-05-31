@@ -17,6 +17,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
+import { getScoreColor } from "@/lib/utils";
 
 /**
  * Job card component for displaying individual job application in kanban/list view.
@@ -115,7 +116,7 @@ export const JobCard = ({
           {application.matchScore && (
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Match:</span>
-              <span className={`text-xs font-medium `}>
+              <span className={`text-xs font-medium ${getScoreColor(application.matchScore)}`}>
                 {application.matchScore}%
               </span>
             </div>

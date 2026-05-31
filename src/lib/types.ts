@@ -170,36 +170,42 @@ export type JobApplicationCard = {
   /** Unique identifier for the job application. */
   id: string;
   /** Company name from the job posting. */
-  company?: string;
+  company?: string | null;
   /** Job title/position from the job posting. */
-  position?: string;
+  position?: string | null;
   /** Job location (e.g., city, state, remote). */
-  location?: string;
+  location?: string | null;
   /** Salary range for the position. */
-  salary?: string;
-  /** Current status of the application (saved, applied, screening, interview, offer, rejected). */
+  salary?: string | null;
+  /** Current status of the application. */
   status: string;
   /** Date when the application was submitted. */
-  appliedDate?: string;
+  appliedDate?: string | null;
   /** Date when the record was last updated. */
-  lastUpdated?: string;
+  lastUpdated?: string | null;
   /** Job match score between 0-100, null if not yet analyzed. */
-  matchScore: number | null;
+  matchScore?: number | null;
   /** Description of the next step in the application process. */
-  nextStep?: string;
+  nextStep?: string | null;
   /** Date of the next step. */
-  nextStepDate?: string;
+  nextStepDate?: string | null;
   /** URL to the job posting. */
-  url?: string;
+  url?: string | null;
+  
+  // Dates sent over tRPC APIs are automatically serialized into strings
   /** Timestamp when the record was created. */
-  createdAt?: Date;
+  createdAt?: Date | string | null;
   /** Timestamp when the record was last updated. */
-  updatedAt?: Date;
+  updatedAt?: Date | string | null;
+  
   /** Associated resume metadata. */
   resume?: {
-    /** Name of the resume used for this application. */
     resumeName: string;
-  };
+  } | null;
+
+  notes?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
 };
 
 /**
@@ -279,3 +285,30 @@ export type RequirementsMatchData = {
   /** Analysis of preferred/nice-to-have job qualifications. */
   preferred: RequirementItem[];
 };
+
+export const applicationStatusValues = [
+  "saved",
+  "applied",
+  "screening",
+  "interview",
+  "offer",
+  "rejected",
+] as const;
+export const trackerFormSchema = z.object({
+  company: z.string().min(1, "Company name is required."),
+  position: z.string().min(1, "Position is required."),
+  location: z.string().min(1, "Location is required."),
+  salary: z.string().optional(),
+  status: z.enum(applicationStatusValues),
+  // Use a union to allow either a completely empty string OR a valid URL/Email
+  url: z.union([z.literal(""), z.string().url("Please enter a valid URL.")]),
+  notes: z.string().optional(),
+  contactName: z.string().optional(),
+  contactEmail: z.union([
+    z.literal(""),
+    z.string().email("Please enter a valid email address."),
+  ]),
+});
+
+// 2. Infer the TypeScript type automatically from the schema
+export type TrackerFormValues = z.infer<typeof trackerFormSchema>;
