@@ -13,7 +13,6 @@ import { authClient } from "@/lib/auth-client";
 import { useTRPC } from "@/trpc/client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  BrainCircuit,
   FileText,
   FolderOpen,
   History,

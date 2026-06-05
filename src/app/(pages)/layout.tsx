@@ -16,9 +16,9 @@ export default async function Layout({
 }) {
   await requireAuth();
   return (
-    <main className="w-full">
+    <main className="flex min-h-screen w-full flex-col">
       <Header />
-      {children}
+      <div className="flex-1 min-h-0">{children}</div>
     </main>
   );
 }

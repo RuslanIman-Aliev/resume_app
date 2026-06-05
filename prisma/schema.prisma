@@ -34,6 +34,7 @@ model User {
   accounts      Account[]
   resumes       Resume[]
   applications  JobApplication[]
+  trackerPositions TrackerPosition[]
 
   @@map("user")
 }
@@ -102,6 +103,7 @@ model Resume {
   analysis          ResumeAnalysis[]
 
   applications      JobApplication[]
+  
   @@map("resume")
 }
 
@@ -168,4 +170,26 @@ enum ApplicationStatus {
   INTERVIEW
   REJECTED
   OFFER
+}
+
+model TrackerPosition {
+  id           String   @id @default(cuid())
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  company      String
+  position     String
+  location     String
+  salary       String?
+  status       String   @default("saved")
+  url          String?
+  notes        String?  @db.Text
+  contactName  String?
+  contactEmail String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("tracker_position")
 }

@@ -148,7 +148,6 @@ export const resumeRouter = createTRPCRouter({
           parsedContent: true,
           resumeName: true,
           postedRole: true,
-          resumeLink: true,
         },
       });
       if (!resume) {
@@ -402,30 +401,39 @@ export const resumeRouter = createTRPCRouter({
         where: { id: input.resumeId, userId: ctx.auth.user.id },
       });
 
-      if (!resume || !resume.structuredData) {
+      if (!resume) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Resume or structured data not found",
+          message: "Resume not found",
         });
       }
 
-      // 1. Parse JSON
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = resume.structuredData as any;
+      const previousText = input.previousText?.trim();
+      const newText = input.newText.trim();
+
+      const hasStructuredData = Boolean(resume.structuredData);
       let changed = false;
 
-      // 2. Precisely edit the fragment
-      if (input.targetSection === "summary" && data.personalInfo) {
-        const currentSummary = data.personalInfo.summary?.trim() ?? "";
-        const nextSummary = input.newText.trim();
+      // 1. Parse JSON
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = hasStructuredData ? (resume.structuredData as any) : null;
 
-        if (currentSummary !== nextSummary) {
+      // 2. Precisely edit the fragment
+      if (
+        hasStructuredData &&
+        input.targetSection === "summary" &&
+        data.personalInfo
+      ) {
+        const currentSummary = data.personalInfo.summary?.trim() ?? "";
+
+        if (currentSummary !== newText) {
           data.personalInfo.summary = input.newText;
           changed = true;
         }
       }
 
       if (
+        hasStructuredData &&
         input.targetSection === "experience" &&
         input.targetId &&
         Array.isArray(data.experience)
@@ -450,6 +458,7 @@ export const resumeRouter = createTRPCRouter({
       }
 
       if (
+        hasStructuredData &&
         input.targetSection === "education" &&
         input.targetId &&
         Array.isArray(data.education)
@@ -475,6 +484,7 @@ export const resumeRouter = createTRPCRouter({
       }
 
       if (
+        hasStructuredData &&
         input.targetSection === "projects" &&
         input.targetId &&
         Array.isArray(data.projects)
@@ -499,8 +509,8 @@ export const resumeRouter = createTRPCRouter({
         }
       }
 
-      if (input.targetSection === "skills") {
-        const normalizedNewSkill = input.newText.trim();
+      if (hasStructuredData && input.targetSection === "skills") {
+        const normalizedNewSkill = newText;
 
         if (!Array.isArray(data.skills)) {
           data.skills = normalizedNewSkill ? [normalizedNewSkill] : [];
@@ -516,10 +526,8 @@ export const resumeRouter = createTRPCRouter({
         }
       }
 
-      if (!changed) {
+      if (hasStructuredData && !changed) {
         // If no direct match found, append the new text to the appropriate section
-        const newText = input.newText.trim();
-
         if (input.targetSection === "summary" && data.personalInfo) {
           const currentSummary = data.personalInfo.summary?.trim() ?? "";
 
@@ -587,7 +595,7 @@ export const resumeRouter = createTRPCRouter({
         }
       }
 
-      if (!changed) {
+      if (hasStructuredData && !changed) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message:
@@ -595,14 +603,34 @@ export const resumeRouter = createTRPCRouter({
         });
       }
 
-      const previousText = input.previousText?.trim();
-      const newText = input.newText.trim();
-
       const nextParsedContent = updateResumeParsedContent(
         resume.parsedContent,
         previousText,
         newText,
       );
+
+      const updatePayload = hasStructuredData
+        ? {
+            structuredData: data,
+            parsedContent: nextParsedContent,
+          }
+        : {
+            // If we do not have structured data yet, still persist the text edit.
+            parsedContent: nextParsedContent,
+          };
+
+      if (!hasStructuredData) {
+        const normalizedCurrent = normalizeResumeParsedContent(
+          resume.parsedContent,
+        );
+        if (nextParsedContent === normalizedCurrent) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "No matching target was found to update in parsed resume data.",
+          });
+        }
+      }
 
       // 3. Save back to DB
       const updateResult = await prisma.resume.updateMany({
@@ -610,10 +638,7 @@ export const resumeRouter = createTRPCRouter({
           id: input.resumeId,
           userId: ctx.auth.user.id,
         },
-        data: {
-          structuredData: data,
-          parsedContent: nextParsedContent,
-        },
+        data: updatePayload,
       });
 
       if (updateResult.count === 0) {

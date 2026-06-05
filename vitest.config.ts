@@ -3,7 +3,8 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   test: {
-    environment: "node",
+    environment: "jsdom",
+    setupFiles: ["./vitest.setup.ts"],
     clearMocks: true,
     restoreMocks: true,
     exclude: ["**/node_modules/**", "**/tests/e2e/**"],

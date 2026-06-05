@@ -11,6 +11,7 @@ import {
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { Sparkles, Target, TrendingUp, Zap } from "lucide-react";
+import dynamic from "next/dynamic";
 import {
   useParams,
   useRouter,
@@ -18,7 +19,6 @@ import {
   useSearchParams,
 } from "next/navigation";
 import { useCallback } from "react";
-import AnalyzeResumeImprovements from "./analyze-resume-improvements";
 import {
   AnalyzeResumeError,
   AnalyzeResumeLoading,
@@ -27,8 +27,24 @@ import AnalyzeSkillsGap from "./analyze-skills-gap";
 import AnalyzerResults from "./analyzer-results";
 import AnalyzeKeywords from "./analyze-keywords";
 import AnalyzeRequirementsMatch from "./analyze-requirements-match";
-import { AnalyzeOriginalResume } from "./analyze-original-resume";
 import { FileText } from "lucide-react";
+
+const AnalyzeResumeImprovements = dynamic(
+  () => import("./analyze-resume-improvements"),
+  {
+    ssr: false,
+  },
+);
+
+const AnalyzeOriginalResume = dynamic(
+  () =>
+    import("./analyze-original-resume").then(
+      (mod) => mod.AnalyzeOriginalResume,
+    ),
+  {
+    ssr: false,
+  },
+);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -154,7 +170,7 @@ export const AnalyzeResumeClient = () => {
       />
 
       <Tabs
-        className=" text-white flex flex-col gap-1! mt-4"
+        className="text-white flex flex-col gap-1! mt-4 flex-1 min-h-0"
         value={currentTab}
         onValueChange={(val) =>
           router.push(`${pathname}?tab=${val}`, { scroll: false })
@@ -198,7 +214,7 @@ export const AnalyzeResumeClient = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4">
+        <TabsContent value="overview" className="mt-4 flex-1 min-h-0">
           <AnalyzeRequirementsMatch
             data={requirementsMatchData}
             improvementsCount={improvementsCount}
@@ -207,20 +223,24 @@ export const AnalyzeResumeClient = () => {
           />
         </TabsContent>
 
-        <TabsContent value="improvements" className="mt-4">
-          <AnalyzeResumeImprovements
-            data={appData as unknown as ApplicationData}
-            resumeId={appData.resumeId}
-            applicationId={appData.id}
-          />
+        <TabsContent value="improvements" className="mt-4 flex-1 min-h-0">
+          <div className="flex h-full min-h-0 flex-col">
+            <AnalyzeResumeImprovements
+              data={appData as unknown as ApplicationData}
+              resumeId={appData.resumeId}
+              applicationId={appData.id}
+            />
+          </div>
         </TabsContent>
-        <TabsContent value="original" className="mt-4">
-          <AnalyzeOriginalResume resumeId={appData.resumeId} />
+        <TabsContent value="original" className="mt-4 flex-1 min-h-0">
+          <div className="flex h-full min-h-0 flex-col">
+            <AnalyzeOriginalResume resumeId={appData.resumeId} />
+          </div>
         </TabsContent>
-        <TabsContent value="skills-gap" className="mt-4">
+        <TabsContent value="skills-gap" className="mt-4 flex-1 min-h-0">
           <AnalyzeSkillsGap data={skillsGapData} />
         </TabsContent>
-        <TabsContent value="keywords" className="mt-4">
+        <TabsContent value="keywords" className="mt-4 flex-1 min-h-0">
           <AnalyzeKeywords data={keywordsGapData} />
         </TabsContent>
       </Tabs>

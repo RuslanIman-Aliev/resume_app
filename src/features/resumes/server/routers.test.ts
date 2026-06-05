@@ -665,23 +665,31 @@ describe("resumeRouter", () => {
     });
   });
 
-  it("throws NOT_FOUND when applyImprovement cannot load structured resume data", async () => {
+  it("updates parsed content when structured data is missing", async () => {
     prismaMock.resume.findFirst.mockResolvedValue({
       id: "resume_1",
       structuredData: null,
       parsedContent: "Any",
     });
+    prismaMock.resume.updateMany.mockResolvedValue({ count: 1 });
 
     const caller = createCaller({});
 
-    await expect(
-      caller.applyImprovement({
-        resumeId: "resume_1",
-        targetSection: "summary",
-        newText: "Updated summary",
-      }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(prismaMock.resume.updateMany).not.toHaveBeenCalled();
+    await caller.applyImprovement({
+      resumeId: "resume_1",
+      targetSection: "summary",
+      newText: "Updated summary",
+    });
+
+    expect(prismaMock.resume.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "resume_1",
+        userId: session.user.id,
+      },
+      data: {
+        parsedContent: "<p>Any</p><p>Updated summary</p>",
+      },
+    });
   });
 
   it("throws PRECONDITION_FAILED when applyImprovement does not change data", async () => {

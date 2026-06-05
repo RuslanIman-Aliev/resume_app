@@ -32,7 +32,6 @@ export function SignInForm() {
   const form = useForm<SignInFormData>({
     resolver: zodResolver(signInFormSchema),
     defaultValues: {
-      name: "",
       email: "",
       password: "",
     },
@@ -100,32 +99,8 @@ export function SignInForm() {
       </CardHeader>
       <form id="form-signin" onSubmit={form.handleSubmit(onSubmit)}>
         <CardContent className="relative z-10 px-6 pb-4">
-          <FieldGroup className="gap-4">
-            <Controller
-              name="name"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel
-                    htmlFor="form-signin-name"
-                    className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80"
-                  >
-                    Name
-                  </FieldLabel>
-                  <Input
-                    {...field}
-                    id="form-signin-name"
-                    aria-invalid={fieldState.invalid}
-                    placeholder="Enter your name"
-                    autoComplete="off"
-                    className="h-11 border-white/10 bg-black/50 text-foreground placeholder:text-muted-foreground/70 focus-visible:border-white/25 focus-visible:ring-white/10"
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
+          <FieldGroup className="gap-4 py-4">
+           
             <Controller
               name="email"
               control={form.control}
