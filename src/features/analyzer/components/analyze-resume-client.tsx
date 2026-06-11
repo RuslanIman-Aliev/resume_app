@@ -116,7 +116,6 @@ export const AnalyzeResumeClient = () => {
   const isPendingAnalysis = errorCode === "NOT_FOUND";
 
   const handleAnalysisReady = useCallback(() => {
-    // Query invalidation in the pusher hook is enough to refresh active screens.
   }, []);
   useJobMatchPusher(analyzeId ?? "", handleAnalysisReady);
 
@@ -155,7 +154,6 @@ export const AnalyzeResumeClient = () => {
   const potentialScore = summaryObj?.estimatedScoreWithAllImprovements || 100;
 
   const navigateToImprovements = () => {
-    // Navigate via URL parameters so Tabs can sync cleanly without hacking the DOM.
     router.push(`${pathname}?tab=improvements`, { scroll: false });
   };
   return (

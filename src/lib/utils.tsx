@@ -245,6 +245,17 @@ export function getScoreColor(score: number) {
   if (score >= 70) return "text-chart-4";
   return "text-chart-5";
 }
+export const getPriorityStyles = (priority: string) => {
+  switch (priority.toLowerCase()) {
+    case "high":
+    case "critical":
+      return "border-red-500/30 text-red-500 bg-red-500/10";
+    case "medium":
+      return "border-yellow-500/30 text-yellow-500 bg-yellow-500/10";
+    default:
+      return "border-blue-500/30 text-blue-500 bg-blue-500/10";
+  }
+};
 
 const priorityConfig = {
   high: {

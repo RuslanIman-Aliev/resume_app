@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ApplicationData, ImprovementTip } from "@/lib/types";
 import { getErrorFeedback } from "@/lib/error-feedback";
-import { getScoreColor } from "@/lib/utils";
+import { getPriorityStyles, getScoreColor } from "@/lib/utils";
 import {
   CheckIcon,
   CircleDot,
@@ -38,6 +38,7 @@ if (syncfusionLicense) {
   registerLicense(syncfusionLicense);
 }
 
+console.log("[SFDT] Syncfusion license registered:", syncfusionLicense);
 const SYNCFUSION_THEME_URL =
   "https://cdn.syncfusion.com/ej2/33.2.3/material.css";
 
@@ -98,18 +99,6 @@ type InsertionPreview = {
   suffix: string;
   isTruncated: boolean;
   isFound: boolean;
-};
-
-const getPriorityStyles = (priority: string) => {
-  switch (priority.toLowerCase()) {
-    case "high":
-    case "critical":
-      return "border-red-500/30 text-red-500 bg-red-500/10";
-    case "medium":
-      return "border-yellow-500/30 text-yellow-500 bg-yellow-500/10";
-    default:
-      return "border-blue-500/30 text-blue-500 bg-blue-500/10";
-  }
 };
 
 const isSfdtLike = (value: unknown) => {
@@ -725,7 +714,7 @@ const AnalyzeResumeImprovements = ({
   // the parsed resume content is loading. The document loading overlay is a
   // separate visual state and should not prevent showing the pending UI.
   const isSuggestionLoading = !!pendingImprovement && isParsedResumeLoading;
-
+  console.log(resumeLink);
   const { mutateAsync: applyImprovement } = useMutation(
     trpc.resume.applyImprovement.mutationOptions(),
   );
@@ -824,6 +813,13 @@ const AnalyzeResumeImprovements = ({
   }, [isEditorDialogOpen]);
 
   useEffect(() => {
+    if (!resumeLink && !isParsedResumeLoading && isEditorDialogOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsDocumentLoading(false);
+      setLoadError("Resume link is missing from the API response.");
+      return;
+    }
+
     if (
       !isEditorDialogOpen ||
       !resumeLink ||
@@ -844,7 +840,10 @@ const AnalyzeResumeImprovements = ({
       const documentEditor = editorRef.current?.documentEditor as
         | DocumentEditorLike
         | undefined;
+
       if (!documentEditor) {
+        setIsDocumentLoading(false);
+        setLoadError("Editor failed to initialize properly.");
         return;
       }
 
@@ -874,7 +873,6 @@ const AnalyzeResumeImprovements = ({
                 .filter(Boolean)
                 .join(" ") || errorMessage;
           } catch {
-            // keep fallback message
           }
           throw new Error(errorMessage);
         }

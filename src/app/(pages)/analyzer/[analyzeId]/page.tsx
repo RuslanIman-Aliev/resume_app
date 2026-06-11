@@ -58,7 +58,7 @@ export async function generateMetadata({
 const AnalyzeResume = () => {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 pb-6">
-      <Button
+      {/* <Button
         variant={"ghost"}
         asChild
         className="hover:bg-primary! hover:text-black"
@@ -66,31 +66,12 @@ const AnalyzeResume = () => {
         <Link href="/analyzer" className="text-sm font-medium">
           &larr; Back to Analyzer
         </Link>
-      </Button>
+      </Button> */}
 
       <div className="flex min-h-0 flex-1 flex-col">
         <AnalyzeResumeClient />
       </div>
 
-      {/* CTA
-      <Card className="border-border/50 bg-card/50 backdrop-blur">
-        <CardContent className="pt-2">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">
-                Ready to tailor your resume?
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Use these insights to customize your application and stand out
-              </p>
-            </div>
-            <Button size="lg" className="gap-2 shadow-lg shadow-primary/25">
-              <Sparkles className="h-5 w-5" />
-              Open Resume Tailor
-            </Button>
-          </div>
-        </CardContent>
-      </Card> */}
     </div>
   );
 };
