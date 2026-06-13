@@ -29,13 +29,31 @@ import {
 } from "@/components/ui/pagination";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, FileText, Loader2, Target } from "lucide-react";
+import {
+  Clock,
+  Copy,
+  Download,
+  FileText,
+  Loader2,
+  MoreVertical,
+  Pencil,
+  SparklesIcon,
+  Target,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ResumeEmpty, ResumeError, ResumeLoading } from "./resume-states";
 import { getErrorFeedback } from "@/lib/error-feedback";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const ResumeCard = () => {
   const trpc = useTRPC();
@@ -114,6 +132,25 @@ const ResumeCard = () => {
     }),
   );
 
+  const handleDownload = async (fileUrl: string, fileName: string) => {
+    try {
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+
   const pageCount = data?.pagination?.pageCount ?? 1;
 
   if (isLoading) {
@@ -151,11 +188,12 @@ const ResumeCard = () => {
                 <CardHeader className="flex items-center justify-between">
                   <div>
                     <Badge>{resume.status}</Badge>
-                  </div>
-                  {/* <div className="flex items-center gap-1">
+                    {/* <div className="flex items-center gap-1">
                 <SparklesIcon className="text-primary size-4" />
-                <span className="text-lg text-primary">{resume.score}</span>
+                <span className="text-lg text-primary">{resume.matchScore}</span>
               </div> */}
+                  </div>
+                  {/*  */}
                 </CardHeader>
                 <CardContent className="">
                   <div className="flex flex-col pb-2">
@@ -178,6 +216,7 @@ const ResumeCard = () => {
                                   <FileText className="h-12 w-12 text-muted-foreground/50" />
                                 </div>
                               )}
+
                               {isAnalyzingCard ? (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm">
                                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/40 bg-primary/15 text-primary shadow-sm">
@@ -196,20 +235,63 @@ const ResumeCard = () => {
                               ) : null}
                             </div>
                           </div>
-                          <div className="pt-2">
-                            <div className="min-w-0">
-                              <h3 className="font-semibold text-lg truncate">
-                                {resume.resumeName}
-                              </h3>
-                              <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
-                                <Target className="h-3.5 w-3.5" />
-                                {resume.postedRole}
-                              </p>
-                            </div>
+                        </div>
+                      </DialogTrigger>
 
-                            <div className=" flex  justify-between">
-                              <div className="flex flex-wrap gap-1.5">
-                                {/* {resume.tags.slice(0, 2).map((tag) => (
+                      <div className="pt-2">
+                        <div className="min-w-0">
+                          <div className="flex items-start justify-between">
+                            <h3 className="font-semibold text-lg truncate">
+                              {resume.resumeName}
+                            </h3>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onSelect={(e) => {
+                                    e.preventDefault();
+                                    handleDownload(
+                                      resume.resumeLink,
+                                      resume.resumeName!,
+                                    );
+                                  }}
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Duplicate
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Rename
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
+                            <Target className="h-3.5 w-3.5" />
+                            {resume.postedRole}
+                          </p>
+                        </div>
+
+                        <div className=" flex  justify-between">
+                          <div className="flex flex-wrap gap-1.5">
+                            {/* {resume.tags.slice(0, 2).map((tag) => (
                         <Badge key={tag} variant="outline" className="text-xs">
                           {tag}
                         </Badge>
@@ -219,22 +301,20 @@ const ResumeCard = () => {
                           +{resume.tags.length - 2}
                         </Badge>
                       )} */}
-                              </div>
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {new Date(resume.createdAt).toLocaleDateString(
-                                  undefined,
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  },
-                                )}
-                              </span>
-                            </div>
                           </div>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(resume.createdAt).toLocaleDateString(
+                              undefined,
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
                         </div>
-                      </DialogTrigger>
+                      </div>
 
                       <DialogContent className="max-w-2xl! w-screen h-[95vh] p-0 overflow-hidden">
                         <DialogTitle className="sr-only">

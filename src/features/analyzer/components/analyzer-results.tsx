@@ -109,7 +109,7 @@ const AnalyzerResults = ({
         ))}
       </div>
 
-      <Card className="border-primary/30 bg-linear-to-r from-primary/5 to-transparent">
+      <Card className="border-primary/30 bg-linear-to-r from-primary/5 to-transparent mt-5">
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-6">
             <div className="flex items-center gap-4">

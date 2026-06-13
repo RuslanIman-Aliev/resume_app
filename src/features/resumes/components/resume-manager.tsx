@@ -188,7 +188,7 @@ const ResumeManager = () => {
                 </DialogDescription>
               </DialogHeader>
 
-              {/* THE FIXED DROPZONE */}
+              {/* THE DROPZONE */}
               <div
                 className={`relative min-h-40 flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors ${
                   file
