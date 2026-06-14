@@ -17,115 +17,19 @@ import {
   Search,
 } from "lucide-react";
 import DialogTracker from "./dialog-tracker";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { useTRPC } from "@/trpc/client";
 
-// const mockApplications: JobApplicationCard[] = [
-//   {
-//     id: "1",
-//     company: "Stripe",
-//     position: "Senior Frontend Engineer",
-//     location: "San Francisco, CA (Remote)",
-//     salary: "$180k - $220k",
-//     status: "interview",
-//     appliedDate: "2024-03-01",
-//     lastUpdated: "2024-03-10",
-//     matchScore: 92,
-//     nextStep: "Technical Interview",
-//     nextStepDate: "2024-03-18",
-//     url: "https://stripe.com/jobs",
-//   },
-//   {
-//     id: "2",
-//     company: "Vercel",
-//     position: "Full Stack Developer",
-//     location: "Remote",
-//     salary: "$150k - $190k",
-//     status: "screening",
-//     appliedDate: "2024-03-05",
-//     lastUpdated: "2024-03-08",
-//     matchScore: 88,
-//     nextStep: "HR Call",
-//     nextStepDate: "2024-03-15",
-//   },
-//   {
-//     id: "3",
-//     company: "Figma",
-//     position: "Product Designer",
-//     location: "New York, NY",
-//     salary: "$140k - $180k",
-//     status: "applied",
-//     appliedDate: "2024-03-08",
-//     lastUpdated: "2024-03-08",
-//     matchScore: 85,
-//   },
-//   {
-//     id: "4",
-//     company: "Linear",
-//     position: "Software Engineer",
-//     location: "Remote",
-//     salary: "$160k - $200k",
-//     status: "saved",
-//     lastUpdated: "2024-03-12",
-//     matchScore: 90,
-//   },
-//   {
-//     id: "5",
-//     company: "Notion",
-//     position: "Frontend Engineer",
-//     location: "San Francisco, CA",
-//     salary: "$170k - $210k",
-//     status: "offer",
-//     appliedDate: "2024-02-15",
-//     lastUpdated: "2024-03-05",
-//     matchScore: 95,
-//   },
-//   {
-//     id: "6",
-//     company: "Airbnb",
-//     position: "Senior Software Engineer",
-//     location: "San Francisco, CA",
-//     salary: "$190k - $240k",
-//     status: "rejected",
-//     appliedDate: "2024-02-20",
-//     lastUpdated: "2024-03-01",
-//     matchScore: 78,
-//   },
-//   {
-//     id: "7",
-//     company: "Spotify",
-//     position: "Backend Engineer",
-//     location: "Stockholm (Remote)",
-//     salary: "$130k - $170k",
-//     status: "applied",
-//     appliedDate: "2024-03-10",
-//     lastUpdated: "2024-03-10",
-//     matchScore: 82,
-//   },
-//   {
-//     id: "8",
-//     company: "Discord",
-//     position: "React Developer",
-//     location: "San Francisco, CA",
-//     salary: "$155k - $195k",
-//     status: "saved",
-//     lastUpdated: "2024-03-11",
-//     matchScore: 87,
-//   },
-// ];
-
 const MainView = () => {
-  // const [applications, setApplications] = useState<JobApplicationCard[]>(
-  //   mockApplications,
-  // );
-
   const [open, setOpen] = useState(false);
   const trpc = useTRPC();
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
     trpc.tracker.getAll.queryOptions(),
   );
+  const queryClient = useQueryClient();
+
   const stats = {
     total: data?.length || 0,
     saved: data?.filter((a) => a.status === "saved").length || 0,
@@ -138,8 +42,11 @@ const MainView = () => {
 
   const { mutate } = useMutation(
     trpc.tracker.create.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
         toast.info("Application added successfully!");
+        await queryClient.invalidateQueries({
+          queryKey: trpc.tracker.getAll.queryKey(),
+        });
       },
       onError: (error) => {
         toast.error(

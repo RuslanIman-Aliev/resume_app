@@ -20,6 +20,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -27,6 +34,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { getErrorFeedback } from "@/lib/error-feedback";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,23 +45,14 @@ import {
   Loader2,
   MoreVertical,
   Pencil,
-  SparklesIcon,
   Target,
-  Trash2,
+  Trash2
 } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ResumeEmpty, ResumeError, ResumeLoading } from "./resume-states";
-import { getErrorFeedback } from "@/lib/error-feedback";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 const ResumeCard = () => {
   const trpc = useTRPC();

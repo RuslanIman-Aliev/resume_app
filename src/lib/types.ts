@@ -169,45 +169,57 @@ export interface ApplicationData {
 export type JobApplicationCard = {
   /** Unique identifier for the job application. */
   id: string;
+  
   /** Company name from the job posting. */
-  company?: string | null;
+  company: string; // FIXED: Removed '?' and '| null'
+  
   /** Job title/position from the job posting. */
-  position?: string | null;
+  position: string; // FIXED: Removed '?' and '| null'
+  
   /** Job location (e.g., city, state, remote). */
-  location?: string | null;
+  location: string;
+  
   /** Salary range for the position. */
-  salary?: string | null;
+  salary: string | null;
+  
   /** Current status of the application. */
   status: string;
+  
   /** Date when the application was submitted. */
   appliedDate?: string | null;
+  
   /** Date when the record was last updated. */
   lastUpdated?: string | null;
+  
   /** Job match score between 0-100, null if not yet analyzed. */
   matchScore?: number | null;
+  
   /** Description of the next step in the application process. */
   nextStep?: string | null;
+  
   /** Date of the next step. */
   nextStepDate?: string | null;
-  /** URL to the job posting. */
-  url?: string | null;
   
-  // Dates sent over tRPC APIs are automatically serialized into strings
+  /** URL to the job posting. */
+  url: string | null;
+  
+  userId: string;
+  
   /** Timestamp when the record was created. */
-  createdAt?: Date | string | null;
+  createdAt: string; 
+  
   /** Timestamp when the record was last updated. */
-  updatedAt?: Date | string | null;
+  updatedAt: string; 
   
   /** Associated resume metadata. */
   resume?: {
     resumeName: string;
   } | null;
 
-  notes?: string | null;
-  contactName?: string | null;
-  contactEmail?: string | null;
+  notes: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
 };
-
 /**
  * Detailed analysis of how well a resume matches a job description.
  */
