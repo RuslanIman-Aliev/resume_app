@@ -3,9 +3,9 @@ import { clsx, type ClassValue } from "clsx";
 import { Briefcase, Code, FileText, GraduationCap, Target } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 import * as pdfjsLib from "pdfjs-dist";
-import mammoth from "mammoth";
 import { toBlob } from "html-to-image";
 import { logError } from "./logger";
+import { renderAsync } from "docx-preview";
 
 /**
  * Merges CSS class names using clsx and tailwind-merge.
@@ -331,48 +331,6 @@ export const getCategoryConfig = (category: unknown) => {
   return categoryConfig.content;
 };
 
-/**
- * Removes active or scriptable markup before rendering DOCX HTML into a thumbnail.
- */
-const sanitizeHtmlForThumbnail = (html: string) => {
-  const parser = new DOMParser();
-  const documentFragment = parser.parseFromString(html, "text/html");
-  const dangerousTags = new Set([
-    "script",
-    "style",
-    "iframe",
-    "object",
-    "embed",
-    "link",
-    "meta",
-  ]);
-
-  const elements = Array.from(documentFragment.body.querySelectorAll("*"));
-  for (const element of elements) {
-    const tagName = element.tagName.toLowerCase();
-
-    if (dangerousTags.has(tagName)) {
-      element.remove();
-      continue;
-    }
-
-    for (const attribute of Array.from(element.attributes)) {
-      const attributeName = attribute.name.toLowerCase();
-      const attributeValue = attribute.value.trim().toLowerCase();
-
-      if (
-        attributeName.startsWith("on") ||
-        attributeValue.startsWith("javascript:") ||
-        attributeValue.startsWith("data:text/html")
-      ) {
-        element.removeAttribute(attribute.name);
-      }
-    }
-  }
-
-  return documentFragment.body.innerHTML;
-};
-
 {
   /*
     - tailoringTips.currentResumeText and tailoringTips.suggestedRewrite MUST always be strings. NEVER return null.
@@ -450,7 +408,8 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   - If improvement affects formatting/clarity: weight lower (1-4)
   - NEVER use 0 for matchScoreBoost - every improvement must have measurable impact
   - The frontend UI will sum these boosts to show users the cumulative expected score improvement
-
+  UNIQUE TARGETS: Do not rewrite the same 'beforeText' multiple times. Target different sections and different bullet points.
+  UNIQUE SUGGESTIONS: Inside the 'suggestions' array, offer 3 completely distinct ways to fix the problem (e.g., Option A: Keyword focus, Option B: Metric focus, Option C: Business impact focus).
   You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
 
   {
@@ -606,39 +565,37 @@ export const generatePdfThumbnail = async (file: File): Promise<File> => {
 export const generateDocxThumbnail = async (file: File): Promise<File> => {
   const arrayBuffer = await file.arrayBuffer();
 
-  const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
-
   const secretWrapper = document.createElement("div");
   secretWrapper.style.position = "fixed";
   secretWrapper.style.top = "0";
   secretWrapper.style.left = "0";
-  secretWrapper.style.width = "1px";
-  secretWrapper.style.height = "1px";
   secretWrapper.style.overflow = "hidden";
   secretWrapper.style.opacity = "0";
   secretWrapper.style.pointerEvents = "none";
   secretWrapper.style.zIndex = "-9999";
 
   const container = document.createElement("div");
-  container.style.width = "800px";
-  container.style.height = "1130px";
   container.style.backgroundColor = "#ffffff";
-  container.style.color = "#000000";
-  container.style.padding = "60px";
-  container.style.fontFamily = "sans-serif";
-  container.style.fontSize = "14px";
-  container.style.lineHeight = "1.5";
-  container.innerHTML = sanitizeHtmlForThumbnail(html);
+  
   secretWrapper.appendChild(container);
   document.body.appendChild(secretWrapper);
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await renderAsync(arrayBuffer, container, undefined, {
+      className: "docx", 
+      inWrapper: false, 
+      ignoreWidth: false, 
+      ignoreHeight: false, 
+      ignoreFonts: false,  
+      breakPages: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     const blob = await toBlob(container, {
       quality: 0.8,
       backgroundColor: "#ffffff",
-      pixelRatio: 1,
+      pixelRatio: 1, 
     });
 
     if (!blob) {
@@ -649,7 +606,7 @@ export const generateDocxThumbnail = async (file: File): Promise<File> => {
       type: "image/jpeg",
     });
   } catch (error) {
-    logError("html-to-image error", error);
+    logError("docx-to-image error", error);
     throw error;
   } finally {
     document.body.removeChild(secretWrapper);

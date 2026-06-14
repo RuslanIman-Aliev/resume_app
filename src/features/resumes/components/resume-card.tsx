@@ -39,14 +39,13 @@ import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Clock,
-  Copy,
   Download,
   FileText,
   Loader2,
   MoreVertical,
   Pencil,
   Target,
-  Trash2
+  Trash2,
 } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -61,8 +60,15 @@ const ResumeCard = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { replace } = useRouter();
+
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [modalResumeId, setModalResumeId] = useState<string | null>(null);
+
+  const [resumeToDelete, setResumeToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   const currentPage = Number(searchParams.get("page")) || 1;
 
   const handlePageChange = useCallback(
@@ -78,6 +84,28 @@ const ResumeCard = () => {
     trpc.resume.getAll.queryOptions({ page: currentPage }),
   );
 
+  const { mutate: deleteResume, isPending: isDeleting } = useMutation(
+    trpc.resume.deleteResume.mutationOptions({
+      onSuccess: () => {
+        toast.success("Resume deleted successfully!");
+        setResumeToDelete(null);
+      },
+      onError: (error) => {
+        toast.error(
+          getErrorFeedback(error, {
+            fallbackMessage: "Failed to delete resume.",
+          }).message,
+        );
+        setResumeToDelete(null);
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getAll.queryKey(),
+        });
+      },
+    }),
+  );
+
   useEffect(() => {
     if (!data?.resumes?.length) return;
 
@@ -87,7 +115,6 @@ const ResumeCard = () => {
     }
   }, [data?.resumes, router]);
 
-  // When the server clamps an out-of-range page, redirect the URL to match
   useEffect(() => {
     if (
       data?.pagination?.currentPage &&
@@ -170,7 +197,7 @@ const ResumeCard = () => {
   }
 
   return (
-    <section className="w-full  md:px-10">
+    <section className="w-full md:px-10">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
         {data?.resumes.map((resume) => {
           const isAnalyzingCard = analyzingId === resume.id;
@@ -187,12 +214,7 @@ const ResumeCard = () => {
                 <CardHeader className="flex items-center justify-between">
                   <div>
                     <Badge>{resume.status}</Badge>
-                    {/* <div className="flex items-center gap-1">
-                <SparklesIcon className="text-primary size-4" />
-                <span className="text-lg text-primary">{resume.matchScore}</span>
-              </div> */}
                   </div>
-                  {/*  */}
                 </CardHeader>
                 <CardContent className="">
                   <div className="flex flex-col pb-2">
@@ -243,7 +265,7 @@ const ResumeCard = () => {
                             <h3 className="font-semibold text-lg truncate">
                               {resume.resumeName}
                             </h3>
-                            <DropdownMenu>
+                            <DropdownMenu >
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
@@ -253,8 +275,8 @@ const ResumeCard = () => {
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
+                              <DropdownMenuContent align="end" >
+                                <DropdownMenuItem className="cursor-pointer"
                                   onSelect={(e) => {
                                     e.preventDefault();
                                     handleDownload(
@@ -266,16 +288,28 @@ const ResumeCard = () => {
                                   <Download className="h-4 w-4 mr-2" />
                                   Download
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Duplicate
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer"
+                                  onSelect={(e) => {
+                                    e.preventDefault();
+                                    // Handle rename logic
+                                  }}
+                                >
                                   <Pencil className="h-4 w-4 mr-2" />
                                   Rename
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive">
+
+                                {/* 3. Update Dropdown logic to open the modal instead of instantly deleting */}
+                                <DropdownMenuItem 
+                                  onSelect={(e) => {
+                                    e.preventDefault();
+                                    setResumeToDelete({
+                                      id: resume.id,
+                                      name: resume.resumeName || "this resume",
+                                    });
+                                  }}
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete
                                 </DropdownMenuItem>
@@ -289,18 +323,7 @@ const ResumeCard = () => {
                         </div>
 
                         <div className=" flex  justify-between">
-                          <div className="flex flex-wrap gap-1.5">
-                            {/* {resume.tags.slice(0, 2).map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {resume.tags.length > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{resume.tags.length - 2}
-                        </Badge>
-                      )} */}
-                          </div>
+                          <div className="flex flex-wrap gap-1.5"></div>
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {new Date(resume.createdAt).toLocaleDateString(
@@ -360,7 +383,7 @@ const ResumeCard = () => {
                       >
                         {isAnalyzingCard ? (
                           <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             Analyzing...
                           </>
                         ) : (
@@ -378,7 +401,7 @@ const ResumeCard = () => {
                       >
                         {isAnalyzingCard ? (
                           <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             Analyzing...
                           </>
                         ) : (
@@ -389,6 +412,8 @@ const ResumeCard = () => {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Re-analyze Modal */}
               <AlertDialog
                 open={modalResumeId === resume.id}
                 onOpenChange={(open) => {
@@ -447,6 +472,51 @@ const ResumeCard = () => {
         })}
       </div>
 
+      {/* 4. The centralized Delete Confirmation Modal */}
+      <AlertDialog
+        open={!!resumeToDelete}
+        onOpenChange={(open) => {
+          // Prevent closing the modal by clicking outside while it is actively deleting
+          if (!open && !isDeleting) {
+            setResumeToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <strong>{resumeToDelete?.name}</strong> and remove all associated
+              data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={(e) => {
+                e.preventDefault(); // Keep modal open until the mutation succeeds/fails
+                if (resumeToDelete) {
+                  deleteResume({ resumeId: resumeToDelete.id });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Resume"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Pagination Controls */}
       {pageCount > 1 && (
         <div className="mt-8 mb-4 border-t pt-6">
           <Pagination>
