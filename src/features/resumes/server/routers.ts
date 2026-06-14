@@ -707,4 +707,15 @@ export const resumeRouter = createTRPCRouter({
 
       return { success: true, changed: true };
     }),
+    deleteResume: protectedProcedure
+    .input(z.object({ resumeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+     await prisma.resume.delete({
+        where: {
+          id: input.resumeId,
+          userId: ctx.auth.user.id,
+        },
+      });
+      return { success: true};
+    }),
 });

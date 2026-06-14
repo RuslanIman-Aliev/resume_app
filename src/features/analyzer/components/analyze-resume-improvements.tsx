@@ -38,19 +38,11 @@ if (syncfusionLicense) {
   registerLicense(syncfusionLicense);
 }
 
-console.log("[SFDT] Syncfusion license registered:", syncfusionLicense);
 const SYNCFUSION_THEME_URL =
   "https://cdn.syncfusion.com/ej2/33.2.3/material.css";
 
 DocumentEditorContainerComponent.Inject(Toolbar);
 
-/**
- * Narrow editor surface used by this component to avoid hard coupling
- * to the full Syncfusion type definitions.
- *
- * All properties are optional to tolerate editor versions that may
- * not expose the same API surface.
- */
 type DocumentEditorLike = {
   isDocumentLoaded?: boolean;
   documentEditorSettings?: {
@@ -58,7 +50,12 @@ type DocumentEditorLike = {
     searchHighlightColor?: string;
   };
   serviceUrl?: string;
-  serverActionSettings?: Record<string, string>;
+  serverActionSettings?: {
+    import?: string;
+    systemClipboard?: string;
+    spellCheck?: string;
+    restrictEditing?: string;
+  };
   documentLoadFailed?: (args?: { status?: unknown }) => void;
   documentHelper?: {
     renderVisiblePages?: (force?: boolean) => void;
@@ -219,19 +216,6 @@ const highlightSuggestionInEditor = (
   }
 };
 
-/**
- * Applies a suggestion directly into the editor content.
- *
- * @param documentEditor - Editor instance (may be undefined while mounting)
- * @param beforeText - Text to find in the editor (must be non-empty)
- * @param afterText - Replacement text (must be non-empty)
- * @returns True when a replacement was executed, otherwise false
- *
- * Behavior:
- * - Prefers search.replaceAll when available.
- * - Falls back to findAll + insertText at the first match.
- * - Does not persist changes to the backend; caller must save separately.
- */
 const applySuggestionToEditor = (
   documentEditor: DocumentEditorLike | undefined,
   beforeText: string,
@@ -357,15 +341,6 @@ const applySuggestionViaSfdtRewrite = async (
   }
 };
 
-/**
- * Exports the current editor content as DOCX and uploads it.
- *
- * @param documentEditor - Editor instance with saveAsBlob support
- * @param resumeId - Resume id used by the API to update resumeLink
- * @returns API response JSON (expected { resumeLink: string }) or
- *   { skipped: true } when export is not supported.
- * @throws When DOCX export fails or the API responds with an error.
- */
 const saveEditorDocx = async (
   documentEditor: DocumentEditorLike | undefined,
   resumeId: string,
@@ -375,11 +350,7 @@ const saveEditorDocx = async (
   }
 
   let blob: Blob | null = null;
-  /**
-   * Resume-improvements editor keeps the same document loading and upload flow
-   * as the original editor, but it also coordinates suggestion application,
-   * in-editor text replacement, and per-suggestion save to the backend.
-   */
+
   try {
     blob = await documentEditor.saveAsBlob("Docx");
   } catch {
@@ -398,7 +369,6 @@ const saveEditorDocx = async (
   formData.append("resumeId", resumeId);
   formData.append("file", blob, `resume-${resumeId}.docx`);
 
-  // Log blob info to help debug upload content vs saved file mismatch.
   try {
     console.log("[SFDT] saveEditorDocx uploading blob info", {
       size: (blob as Blob).size,
@@ -677,8 +647,12 @@ const AnalyzeResumeImprovements = ({
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const [isEditorDialogOpen, setIsEditorDialogOpen] = useState(false);
+
+  // --- REFS ADDED HERE ---
   const editorRef = useRef<DocumentEditorContainerComponent | null>(null);
   const lastLoadedResumeLinkRef = useRef<string | null>(null);
+  const fetchingUrlRef = useRef<string | null>(null);
+
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [isDocumentLoading, setIsDocumentLoading] = useState(false);
   const [isDocumentReady, setIsDocumentReady] = useState(false);
@@ -694,10 +668,6 @@ const AnalyzeResumeImprovements = ({
     },
   );
 
-  // `getParsedContent` may not include `resumeLink` in its response type
-  // (server deliberately omits it). Narrow the resume shape locally to
-  // safely access an optional `resumeLink` when present without changing
-  // the trpc-generated types.
   type MaybeResumeWithLink = {
     parsedContent?: string | null;
     resumeName?: string | null;
@@ -710,9 +680,7 @@ const AnalyzeResumeImprovements = ({
   )?.resumeLink;
   const parsedResumeText = parsedResumeData?.resume?.parsedContent ?? "";
   const isDocumentOverlayLoading = !isDocumentReady && isDocumentLoading;
-  // When a pending suggestion is queued, we only show the skeleton while
-  // the parsed resume content is loading. The document loading overlay is a
-  // separate visual state and should not prevent showing the pending UI.
+
   const isSuggestionLoading = !!pendingImprovement && isParsedResumeLoading;
   console.log(resumeLink);
   const { mutateAsync: applyImprovement } = useMutation(
@@ -750,10 +718,6 @@ const AnalyzeResumeImprovements = ({
     };
   }, [isEditorReady]);
 
-  /**
-   * Keep the suggestion preview synchronized with the currently loaded resume
-   * once the document is ready, and clear highlights while the editor reloads.
-   */
   useEffect(() => {
     if (!isEditorDialogOpen) {
       return;
@@ -784,42 +748,9 @@ const AnalyzeResumeImprovements = ({
     pendingImprovement?.beforeText,
   ]);
 
-  /**
-   * Loads the resume into Syncfusion, preferring the API-converted SFDT but
-   * falling back to plain text when the conversion output cannot be rendered.
-   */
+  // --- MAIN LOAD DOCUMENT EFFECT FIXES APPLIED HERE ---
   useEffect(() => {
-    if (!isEditorDialogOpen) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      const documentEditor = editorRef.current?.documentEditor as
-        | DocumentEditorLike
-        | undefined;
-      const domPages = document.querySelectorAll(".e-de-page").length;
-      const pageCount = documentEditor?.pageCount ?? 0;
-
-      if (domPages > 0 || pageCount > 0) {
-        setIsDocumentReady(true);
-        setIsDocumentLoading(false);
-        window.clearInterval(intervalId);
-      }
-    }, 250);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [isEditorDialogOpen]);
-
-  useEffect(() => {
-    if (!resumeLink && !isParsedResumeLoading && isEditorDialogOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsDocumentLoading(false);
-      setLoadError("Resume link is missing from the API response.");
-      return;
-    }
-
+    // 1. Guard against missing data or unprepared editor
     if (
       !isEditorDialogOpen ||
       !resumeLink ||
@@ -830,13 +761,19 @@ const AnalyzeResumeImprovements = ({
       return;
     }
 
-    if (isDocumentReady && resumeLink === lastLoadedResumeLinkRef.current) {
+    // 2. Prevent duplicate fetches if already loaded or actively fetching
+    if (
+      resumeLink === lastLoadedResumeLinkRef.current ||
+      resumeLink === fetchingUrlRef.current
+    ) {
       return;
     }
 
     let cancelled = false;
 
     const loadDocument = async () => {
+      fetchingUrlRef.current = resumeLink; // Lock the fetch
+
       const documentEditor = editorRef.current?.documentEditor as
         | DocumentEditorLike
         | undefined;
@@ -844,6 +781,7 @@ const AnalyzeResumeImprovements = ({
       if (!documentEditor) {
         setIsDocumentLoading(false);
         setLoadError("Editor failed to initialize properly.");
+        fetchingUrlRef.current = null;
         return;
       }
 
@@ -872,8 +810,7 @@ const AnalyzeResumeImprovements = ({
               [parsed.error, parsed.details, parsed.contentType]
                 .filter(Boolean)
                 .join(" ") || errorMessage;
-          } catch {
-          }
+          } catch {}
           throw new Error(errorMessage);
         }
 
@@ -913,6 +850,7 @@ const AnalyzeResumeImprovements = ({
             getEditorContainerElement(editorRef.current),
             "after-open",
           );
+
           lastLoadedResumeLinkRef.current = resumeLink;
           setIsDocumentLoading(false);
           setIsDocumentReady(true);
@@ -945,6 +883,7 @@ const AnalyzeResumeImprovements = ({
         }
       } finally {
         if (!cancelled) {
+          fetchingUrlRef.current = null; // Unlock the fetch
           setIsDocumentLoading(false);
         }
       }
@@ -954,14 +893,37 @@ const AnalyzeResumeImprovements = ({
 
     return () => {
       cancelled = true;
+      if (fetchingUrlRef.current === resumeLink) {
+        fetchingUrlRef.current = null;
+      }
     };
   }, [
     isEditorDialogOpen,
     resumeLink,
     isParsedResumeLoading,
     isEditorReady,
-    isDocumentReady,
     parsedResumeText,
+  ]);
+
+  useEffect(() => {
+    if (!isEditorDialogOpen || !editorRef.current || !isEditorReady) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      forceEditorRender(
+        editorRef.current?.documentEditor as unknown as DocumentEditorLike,
+        editorRef.current,
+      );
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [
+    pendingImprovement,
+    isSuggestionLoading,
+    loadError,
+    isEditorDialogOpen,
+    isEditorReady,
   ]);
 
   const handleQueueImprovement = (
@@ -970,7 +932,6 @@ const AnalyzeResumeImprovements = ({
   ) => {
     setPendingImprovement(improvement);
     setPendingKey(accordionKey);
-    // Show loading overlay immediately when opening the editor dialog
     setIsDocumentReady(false);
     setLoadError(null);
     setIsDocumentLoading(true);
@@ -981,8 +942,6 @@ const AnalyzeResumeImprovements = ({
     setIsEditorDialogOpen(open);
 
     if (open) {
-      // Ensure loading overlay appears immediately while the editor and
-      // document begin initialization and network fetches.
       setIsDocumentReady(false);
       setLoadError(null);
       setIsDocumentLoading(true);
@@ -1000,12 +959,7 @@ const AnalyzeResumeImprovements = ({
       );
       setIsEditorReady(false);
       lastLoadedResumeLinkRef.current = null;
-      /**
-       * Apply the selected suggestion, persist the structured resume update, and
-       * upload the edited DOCX so the stored resumeLink always points at the
-       * latest file version.
-       */
-      editorRef.current = null;
+      // Note: editorRef.current = null is REMOVED from here
     }
   };
 
@@ -1032,8 +986,6 @@ const AnalyzeResumeImprovements = ({
         newText: pendingImprovement.afterText,
       });
 
-      // Notify immediately that the suggestion was applied to the backend
-      // so UI tests do not race on later editor/file upload steps.
       let alreadyNotified = false;
       try {
         toast.success("Suggestion applied.");
@@ -1068,7 +1020,6 @@ const AnalyzeResumeImprovements = ({
         }
 
         try {
-          // Debug: inspect editor serialization for presence of applied text
           if (typeof documentEditor.serialize === "function") {
             const serialized = documentEditor.serialize();
 
@@ -1106,10 +1057,6 @@ const AnalyzeResumeImprovements = ({
         }
       }
 
-      // Prevent the editor from being reloaded by the load effect while we
-      // refresh parsed content. If we uploaded a new file, preserve the
-      // returned resume link (already set above). Otherwise, mark the
-      // current resumeLink as loaded so the effect will skip re-opening it.
       if (!fileWasUpdated) {
         lastLoadedResumeLinkRef.current = resumeLink ?? null;
       }
