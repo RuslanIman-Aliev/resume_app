@@ -1,9 +1,7 @@
-import { Button } from "@/components/ui/button";
 import { AnalyzeResumeClient } from "@/features/analyzer/components/analyze-resume-client";
 import { requireAuth } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { cache } from "react";
 
 type PageProps = {

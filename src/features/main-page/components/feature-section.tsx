@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Brain, FileText, LineChart, Shield, Zap, Target } from "lucide-react";
+import { Brain, FileText, LineChart, Shield, Target, Zap } from "lucide-react";
 
 const features = [
   {

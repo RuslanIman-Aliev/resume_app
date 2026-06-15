@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Calendar, FileText, Send, Trophy, TrendingUpIcon } from "lucide-react";
+import { Calendar, FileText, Send, TrendingUpIcon, Trophy } from "lucide-react";
 
 const stats = [
   {

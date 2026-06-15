@@ -56,15 +56,25 @@ export const resumeRouter = createTRPCRouter({
         .object({
           limit: z.number().min(1).max(50).default(6),
           page: z.number().min(1).default(1),
+          search: z.string().optional(),
+          status: z.string().optional(),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 6;
       const requestedPage = input?.page ?? 1;
+      const search = input?.search;
+      const status = input?.status;
 
       const totalCount = await prisma.resume.count({
-        where: { userId: ctx.auth.user.id },
+        where: {
+          userId: ctx.auth.user.id,
+          ...(search && {
+            resumeName: { contains: search, mode: "insensitive" },
+          }),
+          ...(status && { status }),
+        },
       });
 
       if (totalCount === 0) {
@@ -79,7 +89,13 @@ export const resumeRouter = createTRPCRouter({
       const skip = (page - 1) * limit;
 
       const resumes = await prisma.resume.findMany({
-        where: { userId: ctx.auth.user.id },
+        where: {
+          userId: ctx.auth.user.id,
+          ...(search && {
+            resumeName: { contains: search, mode: "insensitive" },
+          }),
+          ...(status && { status }),
+        },
         orderBy: { createdAt: "desc" },
         take: limit,
         skip,
@@ -707,15 +723,15 @@ export const resumeRouter = createTRPCRouter({
 
       return { success: true, changed: true };
     }),
-    deleteResume: protectedProcedure
+  deleteResume: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-     await prisma.resume.delete({
+      await prisma.resume.delete({
         where: {
           id: input.resumeId,
           userId: ctx.auth.user.id,
         },
       });
-      return { success: true};
+      return { success: true };
     }),
 });

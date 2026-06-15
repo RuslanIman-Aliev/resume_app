@@ -12,11 +12,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,6 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getErrorFeedback } from "@/lib/error-feedback";
+import { logError } from "@/lib/logger";
+import { generateDocxThumbnail, generatePdfThumbnail } from "@/lib/utils";
+import { useUploadThing } from "@/lib/utils/uploadthing";
+import { useTRPC } from "@/trpc/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Grid3X3,
   List,
@@ -31,25 +39,65 @@ import {
   SlidersHorizontal,
   Upload,
 } from "lucide-react";
-
-import { useUploadThing } from "@/lib/utils/uploadthing";
-import { useState } from "react";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { generateDocxThumbnail, generatePdfThumbnail } from "@/lib/utils";
-import { getErrorFeedback } from "@/lib/error-feedback";
-import { logError } from "@/lib/logger";
 
 const ResumeManager = () => {
   const [file, setFiles] = useState<File | null>(null);
   const [resumeName, setResumeName] = useState("");
   const [targetRole, setTargetRole] = useState("");
   const [open, setOpen] = useState(false);
+  
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { replace } = useRouter();
+
+  const [searchTerm, setSearchTerm] = useState(
+    searchParams.get("search") || ""
+  );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSearchTerm(searchParams.get("search") || "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const params = new URLSearchParams(searchParams);
+      
+      if (searchTerm) {
+        params.set("search", searchTerm);
+      } else {
+        params.delete("search");
+      }
+
+      params.delete("page"); 
+
+      const currentUrlSearch = searchParams.get("search") || "";
+      if (currentUrlSearch !== searchTerm) {
+        replace(`${pathname}?${params.toString()}`);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, pathname, replace, searchParams]);
+
+  const handleStatusChange = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+    
+    if (value === "all") {
+      params.delete("status");
+    } else {
+      params.set("status", value);
+    }
+    
+    params.delete("page"); 
+    replace(`${pathname}?${params.toString()}`);
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -58,9 +106,6 @@ const ResumeManager = () => {
     }
   };
 
-  {
-    /* This mutation will be used to save the uploaded resume's metadata to the database after a successful upload */
-  }
   const mutationOptions = trpc.resume.create.mutationOptions();
 
   const createResumeMutation = useMutation({
@@ -87,13 +132,9 @@ const ResumeManager = () => {
     },
   });
 
-  {
-    /* This hook from UploadThing will handle the file upload process. We pass in callbacks for when the upload completes or if there is an error. */
-  }
   const { startUpload, isUploading } = useUploadThing("resumeUploader", {
     onClientUploadComplete(res) {
       if (res && res.length > 0) {
-        // Since we upload 2 files (pdf and image), we need to extract info from both
         const documentFile = res.find(
           (f) => f.serverData?.type === "pdf" || f.serverData?.type === "docx",
         );
@@ -117,7 +158,7 @@ const ResumeManager = () => {
   });
 
   return (
-    <section className="w-full  md:px-10">
+    <section className="w-full md:px-10">
       <h1 className="text-3xl font-bold mb-6">Resume Manager</h1>
 
       <div className="flex items-center w-full justify-between mb-6">
@@ -126,7 +167,9 @@ const ResumeManager = () => {
             <InputGroup>
               <InputGroupInput
                 id="inline-start-input"
-                placeholder="Search..."
+                placeholder="Search resumes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)} 
               />
               <InputGroupAddon align="inline-start">
                 <SearchIcon className="text-muted-foreground" />
@@ -134,37 +177,34 @@ const ResumeManager = () => {
             </InputGroup>
           </Field>
 
-          <Select>
-            <SelectTrigger className="w-35">
+          <Select 
+            value={searchParams.get("status") || "all"} 
+            onValueChange={handleStatusChange}
+          >
+            <SelectTrigger className="w-35 ml-4">
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="ANALYZED">Analyzed</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="flex items-center gap-2 ">
           <div className="flex items-center rounded-lg border border-border p-1">
-            {/* Add a viewMode property to show a different outputs options*/}
             <Button
               variant={"ghost"}
-              // variant={viewMode === "list" ? "secondary" : "ghost"}
               size="icon"
               className="h-8 w-8"
-              //onClick={() => setViewMode("list")}
             >
               <Grid3X3 className="h-4 w-4" />
             </Button>
             <Button
               variant={"ghost"}
-              // variant={viewMode === "list" ? "secondary" : "ghost"}
               size="icon"
               className="h-8 w-8"
-              //onClick={() => setViewMode("list")}
             >
               <List className="h-4 w-4" />
             </Button>

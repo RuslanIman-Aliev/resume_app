@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { getErrorFeedback } from "@/lib/error-feedback";
 import {
   cn,
   getRelativeTime,
@@ -20,11 +21,10 @@ import {
   FileTextIcon,
   SparklesIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnalyzerError, AnalyzerLoading } from "./analyzer-states";
-import { useRouter } from "next/navigation";
-import { getErrorFeedback } from "@/lib/error-feedback";
 
 const AnalyzerTabs = () => {
   const trpc = useTRPC();

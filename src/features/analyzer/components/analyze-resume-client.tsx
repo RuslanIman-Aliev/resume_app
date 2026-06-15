@@ -10,24 +10,23 @@ import {
 } from "@/lib/types";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
-import { Sparkles, Target, TrendingUp, Zap } from "lucide-react";
+import { FileText, Sparkles, Target, TrendingUp, Zap } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
   useParams,
-  useRouter,
   usePathname,
+  useRouter,
   useSearchParams,
 } from "next/navigation";
 import { useCallback } from "react";
+import AnalyzeKeywords from "./analyze-keywords";
+import AnalyzeRequirementsMatch from "./analyze-requirements-match";
 import {
   AnalyzeResumeError,
   AnalyzeResumeLoading,
 } from "./analyze-resume-states";
 import AnalyzeSkillsGap from "./analyze-skills-gap";
 import AnalyzerResults from "./analyzer-results";
-import AnalyzeKeywords from "./analyze-keywords";
-import AnalyzeRequirementsMatch from "./analyze-requirements-match";
-import { FileText } from "lucide-react";
 
 const AnalyzeResumeImprovements = dynamic(
   () => import("./analyze-resume-improvements"),

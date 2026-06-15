@@ -47,7 +47,7 @@ const InfoCard = ({ title, value, icon: Icon }: ResultCardItem) => {
 
         <p
           title={normalizedValue}
-          className="max-h-28 overflow-y-auto pr-1 text-[15px] leading-6 text-foreground/95 [scrollbar-width:thin]"
+          className="max-h-28 overflow-y-auto pr-1 text-[15px] leading-6 text-foreground/95 scrollbar-thin"
         >
           {normalizedValue}
         </p>

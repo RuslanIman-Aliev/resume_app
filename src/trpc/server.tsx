@@ -1,11 +1,11 @@
-import "server-only";
-import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import { createTRPCClient, httpLink } from "@trpc/client";
+import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import { cache } from "react";
+import "server-only";
 import { createTRPCContext } from "./init";
 import { makeQueryClient } from "./query-client";
-import { appRouter } from "./routers/_app";
 import type { AppRouter } from "./routers/_app";
+import { appRouter } from "./routers/_app";
 
 /**
  * Server-side singleton QueryClient for data caching across requests.

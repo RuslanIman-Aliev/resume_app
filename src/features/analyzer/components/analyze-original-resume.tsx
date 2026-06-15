@@ -1,16 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { registerLicense } from "@syncfusion/ej2-base";
 import {
   DocumentEditorContainerComponent,
   Toolbar,
 } from "@syncfusion/ej2-react-documenteditor";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { strFromU8, unzipSync } from "fflate";
+import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 registerLicense(process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE ?? "");

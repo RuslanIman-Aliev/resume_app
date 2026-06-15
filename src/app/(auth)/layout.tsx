@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import { AuthHero } from "@/app/(auth)/_components/auth-hero";
 import { AuthInteractiveGlow } from "@/app/(auth)/_components/auth-interactive-glow";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   robots: {

@@ -20,7 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyDataCard } from "@/features/analyzer/components/empty-data-card";
 import { useTRPC } from "@/trpc/client";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpDown,
