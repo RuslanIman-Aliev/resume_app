@@ -60,7 +60,7 @@ const ResumeCard = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { replace } = useRouter();
-
+  
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [modalResumeId, setModalResumeId] = useState<string | null>(null);
 
@@ -70,6 +70,9 @@ const ResumeCard = () => {
   } | null>(null);
 
   const currentPage = Number(searchParams.get("page")) || 1;
+  const searchTerm = searchParams.get("search") || undefined;
+  const statusFilter = searchParams.get("status") || undefined;
+
 
   const handlePageChange = useCallback(
     (pageNumber: number) => {
@@ -81,7 +84,7 @@ const ResumeCard = () => {
   );
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
-    trpc.resume.getAll.queryOptions({ page: currentPage }),
+    trpc.resume.getAll.queryOptions({ page: currentPage, search: searchTerm, status: statusFilter }),
   );
 
   const { mutate: deleteResume, isPending: isDeleting } = useMutation(
@@ -265,7 +268,7 @@ const ResumeCard = () => {
                             <h3 className="font-semibold text-lg truncate">
                               {resume.resumeName}
                             </h3>
-                            <DropdownMenu >
+                            <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
@@ -275,8 +278,9 @@ const ResumeCard = () => {
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" >
-                                <DropdownMenuItem className="cursor-pointer"
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
                                   onSelect={(e) => {
                                     e.preventDefault();
                                     handleDownload(
@@ -288,7 +292,8 @@ const ResumeCard = () => {
                                   <Download className="h-4 w-4 mr-2" />
                                   Download
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer"
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
                                   onSelect={(e) => {
                                     e.preventDefault();
                                     // Handle rename logic
@@ -300,7 +305,7 @@ const ResumeCard = () => {
                                 <DropdownMenuSeparator />
 
                                 {/* 3. Update Dropdown logic to open the modal instead of instantly deleting */}
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   onSelect={(e) => {
                                     e.preventDefault();
                                     setResumeToDelete({

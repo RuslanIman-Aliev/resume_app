@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
 import { Header } from "@/components/nav-main";
 import { requireAuth } from "@/lib/auth-utils";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   robots: {

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -9,28 +8,29 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ApplicationData, ImprovementTip } from "@/lib/types";
-import { getErrorFeedback } from "@/lib/error-feedback";
-import { getPriorityStyles, getScoreColor } from "@/lib/utils";
-import {
-  CheckIcon,
-  CircleDot,
-  Copy,
-  Wand2,
-  XIcon,
-  Loader2,
-} from "lucide-react";
-import { EmptyDataCard } from "./empty-data-card";
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getErrorFeedback } from "@/lib/error-feedback";
+import { ApplicationData, ImprovementTip } from "@/lib/types";
+import { getPriorityStyles, getScoreColor } from "@/lib/utils";
+import { useTRPC } from "@/trpc/client";
 import { registerLicense } from "@syncfusion/ej2-base";
 import {
   DocumentEditorContainerComponent,
   Toolbar,
 } from "@syncfusion/ej2-react-documenteditor";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  CheckIcon,
+  CircleDot,
+  Copy,
+  Loader2,
+  Wand2,
+  XIcon,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { EmptyDataCard } from "./empty-data-card";
 
 const syncfusionLicense = process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE?.trim();
 

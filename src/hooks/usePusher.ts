@@ -1,10 +1,10 @@
 "use client";
-import { useEffect } from "react";
-import PusherClient from "pusher-js";
-import { toast } from "sonner";
+import { publicEnv } from "@/lib/env.public";
 import { useTRPC } from "@/trpc/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { publicEnv } from "@/lib/env.public";
+import PusherClient from "pusher-js";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 /**
  * Hook to listen for Pusher real-time events when resume analysis completes.

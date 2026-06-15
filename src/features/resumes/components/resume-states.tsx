@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { FeedbackState } from "@/components/ui/feedback-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, FileText, RefreshCcw } from "lucide-react";
 
 type ResumeErrorProps = {

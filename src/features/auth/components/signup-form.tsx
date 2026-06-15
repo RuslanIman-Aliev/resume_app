@@ -18,13 +18,13 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { getErrorFeedback } from "@/lib/error-feedback";
 import { signUpFormSchema, type SignUpFormData } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { getErrorFeedback } from "@/lib/error-feedback";
 
 export function SignUpForm() {
   const [isPending, setIsPending] = useState(false);

@@ -1,5 +1,5 @@
-import { Skeleton } from "@/components/ui/skeleton";
 import { FeedbackState } from "@/components/ui/feedback-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, Loader2, RefreshCcw } from "lucide-react";
 
 type ImprovementsErrorProps = {

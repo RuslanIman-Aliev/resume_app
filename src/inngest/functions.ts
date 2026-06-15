@@ -1,4 +1,3 @@
-// src/inngest/functions.ts
 import { getJobMatchPrompt, getPrompt } from "@/lib/utils";
 import { inngest } from "./client";
 import OpenAI from "openai";

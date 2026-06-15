@@ -324,3 +324,10 @@ export const trackerFormSchema = z.object({
 
 // 2. Infer the TypeScript type automatically from the schema
 export type TrackerFormValues = z.infer<typeof trackerFormSchema>;
+
+export interface CategoryScoreCardProps {
+  icon: React.ElementType;
+  title: string;
+  score: number;
+  description: string;
+}

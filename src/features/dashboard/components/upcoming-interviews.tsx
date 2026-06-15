@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   Calendar,
+  CalendarPlus,
   Clock,
   MapPin,
-  Video,
   Phone,
-  CalendarPlus,
+  Video,
 } from "lucide-react";
 
 const interviews = [

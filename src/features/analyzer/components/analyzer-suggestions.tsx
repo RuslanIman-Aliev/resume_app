@@ -1,12 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
+  CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
-  CardContent,
 } from "@/components/ui/card";
-import { Sparkles, Lightbulb } from "lucide-react";
+import { Lightbulb, Sparkles } from "lucide-react";
 
 const AnalyzerSuggestions = () => {
   return (

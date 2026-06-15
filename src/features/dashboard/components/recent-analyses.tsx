@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FeedbackState } from "@/components/ui/feedback-state";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,7 +13,6 @@ import {
   getStatusBadge,
 } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { FeedbackState } from "@/components/ui/feedback-state";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, FileText, RefreshCcw, Sparkles } from "lucide-react";
 import Link from "next/link";

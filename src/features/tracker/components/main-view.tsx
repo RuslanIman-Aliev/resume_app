@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { KanbanColumn } from "@/features/tracker/components/kanban-column";
-import { TrackerError, TrackerLoading } from "./tracker-states";
-
+import { getErrorFeedback } from "@/lib/error-feedback";
 import type { TrackerFormValues } from "@/lib/types";
-import { useState } from "react";
+import { useTRPC } from "@/trpc/client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpDown,
   Filter,
@@ -16,11 +16,10 @@ import {
   Plus,
   Search,
 } from "lucide-react";
-import DialogTracker from "./dialog-tracker";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
-import { getErrorFeedback } from "@/lib/error-feedback";
-import { useTRPC } from "@/trpc/client";
+import DialogTracker from "./dialog-tracker";
+import { TrackerError, TrackerLoading } from "./tracker-states";
 
 const MainView = () => {
   const [open, setOpen] = useState(false);

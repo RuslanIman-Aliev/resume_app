@@ -1,9 +1,4 @@
-interface CategoryScoreCardProps {
-  icon: React.ElementType;
-  title: string;
-  score: number;
-  description: string;
-}
+import { CategoryScoreCardProps } from "@/lib/types";
 
 export function CoachScoreCard({
   icon: Icon,
