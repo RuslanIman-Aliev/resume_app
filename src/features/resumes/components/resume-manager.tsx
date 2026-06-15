@@ -61,6 +61,11 @@ const ResumeManager = () => {
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSearchTerm(searchParams.get("search") || "");
+  }, [searchParams]);
+
+  useEffect(() => {
     const timeoutId = setTimeout(() => {
       const params = new URLSearchParams(searchParams);
       
