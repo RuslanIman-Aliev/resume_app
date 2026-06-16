@@ -105,6 +105,11 @@ export const useJobMatchPusher = (
         refetchType: "active",
       });
 
+      queryClient.invalidateQueries({
+        queryKey: trpc.tracker.getAll.queryOptions().queryKey,
+        refetchType: "all",
+      });
+
       onSuccess();
     });
 

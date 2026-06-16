@@ -126,35 +126,56 @@ export const analyzeJobMatched = inngest.createFunction(
     });
 
     const parsedData = JSON.parse(result || "{}");
-
     const validatedData = jobMatchAnalysisSchema.parse(parsedData);
 
     // Save the analysis results to the database, linking it to the correct resume. We use upsert to create a new analysis if it doesn't exist or update the existing one if it does.
     await step.run("save-to-db", async () => {
-      await prisma.jobApplication.update({
+      const existingApp = await prisma.jobApplication.findUnique({
         where: { id: event.data.applicationId },
-        data: {
-          companyName: validatedData.companyName,
-          jobTitle: validatedData.jobTitle,
-          url: validatedData.url,
-          salaryRange: validatedData.salaryRange,
-          experience: validatedData.experience,
-          targetLanguage: validatedData.targetLanguage,
-          matchScore: validatedData.matchScore,
-          matchingSkills: validatedData.matchingSkills,
-          improvements: validatedData.improvements,
-          missingSkills: validatedData.missingSkills,
-          requirementsMatch: validatedData.requirementsMatch,
-          skillsGap: validatedData.skillsGap,
-          keywordsGap: validatedData.keywordsGap,
-          summary: validatedData.summary,
-          //tailoringTips: validatedData.tailoringTips,
-          coverLetterText: validatedData.coverLetterText,
-          status: "ANALYZED",
-        },
+        select: { userId: true },
       });
-    });
 
+      if (!existingApp) {
+        throw new Error(`Application ${event.data.applicationId} not found`);
+      }
+
+      await prisma.$transaction([
+        prisma.jobApplication.update({
+          where: { id: event.data.applicationId },
+          data: {
+            companyName: validatedData.companyName,
+            jobTitle: validatedData.jobTitle,
+            url: validatedData.url,
+            salaryRange: validatedData.salaryRange,
+            experience: validatedData.experience,
+            targetLanguage: validatedData.targetLanguage,
+            matchScore: validatedData.matchScore,
+            matchingSkills: validatedData.matchingSkills,
+            improvements: validatedData.improvements,
+            missingSkills: validatedData.missingSkills,
+            requirementsMatch: validatedData.requirementsMatch,
+            skillsGap: validatedData.skillsGap,
+            keywordsGap: validatedData.keywordsGap,
+            summary: validatedData.summary,
+            coverLetterText: validatedData.coverLetterText,
+            status: "ANALYZED",
+          },
+        }),
+
+        prisma.trackerPosition.create({
+          data: {
+            userId: existingApp.userId,
+            company: validatedData.companyName || "Unknown Company",
+            position: validatedData.jobTitle || "Unknown Position",
+            salary: validatedData.salaryRange,
+            url: validatedData.url,
+            matchScore: validatedData.matchScore,
+            status: "saved",
+            location: "Location not specified",
+          },
+        }),
+      ]);
+    });
     // After saving the results, we trigger a Pusher event to notify the client that the analysis is complete. The client can listen for this event and update the UI accordingly.
     await step.run("notify-client", async () => {
       const pusher = new Pusher({
