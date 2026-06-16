@@ -177,7 +177,7 @@ export type JobApplicationCard = {
   position: string; // FIXED: Removed '?' and '| null'
   
   /** Job location (e.g., city, state, remote). */
-  location: string;
+  location: string | null;
   
   /** Salary range for the position. */
   salary: string | null;
@@ -192,7 +192,7 @@ export type JobApplicationCard = {
   lastUpdated?: string | null;
   
   /** Job match score between 0-100, null if not yet analyzed. */
-  matchScore?: number | null;
+  matchScore: number | null;
   
   /** Description of the next step in the application process. */
   nextStep?: string | null;
@@ -309,7 +309,7 @@ export const applicationStatusValues = [
 export const trackerFormSchema = z.object({
   company: z.string().min(1, "Company name is required."),
   position: z.string().min(1, "Position is required."),
-  location: z.string().min(1, "Location is required."),
+  location: z.string().optional(),
   salary: z.string().optional(),
   status: z.enum(applicationStatusValues),
   // Use a union to allow either a completely empty string OR a valid URL/Email
