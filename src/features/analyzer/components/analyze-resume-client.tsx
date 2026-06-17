@@ -24,6 +24,7 @@ import AnalyzeRequirementsMatch from "./analyze-requirements-match";
 import {
   AnalyzeResumeError,
   AnalyzeResumeLoading,
+  AnalyzeResumePending,
 } from "./analyze-resume-states";
 import AnalyzeSkillsGap from "./analyze-skills-gap";
 import AnalyzerResults from "./analyzer-results";
@@ -114,11 +115,14 @@ export const AnalyzeResumeClient = () => {
   const errorCode = (error as { data?: { code?: string } } | null)?.data?.code;
   const isPendingAnalysis = errorCode === "NOT_FOUND";
 
-  const handleAnalysisReady = useCallback(() => {
-  }, []);
+  const handleAnalysisReady = useCallback(() => {}, []);
   useJobMatchPusher(analyzeId ?? "", handleAnalysisReady);
 
-  if (isLoading || isPendingAnalysis) {
+  if (isPendingAnalysis) {
+    return <AnalyzeResumePending />;
+  }
+
+  if (isLoading) {
     return <AnalyzeResumeLoading />;
   }
 

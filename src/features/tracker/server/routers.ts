@@ -59,4 +59,32 @@ export const trackerRouter = createTRPCRouter({
       });
       return { success: true };
     }),
+    
+  update: protectedProcedure
+    .input(
+      trackerFormSchema.extend({
+        id: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const updatedJob = await prisma.trackerPosition.update({
+        where: {
+          id: input.id,
+          userId: ctx.auth.user.id,
+        },
+        data: {
+          company: input.company,
+          position: input.position,
+          location: input.location,
+          salary: input.salary,
+          status: input.status,
+          url: input.url,
+          notes: input.notes,
+          contactName: input.contactName,
+          contactEmail: input.contactEmail,
+        },
+      });
+
+      return updatedJob;
+    }),
 });

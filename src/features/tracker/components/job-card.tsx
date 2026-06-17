@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,7 +8,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getErrorFeedback } from "@/lib/error-feedback";
-import type { JobApplicationCard } from "@/lib/types";
+import type {
+  JobApplicationCard,
+  TrackerFormValues,
+  applicationStatusValues,
+} from "@/lib/types";
 import { getScoreColor } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -16,12 +21,15 @@ import {
   ChevronRight,
   DollarSign,
   ExternalLink,
+  Eye,
   MapPin,
   MoreHorizontal,
   Pencil,
   Trash2,
 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import DialogTracker from "./dialog-tracker";
 
 /**
  * Job card component for displaying individual job application in kanban/list view.
@@ -44,8 +52,28 @@ export const JobCard = ({
     { id: "offer", label: "Offer", color: "text-primary" },
     { id: "rejected", label: "Rejected", color: "text-red-400" },
   ];
+
+  const [dialogMode, setDialogMode] = useState<"closed" | "view" | "edit">(
+    "closed",
+  );
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+
+  const { mutateAsync: updateApplication } = useMutation(
+    trpc.tracker.update.mutationOptions({
+      onSuccess: () => {
+        toast.success("Application updated!");
+        queryClient.invalidateQueries({
+          queryKey: trpc.tracker.getAll.queryKey(),
+        });
+        setDialogMode("closed");
+      },
+      onError: () => {
+        toast.error("Failed to update application.");
+      },
+    }),
+  );
+
   const { mutate: deleteApplication } = useMutation(
     trpc.tracker.delete.mutationOptions({
       onMutate: async (deletedVars) => {
@@ -93,6 +121,7 @@ export const JobCard = ({
       },
     }),
   );
+
   const { mutate: updateStatus } = useMutation(
     trpc.tracker.updateStatus.mutationOptions({
       onMutate: async (newVariables) => {
@@ -137,6 +166,18 @@ export const JobCard = ({
     }),
   );
 
+  const defaultValues: TrackerFormValues = {
+    company: application.company || "",
+    position: application.position || "",
+    location: application.location || "",
+    salary: application.salary || "",
+    status: application.status as (typeof applicationStatusValues)[number],
+    url: application.url || "",
+    notes: application.notes || "",
+    contactName: application.contactName || "",
+    contactEmail: application.contactEmail || "",
+  };
+
   function onStatusChange(
     applicationId: string,
     statusId:
@@ -179,7 +220,13 @@ export const JobCard = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDialogMode("view")}>
+                <Eye className="h-4 w-4 mr-2" />
+                Show Info
+              </DropdownMenuItem>
+
+              {/* 4. Update your Edit button */}
+              <DropdownMenuItem onClick={() => setDialogMode("edit")}>
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
@@ -257,6 +304,21 @@ export const JobCard = ({
             </div>
           )}
         </div>
+        <Dialog
+          open={dialogMode !== "closed"}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setDialogMode("closed");
+          }}
+        >
+          <DialogTracker
+            initialData={defaultValues}
+            readOnly={dialogMode === "view"}
+            onClose={() => setDialogMode("closed")}
+            onSubmit={async (values) => {
+             await updateApplication({ id: application.id, ...values });
+            }}
+          />
+        </Dialog>
 
         {application.nextStep && (
           <div className="mt-2 p-2 bg-primary/10 rounded-md">

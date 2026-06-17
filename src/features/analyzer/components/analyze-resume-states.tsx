@@ -2,7 +2,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FeedbackState } from "@/components/ui/feedback-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, RefreshCcw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Cpu, FileSearch, Loader2, RefreshCcw, Sparkles, Target } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type AnalyzeResumeErrorProps = {
   onRetry?: () => void;
@@ -110,6 +111,85 @@ export const AnalyzeResumeLoading = () => {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+};
+
+export const AnalyzeResumePending = () => {
+  const [activeStep, setActiveStep] = useState(0);
+
+  const steps = [
+    { icon: FileSearch, title: "Reading Job Description", desc: "Extracting core requirements and keywords" },
+    { icon: Target, title: "Analyzing Resume", desc: "Mapping your experience to the role" },
+    { icon: Cpu, title: "Evaluating Skills Gap", desc: "Identifying missing technical and soft skills" },
+    { icon: Sparkles, title: "Generating Insights", desc: "Calculating match score and improvements" },
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveStep((current) => (current < steps.length - 1 ? current + 1 : current));
+    }, 8500);
+
+    return () => clearInterval(interval);
+  }, [steps.length]);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] py-12 px-4 animate-in fade-in duration-700">
+      
+      <div className="relative mb-8">
+        <div className="absolute inset-0 blur-2xl bg-primary/20 rounded-full animate-pulse" />
+        <div className="bg-background border-2 border-primary/30 p-5 rounded-full relative shadow-[0_0_40px_-10px_rgba(var(--primary),0.3)]">
+          <Sparkles className="h-10 w-10 text-primary animate-pulse" />
+        </div>
+      </div>
+      
+      <div className="text-center space-y-3 mb-12">
+        <h2 className="text-3xl font-bold tracking-tight">Analyzing Your Match</h2>
+        <p className="text-muted-foreground max-w-125 mx-auto text-sm md:text-base">
+          Our AI is performing a deep-dive comparison between your resume and the job posting. This thorough analysis takes about 30-45 seconds.
+        </p>
+      </div>
+
+      <div className="w-full max-w-2xl grid sm:grid-cols-2 gap-4 mb-8">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = index === activeStep;
+          const isCompleted = index < activeStep;
+
+          return (
+            <Card 
+              key={index} 
+              className={`transition-all duration-500 border ${
+                isActive 
+                  ? "bg-primary/10 border-primary/50 shadow-sm scale-[1.02]" 
+                  : isCompleted 
+                  ? "bg-card/50 border-border/50 opacity-70" 
+                  : "bg-background border-border/30 opacity-40"
+              }`}
+            >
+              <CardContent className="p-4 flex items-start gap-4">
+                <div className={`mt-1 p-2 rounded-full ${isActive ? "bg-primary/20 text-primary" : isCompleted ? "bg-green-500/20 text-green-500" : "bg-secondary text-muted-foreground"}`}>
+                  {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                </div>
+                <div className="space-y-1">
+                  <p className={`font-semibold text-sm ${isActive ? "text-primary" : "text-foreground"}`}>
+                    {step.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {step.desc}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-3 text-sm font-medium text-primary bg-primary/10 border border-primary/20 py-2.5 px-5 rounded-full shadow-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>{steps[activeStep].title}...</span>
+      </div>
+
     </div>
   );
 };
