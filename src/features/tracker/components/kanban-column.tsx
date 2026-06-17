@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { JobApplicationCard } from "@/lib/types";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { JobCard } from "./job-card";
 
 /**
@@ -31,6 +31,14 @@ export const KanbanColumn = ({
 
   const displayedJobs = columnJobs.slice(startIndex, endIndex);
 
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCurrentPage(totalPages);
+    } else if (totalPages === 0) {
+      setCurrentPage(1);
+    }
+  }, [columnJobs.length, currentPage, totalPages]);
   return (
     <div className="flex flex-col w-87.5 shrink-0 bg-card/20 rounded-2xl p-4">
       <h3 className={`font-bold mb-4 ${color}`}>

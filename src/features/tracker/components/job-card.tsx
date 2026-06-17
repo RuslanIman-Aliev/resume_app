@@ -59,7 +59,7 @@ export const JobCard = ({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { mutate: updateApplication } = useMutation(
+  const { mutateAsync: updateApplication } = useMutation(
     trpc.tracker.update.mutationOptions({
       onSuccess: () => {
         toast.success("Application updated!");
@@ -314,8 +314,8 @@ export const JobCard = ({
             initialData={defaultValues}
             readOnly={dialogMode === "view"}
             onClose={() => setDialogMode("closed")}
-            onSubmit={(values) => {
-              updateApplication({ id: application.id, ...values });
+            onSubmit={async (values) => {
+             await updateApplication({ id: application.id, ...values });
             }}
           />
         </Dialog>
