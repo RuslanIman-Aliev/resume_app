@@ -8,7 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -18,7 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { applicationStatusValues, trackerFormSchema, TrackerFormValues } from "@/lib/types";
+import {
+  applicationStatusValues,
+  trackerFormSchema,
+  TrackerFormValues,
+} from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, DollarSign, Link, Mail, MapPin, User } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
@@ -26,12 +35,19 @@ import { Controller, useForm } from "react-hook-form";
 type DialogTrackerProps = {
   onSubmit: (values: TrackerFormValues) => void | Promise<void>;
   onClose: () => void;
+  initialData?: TrackerFormValues;
+  readOnly?: boolean;
 };
 
-const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
+const DialogTracker = ({
+  onSubmit,
+  onClose,
+  initialData,
+  readOnly = false,
+}: DialogTrackerProps) => {
   const form = useForm<TrackerFormValues>({
     resolver: zodResolver(trackerFormSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       company: "",
       position: "",
       location: "",
@@ -44,6 +60,7 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
     },
   });
 
+  const isEditing = !!initialData;
   const handleSubmit = form.handleSubmit(async (values) => {
     await onSubmit(values as TrackerFormValues);
     form.reset();
@@ -52,17 +69,19 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
   return (
     <DialogContent className="sm:max-w-125">
       <DialogHeader>
-        <DialogTitle>Add New Application</DialogTitle>
+        <DialogTitle>{isEditing ? "Edit" : "Add"} Application</DialogTitle>
         <DialogDescription>
-          Track a new job opportunity. Fill in the details below.
+          {isEditing
+            ? "Update the details of this job application."
+            : "Track a new job opportunity. Fill in the details below."}
         </DialogDescription>
       </DialogHeader>
 
       <form onSubmit={handleSubmit}>
         <FieldGroup className="space-y-4 py-4 px-2 max-h-[60vh] overflow-y-auto">
-          
           <Controller
             name="company"
+            disabled={readOnly}
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
@@ -87,6 +106,7 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
           <Controller
             name="position"
             control={form.control}
+            disabled={readOnly}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="tracker-position">Position</FieldLabel>
@@ -106,6 +126,7 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
           <Controller
             name="location"
             control={form.control}
+            disabled={readOnly}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="tracker-location">Location</FieldLabel>
@@ -129,6 +150,7 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
           <Controller
             name="salary"
             control={form.control}
+            disabled={readOnly}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="tracker-salary">Salary Range</FieldLabel>
@@ -152,11 +174,15 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
           <Controller
             name="status"
             control={form.control}
+            disabled={readOnly}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="tracker-status">Status</FieldLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger id="tracker-status" aria-invalid={fieldState.invalid}>
+                <Select  onValueChange={field.onChange} value={field.value} disabled={readOnly}>
+                  <SelectTrigger
+                    id="tracker-status"
+                    aria-invalid={fieldState.invalid}
+                  >
                     <SelectValue placeholder="Select a status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -177,6 +203,7 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
           <Controller
             name="url"
             control={form.control}
+            disabled={readOnly}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="tracker-url">Job Posting URL</FieldLabel>
@@ -206,10 +233,13 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
 
           <Controller
             name="contactName"
+            disabled={readOnly}
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="tracker-contact-name">Recruiter / Contact Name</FieldLabel>
+                <FieldLabel htmlFor="tracker-contact-name">
+                  Recruiter / Contact Name
+                </FieldLabel>
                 <div className="relative">
                   <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -230,9 +260,12 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
           <Controller
             name="contactEmail"
             control={form.control}
+            disabled={readOnly}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="tracker-contact-email">Contact Email</FieldLabel>
+                <FieldLabel htmlFor="tracker-contact-email">
+                  Contact Email
+                </FieldLabel>
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -255,6 +288,7 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
           <Controller
             name="notes"
             control={form.control}
+            disabled={readOnly}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="tracker-notes">Notes</FieldLabel>
@@ -271,15 +305,21 @@ const DialogTracker = ({ onSubmit, onClose }: DialogTrackerProps) => {
               </Field>
             )}
           />
-
         </FieldGroup>
 
         <DialogFooter className="pt-4">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Saving..." : "Add Application"}
+          <Button
+            type="submit"
+            disabled={form.formState.isSubmitting || readOnly}
+          >
+            {form.formState.isSubmitting
+              ? "Saving..."
+              : isEditing
+                ? "Save Changes"
+                : "Add Application"}
           </Button>
         </DialogFooter>
       </form>
