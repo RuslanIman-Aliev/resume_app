@@ -151,6 +151,13 @@ const ImprovementsSection = () => {
                         ))}
                       </ul>
                     </div>
+
+                    <div className="mt-4 pt-4 border-t border-border/30">
+                      <Button>
+                        Apply This Suggestion
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
