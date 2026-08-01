@@ -1,12 +1,43 @@
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 import {
   normalizeResumeParsedContent,
   updateResumeParsedContent,
 } from "@/lib/resume-content";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import type {
+  AnalysisImprovement,
+  JobMatchImprovement,
+  QuickWin,
+  StructuredResumeData,
+} from "@/lib/schemas";
 import { TRPCError } from "@trpc/server";
+import type { Prisma } from "@prisma/client";
 import z from "zod";
+
+/**
+ * Per-user cap on AI analysis triggers. Each trigger enqueues an OpenAI-backed
+ * job, so this stops a client from looping the mutation and draining the API
+ * budget / flooding the Inngest queue.
+ */
+const AI_TRIGGER_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
+
+/**
+ * Rejects an AI-trigger call that exceeds the per-user rate limit with a
+ * retryable TOO_MANY_REQUESTS error (HTTP 429).
+ */
+const enforceAiTriggerLimit = (userId: string, action: string) => {
+  const result = rateLimit(`${action}:${userId}`, AI_TRIGGER_RATE_LIMIT);
+  if (!result.success) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Too many analysis requests. Please wait ${Math.ceil(
+        result.retryAfterMs / 1000,
+      )}s and try again.`,
+    });
+  }
+};
 
 /**
  * tRPC router for resume lifecycle operations, including uploads,
@@ -180,6 +211,8 @@ export const resumeRouter = createTRPCRouter({
   triggerAnalysis: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      enforceAiTriggerLimit(ctx.auth.user.id, "triggerAnalysis");
+
       const resume = await prisma.resume.findFirst({
         where: { id: input.resumeId, userId: ctx.auth.user.id },
         select: { parsedContent: true, resumeName: true, postedRole: true },
@@ -234,10 +267,8 @@ export const resumeRouter = createTRPCRouter({
         analysis: {
           ...analysis,
           strengths: analysis.strengths as string[],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          quickWins: analysis.quickWins as any[],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          improvements: analysis.improvements as any[],
+          quickWins: analysis.quickWins as QuickWin[],
+          improvements: analysis.improvements as AnalysisImprovement[],
         },
       };
     }),
@@ -299,8 +330,7 @@ export const resumeRouter = createTRPCRouter({
       }
 
       return {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        improvements: analysis.improvements as any[],
+        improvements: analysis.improvements as AnalysisImprovement[],
       };
     }),
   /**
@@ -317,6 +347,8 @@ export const resumeRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      enforceAiTriggerLimit(ctx.auth.user.id, "triggerJobMatch");
+
       const ownedResume = await prisma.resume.findFirst({
         where: { id: input.resumeId, userId: ctx.auth.user.id },
         select: {
@@ -431,16 +463,13 @@ export const resumeRouter = createTRPCRouter({
       const hasStructuredData = Boolean(resume.structuredData);
       let changed = false;
 
-      // 1. Parse JSON
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = hasStructuredData ? (resume.structuredData as any) : null;
+      // 1. Read the structured resume JSON as its typed shape.
+      const data = resume.structuredData
+        ? (resume.structuredData as StructuredResumeData)
+        : null;
 
       // 2. Precisely edit the fragment
-      if (
-        hasStructuredData &&
-        input.targetSection === "summary" &&
-        data.personalInfo
-      ) {
+      if (data && input.targetSection === "summary" && data.personalInfo) {
         const currentSummary = data.personalInfo.summary?.trim() ?? "";
 
         if (currentSummary !== newText) {
@@ -450,7 +479,7 @@ export const resumeRouter = createTRPCRouter({
       }
 
       if (
-        hasStructuredData &&
+        data &&
         input.targetSection === "experience" &&
         input.targetId &&
         Array.isArray(data.experience)
@@ -475,7 +504,7 @@ export const resumeRouter = createTRPCRouter({
       }
 
       if (
-        hasStructuredData &&
+        data &&
         input.targetSection === "education" &&
         input.targetId &&
         Array.isArray(data.education)
@@ -501,7 +530,7 @@ export const resumeRouter = createTRPCRouter({
       }
 
       if (
-        hasStructuredData &&
+        data &&
         input.targetSection === "projects" &&
         input.targetId &&
         Array.isArray(data.projects)
@@ -526,7 +555,7 @@ export const resumeRouter = createTRPCRouter({
         }
       }
 
-      if (hasStructuredData && input.targetSection === "skills") {
+      if (data && input.targetSection === "skills") {
         const normalizedNewSkill = newText;
 
         if (!Array.isArray(data.skills)) {
@@ -543,7 +572,7 @@ export const resumeRouter = createTRPCRouter({
         }
       }
 
-      if (hasStructuredData && !changed) {
+      if (data && !changed) {
         // If no direct match found, append the new text to the appropriate section
         if (input.targetSection === "summary" && data.personalInfo) {
           const currentSummary = data.personalInfo.summary?.trim() ?? "";
@@ -626,9 +655,9 @@ export const resumeRouter = createTRPCRouter({
         newText,
       );
 
-      const updatePayload = hasStructuredData
+      const updatePayload = data
         ? {
-            structuredData: data,
+            structuredData: data as unknown as Prisma.InputJsonValue,
             parsedContent: nextParsedContent,
           }
         : {
@@ -675,8 +704,9 @@ export const resumeRouter = createTRPCRouter({
         });
 
         if (application && application.improvements) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const improvements = application.improvements as any[];
+          const improvements = application.improvements as Array<
+            JobMatchImprovement & { isApplied?: boolean }
+          >;
           let matchScoreBoostToApply = 0;
 
           const updatedImprovements = improvements.map((imp) => {
@@ -700,10 +730,10 @@ export const resumeRouter = createTRPCRouter({
           });
 
           const updateData: {
-            improvements: typeof updatedImprovements;
+            improvements: Prisma.InputJsonValue;
             matchScore?: number;
           } = {
-            improvements: updatedImprovements,
+            improvements: updatedImprovements as unknown as Prisma.InputJsonValue,
           };
 
           if (matchScoreBoostToApply > 0) {
@@ -726,12 +756,22 @@ export const resumeRouter = createTRPCRouter({
   deleteResume: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await prisma.resume.delete({
+      // deleteMany lets us scope by the non-unique userId safely and returns a
+      // count instead of throwing when nothing matches.
+      const result = await prisma.resume.deleteMany({
         where: {
           id: input.resumeId,
           userId: ctx.auth.user.id,
         },
       });
+
+      if (result.count === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resume not found",
+        });
+      }
+
       return { success: true };
     }),
 });

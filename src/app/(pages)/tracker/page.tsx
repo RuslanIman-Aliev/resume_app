@@ -1,4 +1,5 @@
 import MainView from "@/features/tracker/components/main-view";
+import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -7,10 +8,16 @@ export const metadata: Metadata = {
 };
 
 const TrackerPage = () => {
+  const queryClient = getQueryClient();
+  // Prefetch the board on the server so MainView hydrates without a client fetch.
+  void queryClient.prefetchQuery(trpc.tracker.getAll.queryOptions());
+
   return (
-    <div>
-      <MainView />
-    </div>
+    <HydrateClient>
+      <div>
+        <MainView />
+      </div>
+    </HydrateClient>
   );
 };
 

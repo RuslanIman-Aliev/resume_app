@@ -9,9 +9,14 @@ import { cache } from "react";
  */
 export const createTRPCContext = cache(async () => {
   /**
+   * Base context is intentionally empty. Authentication is resolved per-request
+   * in `protectedProcedure`, which injects the real session as `ctx.auth`.
+   * Do not put a user identity here — a static value would be trusted by any
+   * non-protected procedure.
+   *
    * @see: https://trpc.io/docs/server/context
    */
-  return { userId: "user_123" };
+  return {};
 });
 // Avoid exporting the entire t-object
 // since it's not very descriptive.

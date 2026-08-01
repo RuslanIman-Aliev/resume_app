@@ -1,24 +1,21 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { decodeBase64ToText } from "@/lib/sfdt/base64";
+import { extractSfdtFromZipBase64 } from "@/lib/sfdt/extract-zip";
+import { isSfdtLike } from "@/lib/sfdt/is-sfdt";
+import { normalizeSfdtText } from "@/lib/sfdt/normalize";
+import { saveEditorDocx } from "@/lib/sfdt/resume-docx-api";
+import "@/lib/syncfusion/setup";
 import { useTRPC } from "@/trpc/client";
-import { registerLicense } from "@syncfusion/ej2-base";
-import {
-  DocumentEditorContainerComponent,
-  Toolbar,
-} from "@syncfusion/ej2-react-documenteditor";
+import { DocumentEditorContainerComponent } from "@syncfusion/ej2-react-documenteditor";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { strFromU8, unzipSync } from "fflate";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-registerLicense(process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE ?? "");
-
 const SYNCFUSION_THEME_URL =
   "https://cdn.syncfusion.com/ej2/33.2.3/material.css";
-
-DocumentEditorContainerComponent.Inject(Toolbar);
 
 type DocumentEditorLike = {
   isDocumentLoaded?: boolean;
@@ -53,67 +50,6 @@ type SfdtVariantInput = {
   value: SfdtPayload;
 };
 
-/**
- * Exports the current editor contents as DOCX and persists the new file
- * through the same UploadThing-backed API used by the improvements editor.
- *
- * The API updates both the uploaded file and the stored `resumeLink`, so the
- * next refresh reads the newly saved version instead of the previous one.
- */
-const saveEditorDocx = async (
-  documentEditor: DocumentEditorLike | undefined,
-  resumeId: string,
-) => {
-  if (!documentEditor?.saveAsBlob) {
-    return { skipped: true };
-  }
-
-  let blob: Blob | null = null;
-  try {
-    blob = await documentEditor.saveAsBlob("Docx");
-  } catch {
-    try {
-      blob = await documentEditor.saveAsBlob("docx");
-    } catch {
-      blob = null;
-    }
-  }
-
-  if (!blob) {
-    throw new Error("Failed to export DOCX from editor.");
-  }
-
-  const formData = new FormData();
-  formData.append("resumeId", resumeId);
-  formData.append("file", blob, `resume-${resumeId}.docx`);
-
-  const response = await fetch("/api/resume/save-docx", {
-    method: "POST",
-    body: formData,
-  });
-
-  const responseText = await response.text();
-
-  if (!response.ok) {
-    let errorMessage = "Failed to update resume file.";
-    try {
-      const parsed = JSON.parse(responseText) as { error?: string };
-      errorMessage = parsed.error || errorMessage;
-    } catch {
-      if (responseText) {
-        errorMessage = responseText;
-      }
-    }
-    throw new Error(errorMessage);
-  }
-
-  try {
-    return responseText ? JSON.parse(responseText) : { success: true };
-  } catch {
-    return { success: true };
-  }
-};
-
 export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -144,160 +80,6 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     ?.resumeLink;
   const parsedResumeText = data?.resume?.parsedContent ?? "";
 
-  /**
-   * The original resume editor follows the same Syncfusion loading model as
-   * the improvements flow, but it omits suggestion UI and exposes Save/Cancel
-   * controls for manual editing.
-   */
-  useEffect(() => {
-    if (resumeLink) {
-      console.log("[Resume] link:", resumeLink);
-    }
-  }, [resumeLink]);
-
-  const decodeBase64ToBytes = useCallback((value: string) => {
-    const binary = atob(value);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-  }, []);
-
-  const decodeBase64ToText = useCallback(
-    (value: string) => {
-      try {
-        return strFromU8(decodeBase64ToBytes(value));
-      } catch {
-        return "";
-      }
-    },
-    [decodeBase64ToBytes],
-  );
-
-  const normalizeSfdtValue = useCallback((value: unknown): unknown => {
-    const normalizeValue = (input: unknown): unknown => {
-      if (Array.isArray(input)) {
-        return input.map((item) => normalizeValue(item));
-      }
-
-      if (!input || typeof input !== "object") {
-        return input;
-      }
-
-      const normalized: Record<string, unknown> = {};
-
-      for (const [key, nestedValue] of Object.entries(
-        input as Record<string, unknown>,
-      )) {
-        const normalizedKey = key === "tlp" ? "t" : key;
-        normalized[normalizedKey] = normalizeValue(nestedValue);
-      }
-
-      if (normalized.optimizeSfdt === true) {
-        delete normalized.optimizeSfdt;
-      }
-
-      return normalized;
-    };
-
-    return normalizeValue(value);
-  }, []);
-
-  const normalizeSfdtText = useCallback(
-    (sfdtText: string) => {
-      try {
-        const parsed = JSON.parse(sfdtText) as unknown;
-        const normalized = normalizeSfdtValue(parsed);
-        return JSON.stringify(normalized);
-      } catch {
-        return sfdtText;
-      }
-    },
-    [normalizeSfdtValue],
-  );
-
-  type ZipExtractResult =
-    | { kind: "sfdt"; text: string; sourceName: string }
-    | { kind: "docx"; bytes: Uint8Array }
-    | { kind: "unknown"; reason: string };
-
-  const isSfdtLike = (value: unknown) => {
-    if (!value || typeof value !== "object") return false;
-    const record = value as Record<string, unknown>;
-    return Array.isArray(record.sec) || Array.isArray(record.sections);
-  };
-
-  const extractSfdtFromZipBase64 = useCallback(
-    (value: string): ZipExtractResult => {
-      const bytes = decodeBase64ToBytes(value);
-      const files = unzipSync(bytes);
-      const fileNames = Object.keys(files);
-      console.log("[extractSfdtFromZipBase64] files in zip:", fileNames);
-
-      const sfdtCandidates: Array<{
-        name: string;
-        text: string;
-        textRuns: number;
-      }> = [];
-
-      for (const name of fileNames) {
-        const text = strFromU8(files[name]).trim();
-        if (!text.startsWith("{")) continue;
-
-        try {
-          const parsed = JSON.parse(text) as Record<string, unknown>;
-          if (typeof parsed.sfdt === "string") {
-            return { kind: "sfdt", text: parsed.sfdt, sourceName: name };
-          }
-          if (isSfdtLike(parsed)) {
-            const textRuns = text.match(/"(t|tlp|text)":"[^"]*"/g)?.length ?? 0;
-            sfdtCandidates.push({ name, text, textRuns });
-          }
-        } catch {
-          continue;
-        }
-      }
-
-      if (sfdtCandidates.length > 0) {
-        sfdtCandidates.sort((a, b) => {
-          if (b.textRuns !== a.textRuns) return b.textRuns - a.textRuns;
-          return b.text.length - a.text.length;
-        });
-        const best = sfdtCandidates[0];
-        console.log(
-          "[extractSfdtFromZipBase64] SFDT candidate selected:",
-          best.name,
-          "textRuns:",
-          best.textRuns,
-        );
-        return { kind: "sfdt", text: best.text, sourceName: best.name };
-      }
-
-      const hasWordDocument = Boolean(files["word/document.xml"]);
-      const hasContentTypes = Boolean(files["[Content_Types].xml"]);
-      if (hasWordDocument && hasContentTypes) {
-        return { kind: "docx", bytes };
-      }
-
-      const sfdtName = fileNames.find((name) =>
-        name.toLowerCase().match(/\.(sfdt|json)$/),
-      );
-      if (sfdtName) {
-        const fallbackText = strFromU8(files[sfdtName]).trim();
-        if (fallbackText) {
-          return { kind: "sfdt", text: fallbackText, sourceName: sfdtName };
-        }
-      }
-
-      return {
-        kind: "unknown",
-        reason: "SFDT не найден в архиве",
-      };
-    },
-    [decodeBase64ToBytes],
-  );
-
   useEffect(() => {
     if (!isEditorReady) {
       return;
@@ -317,18 +99,14 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     try {
       if (documentEditor.documentEditorSettings) {
         documentEditor.documentEditorSettings.optimizeSfdt = false;
-        console.log(
-          "[DocumentEditor] documentEditorSettings.optimizeSfdt forced to false on create",
-        );
       }
     } catch {
-      console.warn("[DocumentEditor] failed to force optimizeSfdt");
+      // ignore optimizeSfdt errors
     }
 
     documentEditor.documentLoadFailed = (args) => {
       console.warn("[DocumentEditor] load failed:", args?.status);
     };
-    console.log("[DocumentEditor] import endpoint set to /api/Import");
   }, [isEditorReady]);
 
   /**
@@ -961,9 +739,6 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     parsedResumeText,
     isEditorReady,
     isDocumentReady,
-    extractSfdtFromZipBase64,
-    decodeBase64ToText,
-    normalizeSfdtText,
   ]);
 
   const isGlobalLoading = isLoading || isDocumentLoading;

@@ -72,21 +72,22 @@ export const MainScoreSkeleton = () => {
   );
 };
 
+const analysisSteps = [
+  {
+    title: "Parsing resume sections",
+    detail: "Extracting experience, skills, and keywords.",
+  },
+  {
+    title: "Scoring for the role",
+    detail: "Matching content with the target role requirements.",
+  },
+  {
+    title: "Drafting improvements",
+    detail: "Preparing quick wins and action items.",
+  },
+];
+
 export const MainScorePending = () => {
-  const analysisSteps = [
-    {
-      title: "Parsing resume sections",
-      detail: "Extracting experience, skills, and keywords.",
-    },
-    {
-      title: "Scoring for the role",
-      detail: "Matching content with the target role requirements.",
-    },
-    {
-      title: "Drafting improvements",
-      detail: "Preparing quick wins and action items.",
-    },
-  ];
   return (
     <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-linear-to-br from-primary/10 via-card to-secondary/20 p-8">
       <div className="pointer-events-none absolute -top-20 -left-16 h-56 w-56 rounded-full bg-primary/20 blur-3xl" />

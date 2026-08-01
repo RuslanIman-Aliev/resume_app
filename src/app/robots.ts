@@ -16,7 +16,6 @@ export default function robots(): MetadataRoute.Robots {
           "/analyzer",
           "/signin",
           "/signup",
-          "/sentry-example-page",
         ],
       },
     ],

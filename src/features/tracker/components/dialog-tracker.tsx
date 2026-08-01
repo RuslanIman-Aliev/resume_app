@@ -62,8 +62,14 @@ const DialogTracker = ({
 
   const isEditing = !!initialData;
   const handleSubmit = form.handleSubmit(async (values) => {
-    await onSubmit(values as TrackerFormValues);
-    form.reset();
+    try {
+      await onSubmit(values as TrackerFormValues);
+      form.reset();
+    } catch {
+      // The mutation surfaces its own error toast; swallow the rejection here
+      // so it doesn't become an unhandled promise rejection and the form keeps
+      // the user's input for a retry.
+    }
   });
 
   return (

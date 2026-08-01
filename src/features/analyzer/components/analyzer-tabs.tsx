@@ -7,12 +7,9 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorFeedback } from "@/lib/error-feedback";
-import {
-  cn,
-  getRelativeTime,
-  getScoreColor,
-  getStatusBadge,
-} from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { getRelativeTime, getScoreColor } from "@/lib/format";
+import { getStatusBadge } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {

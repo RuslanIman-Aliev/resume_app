@@ -3,6 +3,7 @@ import MainInfo from "@/features/dashboard/components/main-info";
 import QuickActions from "@/features/dashboard/components/quick-actions";
 import RecentAnalyses from "@/features/dashboard/components/recent-analyses";
 import UpcomingInterviews from "@/features/dashboard/components/upcoming-interviews";
+import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -12,24 +13,30 @@ export const metadata: Metadata = {
 };
 
 const Page = () => {
+  const queryClient = getQueryClient();
+  // Prefetch on the server so RecentAnalyses hydrates without a client fetch.
+  void queryClient.prefetchQuery(trpc.resume.getLatest4Analyses.queryOptions());
+
   return (
-    <div>
-      <section className="container max-w-7xl mx-auto pt-10">
-        <MainInfo />
+    <HydrateClient>
+      <div>
+        <section className="container max-w-7xl mx-auto pt-10">
+          <MainInfo />
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <ApplicationPipeline />
-            <RecentAnalyses />
-          </div>
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-6">
+              <ApplicationPipeline />
+              <RecentAnalyses />
+            </div>
 
-          <div className="space-y-6">
-            <QuickActions />
-            <UpcomingInterviews />
+            <div className="space-y-6">
+              <QuickActions />
+              <UpcomingInterviews />
+            </div>
           </div>
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
+    </HydrateClient>
   );
 };
 

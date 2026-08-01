@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { auth } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+import { assertAllowedFileUrl, SafeFetchError } from "@/lib/safe-fetch";
+
+const urlSchema = z.object({ url: z.string().url() });
 
 const isDocxContentType = (contentType: string) =>
   contentType.includes(
@@ -34,11 +40,20 @@ const getUrlFromRequest = async (request: Request) => {
 
 export async function POST(request: Request) {
   try {
-    const url = await getUrlFromRequest(request);
-
-    if (!url) {
-      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const rawUrl = await getUrlFromRequest(request);
+    const parsedInput = urlSchema.safeParse({ url: rawUrl });
+    if (!parsedInput.success) {
+      return NextResponse.json({ error: "No valid URL provided" }, {
+        status: 400,
+      });
+    }
+
+    const url = assertAllowedFileUrl(parsedInput.data.url);
 
     const fileResponse = await fetch(url);
     if (!fileResponse.ok) {
@@ -82,7 +97,12 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("docx-proxy error:", error);
+    if (error instanceof SafeFetchError) {
+      return NextResponse.json({ error: error.message }, {
+        status: error.status,
+      });
+    }
+    logError("docx-proxy error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

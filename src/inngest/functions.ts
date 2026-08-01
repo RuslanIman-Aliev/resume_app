@@ -1,10 +1,11 @@
-import { getJobMatchPrompt, getPrompt } from "@/lib/utils";
+import { getJobMatchPrompt, getPrompt } from "@/lib/prompts";
 import { inngest } from "./client";
 import OpenAI from "openai";
 import { jobMatchAnalysisSchema, resumeAnalysisSchema } from "@/lib/schemas";
 import prisma from "@/lib/db";
 import Pusher from "pusher";
 import * as Sentry from "@sentry/nextjs";
+import { serverEnv } from "@/lib/env.server";
 
 const openai = new OpenAI();
 const client = Sentry.instrumentOpenAiClient(openai, {
@@ -72,10 +73,10 @@ export const analyzeResume = inngest.createFunction(
     // After saving the results, we trigger a Pusher event to notify the client that the analysis is complete. The client can listen for this event and update the UI accordingly.
     await step.run("notify-client", async () => {
       const pusher = new Pusher({
-        appId: process.env.PUSHER_APP_ID!,
-        key: process.env.PUSHER_APP_KEY!,
-        secret: process.env.PUSHER_APP_SECRET!,
-        cluster: process.env.PUSHER_APP_CLUSTER!,
+        appId: serverEnv.PUSHER_APP_ID,
+        key: serverEnv.PUSHER_APP_KEY,
+        secret: serverEnv.PUSHER_APP_SECRET,
+        cluster: serverEnv.PUSHER_APP_CLUSTER,
         useTLS: true,
       });
       await pusher.trigger(
@@ -179,10 +180,10 @@ export const analyzeJobMatched = inngest.createFunction(
     // After saving the results, we trigger a Pusher event to notify the client that the analysis is complete. The client can listen for this event and update the UI accordingly.
     await step.run("notify-client", async () => {
       const pusher = new Pusher({
-        appId: process.env.PUSHER_APP_ID!,
-        key: process.env.PUSHER_APP_KEY!,
-        secret: process.env.PUSHER_APP_SECRET!,
-        cluster: process.env.PUSHER_APP_CLUSTER!,
+        appId: serverEnv.PUSHER_APP_ID,
+        key: serverEnv.PUSHER_APP_KEY,
+        secret: serverEnv.PUSHER_APP_SECRET,
+        cluster: serverEnv.PUSHER_APP_CLUSTER,
         useTLS: true,
       });
       await pusher.trigger(

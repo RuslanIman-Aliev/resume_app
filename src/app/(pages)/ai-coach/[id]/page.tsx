@@ -9,12 +9,13 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { cache } from "react";
 import { requireAuth } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 
 type PageProps = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 const getResumeMetadata = cache(async (id: string) => {
@@ -51,7 +52,14 @@ export async function generateMetadata({
   return { title, description };
 }
 
-const AiCoachPage = () => {
+const AiCoachPage = async ({ params }: PageProps) => {
+  const { id } = await params;
+  const resume = await getResumeMetadata(id);
+
+  if (!resume) {
+    notFound();
+  }
+
   return (
     <section className="">
       <div className="max-w-7xl mx-auto flex flex-col my-10">

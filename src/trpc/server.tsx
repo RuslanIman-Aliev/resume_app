@@ -1,10 +1,12 @@
-import { createTRPCClient, httpLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
-import { cache } from "react";
+import {
+  dehydrate,
+  HydrationBoundary,
+} from "@tanstack/react-query";
+import { cache, type ReactNode } from "react";
 import "server-only";
 import { createTRPCContext } from "./init";
 import { makeQueryClient } from "./query-client";
-import type { AppRouter } from "./routers/_app";
 import { appRouter } from "./routers/_app";
 
 /**
@@ -22,9 +24,16 @@ export const trpc = createTRPCOptionsProxy({
   router: appRouter,
   queryClient: getQueryClient,
 });
-createTRPCOptionsProxy<AppRouter>({
-  client: createTRPCClient<AppRouter>({
-    links: [httpLink({ url: "..." })],
-  }),
-  queryClient: getQueryClient,
-});
+
+/**
+ * Streams the server-prefetched query cache to the client so components using
+ * the same query keys hydrate without an extra client-side fetch.
+ */
+export function HydrateClient({ children }: { children: ReactNode }) {
+  const queryClient = getQueryClient();
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      {children}
+    </HydrationBoundary>
+  );
+}
