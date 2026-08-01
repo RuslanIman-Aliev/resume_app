@@ -113,19 +113,22 @@ const MainScoreCard = () => {
     isAwaitingAnalysis,
     clearAnalysisParams,
     data?.analysis?.createdAt,
-    data?.analysis,
   ]);
 
   useResumePusher(isAwaitingAnalysis ? resumeId : null, handleAnalysisReady);
 
+  const analysisId = data?.analysis?.id;
   useEffect(() => {
-    if (!data?.analysis) return;
+    if (!analysisId) return;
 
+    // Depend on the analysis id (a primitive) rather than the analysis object,
+    // whose identity changes on every poll refetch and would otherwise
+    // re-invalidate resume.getAll on every interval tick.
     queryClient.invalidateQueries({
       queryKey: trpc.resume.getAll.queryKey(),
       refetchType: "active",
     });
-  }, [data?.analysis, queryClient, trpc]);
+  }, [analysisId, queryClient, trpc]);
 
   if (isLoading) {
     return <MainScoreSkeleton />;
@@ -276,7 +279,7 @@ const MainScoreCard = () => {
               data?.analysis.quickWins.length > 0 ? (
                 data?.analysis.quickWins.map((win, index) => (
                   <div
-                    key={`win-${index}`}
+                    key={`${win.title}-${index}`}
                     className="flex gap-3 justify-between items-center"
                   >
                     <div className="flex items-center">
@@ -316,7 +319,7 @@ const MainScoreCard = () => {
               {strengths && strengths.length > 0 ? (
                 strengths.map((strength, index) => (
                   <div
-                    key={`strength-${index}`}
+                    key={`${strength}-${index}`}
                     className="flex items-start gap-3"
                   >
                     <CheckCircle2 className="h-5 w-5 text-primary mt-1" />

@@ -8,12 +8,12 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getCategoryConfig, getPriorityConfig } from "@/lib/utils";
+import { getCategoryConfig, getPriorityConfig } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, ArrowRight, Lightbulb, Sparkles } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ImprovementsError, ImprovementsSkeleton } from "./improvements-status";
 
 const ImprovementsSection = () => {
@@ -28,6 +28,17 @@ const ImprovementsSection = () => {
     trpc.resume.getImprovements.queryOptions({ resumeId }),
   );
 
+  const filteredImprovements = useMemo(() => {
+    const improvements = data?.improvements ?? [];
+    if (filter === "all") {
+      return improvements;
+    }
+    // impact is e.g. "High Impact" -> normalize to its first word ("high").
+    return improvements.filter(
+      (improvement) => improvement.impact.toLowerCase().split(" ")[0] === filter,
+    );
+  }, [data?.improvements, filter]);
+
   if (isLoading) {
     return <ImprovementsSkeleton />;
   }
@@ -41,7 +52,7 @@ const ImprovementsSection = () => {
         <div className="flex flex-col">
           <h2 className="text-xl font-bold">Improvement Suggestions</h2>
           <p className="text-muted-foreground">
-            {data?.improvements.length} suggestions to improve your resume
+            {filteredImprovements.length} suggestions to improve your resume
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -61,7 +72,7 @@ const ImprovementsSection = () => {
       </div>
       <div>
         <Accordion type="multiple" className="mt-4 space-y-6">
-          {data?.improvements.map((improvement, index) => {
+          {filteredImprovements.map((improvement, index) => {
             const category = getCategoryConfig(improvement.category);
             const priority = getPriorityConfig(improvement.impact);
             const accordionItemValue = `${improvement.description}-${index}`;
@@ -133,19 +144,12 @@ const ImprovementsSection = () => {
                       </h4>
                       <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
                         {improvement.tips.map((tip: string, index: number) => (
-                          <li className="flex gap-2" key={index}>
+                          <li className="flex gap-2" key={`${tip}-${index}`}>
                             <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                             {tip}
                           </li>
                         ))}
                       </ul>
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-border/30">
-                      <Button>
-                        Apply This Suggestion
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
                     </div>
                   </div>
                 </AccordionContent>

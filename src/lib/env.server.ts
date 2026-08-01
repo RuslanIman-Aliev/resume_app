@@ -16,6 +16,8 @@ const serverEnvSchema = z.object({
   PUSHER_APP_CLUSTER: z.string().min(1),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
+  DOCUMENT_EDITOR_SERVICE_URL: z.string().url().optional(),
+  NEXT_PUBLIC_SYNCFUSION_LICENSE: z.string().optional(),
 });
 
 const parsedEnv = serverEnvSchema.safeParse(process.env);

@@ -9,16 +9,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { ResumePagination } from "@/components/resume-pagination";
+import { getMatchScoreBadgeClass } from "@/lib/analysis/score-color";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyDataCard } from "@/features/analyzer/components/empty-data-card";
+import { useUrlPage } from "@/hooks/use-url-page";
 import { useTRPC } from "@/trpc/client";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
@@ -75,6 +70,18 @@ const getScoreFilterFromParams = (params: SearchParamsReader): ScoreFilter =>
 const getSortByFromParams = (params: SearchParamsReader): SortBy =>
   parseSortBy(params.get(sortParamKey));
 
+const SCORE_FILTER_LABELS = {
+  all: "All Scores",
+  high: "High (80%+)",
+  medium: "Medium (60-79%)",
+  low: "Low (<60%)",
+} as const;
+
+const SORT_LABELS = {
+  date: "Date",
+  score: "Score",
+} as const;
+
 const CardComponent = ({
   title,
   value,
@@ -104,25 +111,12 @@ const RecentAnalysesList = () => {
   const trpc = useTRPC();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { replace } = useRouter();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const filterScore = getScoreFilterFromParams(searchParams);
   const sortBy = getSortByFromParams(searchParams);
-  const currentPage = Number(searchParams.get("page")) || 1;
-
-  const scoreFilterLabelMap = {
-    all: "All Scores",
-    high: "High (80%+)",
-    medium: "Medium (60-79%)",
-    low: "Low (<60%)",
-  } as const;
-
-  const sortLabelMap = {
-    date: "Date",
-    score: "Score",
-  } as const;
+  const { page: currentPage, setPage: handlePageChange } = useUrlPage();
 
   const resetToFirstPage = useCallback(() => {
     const params = new URLSearchParams(searchParams);
@@ -130,8 +124,8 @@ const RecentAnalysesList = () => {
       return;
     }
     params.set("page", "1");
-    replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [searchParams, pathname, replace]);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, pathname, router]);
 
   const updateParams = useCallback(
     (updates: Record<string, string | null>, resetPage = false) => {
@@ -163,9 +157,9 @@ const RecentAnalysesList = () => {
       const nextUrl = params.toString()
         ? `${pathname}?${params.toString()}`
         : pathname;
-      replace(nextUrl, { scroll: false });
+      router.replace(nextUrl, { scroll: false });
     },
-    [searchParams, pathname, replace],
+    [searchParams, pathname, router],
   );
 
   useEffect(() => {
@@ -200,15 +194,6 @@ const RecentAnalysesList = () => {
     [sortBy, updateParams],
   );
 
-  const handlePageChange = useCallback(
-    (pageNumber: number) => {
-      const params = new URLSearchParams(searchParams);
-      params.set("page", pageNumber.toString());
-      replace(`${pathname}?${params.toString()}`, { scroll: true });
-    },
-    [searchParams, pathname, replace],
-  );
-
   const { data, isLoading, error } = useQuery({
     ...trpc.jobApplication.getJobApplication.queryOptions({
       page: currentPage,
@@ -219,16 +204,8 @@ const RecentAnalysesList = () => {
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => {
-    if (
-      data?.pagination?.currentPage &&
-      data.pagination.currentPage !== currentPage
-    ) {
-      handlePageChange(data.pagination.currentPage);
-    }
-  }, [data?.pagination?.currentPage, currentPage, handlePageChange]);
-
   const pageCount = data?.pagination?.pageCount ?? 1;
+  const activePage = data?.pagination?.currentPage ?? currentPage;
   if (isLoading && !data) {
     return (
       <div className="w-full animate-in fade-in duration-500">
@@ -341,7 +318,7 @@ const RecentAnalysesList = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <Filter className="h-4 w-4" />
-                {scoreFilterLabelMap[filterScore]}
+                {SCORE_FILTER_LABELS[filterScore]}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -364,7 +341,7 @@ const RecentAnalysesList = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <ArrowUpDown className="h-4 w-4" />
-                {sortLabelMap[sortBy]}
+                {SORT_LABELS[sortBy]}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -394,13 +371,7 @@ const RecentAnalysesList = () => {
         ) : (
           data?.application.map((analysis) => {
             const score = analysis.matchScore ?? 0;
-            let scoreBoxClass =
-              "text-yellow-500 border-yellow-500/30 bg-yellow-500/10";
-            if (score >= 80)
-              scoreBoxClass =
-                "text-green-500 border-green-500/30 bg-green-500/10";
-            else if (score < 50)
-              scoreBoxClass = "text-red-500 border-red-500/30 bg-red-500/10";
+            const scoreBoxClass = getMatchScoreBadgeClass(score);
 
             return (
               <Card
@@ -462,52 +433,11 @@ const RecentAnalysesList = () => {
           })
         )}
       </div>
-      {pageCount > 1 && (
-        <div className="mt-8 mb-4 border-t pt-6">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
-                  className={
-                    currentPage === 1
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-
-              {Array.from({ length: pageCount }).map((_, i) => {
-                const pageNumber = i + 1;
-                return (
-                  <PaginationItem key={pageNumber}>
-                    <PaginationLink
-                      onClick={() => handlePageChange(pageNumber)}
-                      isActive={currentPage === pageNumber}
-                      className="cursor-pointer"
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() =>
-                    handlePageChange(Math.min(currentPage + 1, pageCount))
-                  }
-                  className={
-                    currentPage === pageCount
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+      <ResumePagination
+        currentPage={activePage}
+        pageCount={pageCount}
+        onPageChange={handlePageChange}
+      />
     </>
   );
 };

@@ -2,6 +2,7 @@ import { AnalyzeResumeClient } from "@/features/analyzer/components/analyze-resu
 import { requireAuth } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { cache } from "react";
 
 type PageProps = {
@@ -53,7 +54,14 @@ export async function generateMetadata({
   return { title, description };
 }
 
-const AnalyzeResume = () => {
+const AnalyzeResume = async ({ params }: PageProps) => {
+  const { analyzeId } = await params;
+  const application = await getApplicationMetadata(analyzeId);
+
+  if (!application) {
+    notFound();
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 pb-6">
       {/* <Button

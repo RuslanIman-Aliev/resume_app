@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { getScoreColor } from "@/lib/utils";
+import { getScoreColor } from "@/lib/format";
 import {
   Briefcase,
   Building2,

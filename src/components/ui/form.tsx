@@ -6,6 +6,8 @@ import {
   FormProvider,
   useFormContext,
   type ControllerProps,
+  type FieldPath,
+  type FieldValues,
 } from "react-hook-form";
 import { Slot } from "radix-ui";
 
@@ -24,7 +26,10 @@ const FormFieldContext = React.createContext<FormFieldContextValue>({
 
 const FormItemContext = React.createContext<{ id: string }>({ id: "" });
 
-function FormField({ ...props }: ControllerProps<any, any>) {
+function FormField<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+>({ ...props }: ControllerProps<TFieldValues, TName>) {
   return (
     <FormFieldContext.Provider value={{ name: props.name }}>
       <Controller {...props} />

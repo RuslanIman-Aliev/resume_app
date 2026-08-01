@@ -115,23 +115,25 @@ export const AnalyzeResumeLoading = () => {
   );
 };
 
+const analyzingSteps = [
+  { icon: FileSearch, title: "Reading Job Description", desc: "Extracting core requirements and keywords" },
+  { icon: Target, title: "Analyzing Resume", desc: "Mapping your experience to the role" },
+  { icon: Cpu, title: "Evaluating Skills Gap", desc: "Identifying missing technical and soft skills" },
+  { icon: Sparkles, title: "Generating Insights", desc: "Calculating match score and improvements" },
+];
+
 export const AnalyzeResumePending = () => {
   const [activeStep, setActiveStep] = useState(0);
 
-  const steps = [
-    { icon: FileSearch, title: "Reading Job Description", desc: "Extracting core requirements and keywords" },
-    { icon: Target, title: "Analyzing Resume", desc: "Mapping your experience to the role" },
-    { icon: Cpu, title: "Evaluating Skills Gap", desc: "Identifying missing technical and soft skills" },
-    { icon: Sparkles, title: "Generating Insights", desc: "Calculating match score and improvements" },
-  ];
-
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveStep((current) => (current < steps.length - 1 ? current + 1 : current));
+      setActiveStep((current) =>
+        current < analyzingSteps.length - 1 ? current + 1 : current,
+      );
     }, 8500);
 
     return () => clearInterval(interval);
-  }, [steps.length]);
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] py-12 px-4 animate-in fade-in duration-700">
@@ -151,14 +153,14 @@ export const AnalyzeResumePending = () => {
       </div>
 
       <div className="w-full max-w-2xl grid sm:grid-cols-2 gap-4 mb-8">
-        {steps.map((step, index) => {
+        {analyzingSteps.map((step, index) => {
           const Icon = step.icon;
           const isActive = index === activeStep;
           const isCompleted = index < activeStep;
 
           return (
-            <Card 
-              key={index} 
+            <Card
+              key={step.title}
               className={`transition-all duration-500 border ${
                 isActive 
                   ? "bg-primary/10 border-primary/50 shadow-sm scale-[1.02]" 
@@ -187,7 +189,7 @@ export const AnalyzeResumePending = () => {
 
       <div className="flex items-center gap-3 text-sm font-medium text-primary bg-primary/10 border border-primary/20 py-2.5 px-5 rounded-full shadow-sm">
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span>{steps[activeStep].title}...</span>
+        <span>{analyzingSteps[activeStep].title}...</span>
       </div>
 
     </div>

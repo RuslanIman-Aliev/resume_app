@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { strFromU8, unzipSync } from "fflate";
+import { z } from "zod";
+import { auth } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+import { assertAllowedFileUrl, SafeFetchError } from "@/lib/safe-fetch";
+import { serverEnv } from "@/lib/env.server";
 
-const DOCUMENT_EDITOR_SERVICE_URL = process.env.DOCUMENT_EDITOR_SERVICE_URL;
+const DOCUMENT_EDITOR_SERVICE_URL = serverEnv.DOCUMENT_EDITOR_SERVICE_URL;
+
+const urlSchema = z.object({ url: z.string().url() });
 
 const normalizeServiceUrl = (value: string) =>
   value.endsWith("/") ? value : `${value}/`;
@@ -63,15 +70,27 @@ const extractSfdtFromBase64Zip = (value: string): ExtractedSfdtResult => {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!DOCUMENT_EDITOR_SERVICE_URL) {
+      return NextResponse.json(
+        { error: "DOCUMENT_EDITOR_SERVICE_URL is not configured" },
+        { status: 500 },
+      );
+    }
+
     const requestContentType = request.headers.get("content-type") || "";
-    let url = "";
+    let rawUrl = "";
 
     if (requestContentType.includes("application/json")) {
       try {
         const body = await request.json();
-        url = typeof body?.url === "string" ? body.url : "";
+        rawUrl = typeof body?.url === "string" ? body.url : "";
       } catch {
-        url = "";
+        rawUrl = "";
       }
     } else if (
       requestContentType.includes("multipart/form-data") ||
@@ -79,14 +98,19 @@ export async function POST(request: Request) {
     ) {
       const form = await request.formData();
       const formUrl = form.get("url");
-      url = typeof formUrl === "string" ? formUrl : "";
+      rawUrl = typeof formUrl === "string" ? formUrl : "";
     } else {
-      url = new URL(request.url).searchParams.get("url") ?? "";
+      rawUrl = new URL(request.url).searchParams.get("url") ?? "";
     }
 
-    if (!url) {
-      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    const parsedInput = urlSchema.safeParse({ url: rawUrl });
+    if (!parsedInput.success) {
+      return NextResponse.json({ error: "No valid URL provided" }, {
+        status: 400,
+      });
     }
+
+    const url = assertAllowedFileUrl(parsedInput.data.url);
 
     const fileResponse = await fetch(url);
     if (!fileResponse.ok) {
@@ -137,7 +161,7 @@ export async function POST(request: Request) {
     formData.append("files", blob, "resume.docx");
 
     const sfdtResponse = await fetch(
-      `${normalizeServiceUrl(DOCUMENT_EDITOR_SERVICE_URL!)}Import`,
+      `${normalizeServiceUrl(DOCUMENT_EDITOR_SERVICE_URL)}Import`,
       {
         method: "POST",
         body: formData,
@@ -230,7 +254,12 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
-    console.error("docx-to-sfdt error:", error);
+    if (error instanceof SafeFetchError) {
+      return NextResponse.json({ error: error.message }, {
+        status: error.status,
+      });
+    }
+    logError("docx-to-sfdt error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

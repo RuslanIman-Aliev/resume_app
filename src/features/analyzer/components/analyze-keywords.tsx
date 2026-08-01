@@ -40,7 +40,7 @@ const AnalyzeKeywords = ({ data }: AnalyzeKeywordsProps) => {
             <div className="flex flex-wrap gap-2">
               {data.found.map((keyword, index) => (
                 <Badge
-                  key={index}
+                  key={`${keyword}-${index}`}
                   variant="outline"
                   className="border-green-500/30 bg-green-500/10 text-green-500 px-2.5 py-0.5 font-normal"
                 >
@@ -65,7 +65,7 @@ const AnalyzeKeywords = ({ data }: AnalyzeKeywordsProps) => {
             <div className="flex flex-wrap gap-2">
               {data.missing.map((keyword, index) => (
                 <Badge
-                  key={index}
+                  key={`${keyword}-${index}`}
                   variant="outline"
                   className="border-red-500/30 bg-red-500/10 text-red-500 px-2.5 py-0.5 font-normal flex items-center gap-1.5 cursor-pointer hover:bg-red-500/20 transition-colors"
                   onClick={() => navigator.clipboard.writeText(keyword)}

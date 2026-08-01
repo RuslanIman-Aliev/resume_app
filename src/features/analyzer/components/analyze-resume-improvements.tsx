@@ -11,14 +11,26 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getErrorFeedback } from "@/lib/error-feedback";
-import { ApplicationData, ImprovementTip } from "@/lib/types";
-import { getPriorityStyles, getScoreColor } from "@/lib/utils";
-import { useTRPC } from "@/trpc/client";
-import { registerLicense } from "@syncfusion/ej2-base";
+import { delay } from "@/lib/sfdt/delay";
+import { extractSfdtPayload } from "@/lib/sfdt/payload";
+import { saveEditorDocx } from "@/lib/sfdt/resume-docx-api";
+import { getInsertionPreview } from "@/lib/sfdt/text";
 import {
-  DocumentEditorContainerComponent,
-  Toolbar,
-} from "@syncfusion/ej2-react-documenteditor";
+  applySuggestionToEditor,
+  applySuggestionViaSfdtRewrite,
+  clearEditorSearchHighlights,
+  forceEditorRender,
+  highlightSuggestionInEditor,
+  tryOpenVariants,
+  waitForContainerReady,
+} from "@/lib/syncfusion/document-editor";
+import type { DocumentEditorLike } from "@/lib/syncfusion/document-editor-types";
+import "@/lib/syncfusion/setup";
+import { ApplicationData, ImprovementTip } from "@/lib/types";
+import { getScoreColor } from "@/lib/format";
+import { getPriorityStyles } from "@/lib/ui-config";
+import { useTRPC } from "@/trpc/client";
+import { DocumentEditorContainerComponent } from "@syncfusion/ej2-react-documenteditor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckIcon,
@@ -32,600 +44,8 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { EmptyDataCard } from "./empty-data-card";
 
-const syncfusionLicense = process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE?.trim();
-
-if (syncfusionLicense) {
-  registerLicense(syncfusionLicense);
-}
-
 const SYNCFUSION_THEME_URL =
   "https://cdn.syncfusion.com/ej2/33.2.3/material.css";
-
-DocumentEditorContainerComponent.Inject(Toolbar);
-
-type DocumentEditorLike = {
-  isDocumentLoaded?: boolean;
-  documentEditorSettings?: {
-    optimizeSfdt?: boolean;
-    searchHighlightColor?: string;
-  };
-  serviceUrl?: string;
-  serverActionSettings?: {
-    import?: string;
-    systemClipboard?: string;
-    spellCheck?: string;
-    restrictEditing?: string;
-  };
-  documentLoadFailed?: (args?: { status?: unknown }) => void;
-  documentHelper?: {
-    renderVisiblePages?: (force?: boolean) => void;
-    clearSelectionHighlight?: () => void;
-  };
-  search?: {
-    find?: (text: string) => void;
-    findAll?: (text: string) => void;
-    replaceAll?: (searchText: string, replaceText: string) => void;
-    replace?: (searchText: string, replaceText: string) => void;
-  };
-  searchResults?: {
-    length?: number;
-    navigateTo?: (index: number) => void;
-    clear?: () => void;
-  };
-  editor?: {
-    insertText?: (text: string) => void;
-  };
-  saveAsBlob?: (format: string) => Promise<Blob>;
-  serialize?: () => string;
-  open: (data: string | Record<string, unknown>) => void;
-  openAsync?: (data: string | Record<string, unknown>) => Promise<void>;
-  openBlank?: () => void;
-  pageCount?: number;
-  resize?: () => void;
-  zoomFactor?: number;
-};
-
-type SfdtVariant = {
-  kind: "object" | "rawString";
-  value: string | Record<string, unknown>;
-};
-
-type InsertionPreview = {
-  prefix: string;
-  match: string;
-  suffix: string;
-  isTruncated: boolean;
-  isFound: boolean;
-};
-
-const isSfdtLike = (value: unknown) => {
-  if (!value || typeof value !== "object") return false;
-  const record = value as Record<string, unknown>;
-  return Array.isArray(record.sec) || Array.isArray(record.sections);
-};
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const stripHtml = (value: string) =>
-  value
-    .replace(/<[^>]*>?/gm, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const getInsertionPreview = (
-  resumeText: string,
-  beforeText: string,
-): InsertionPreview => {
-  if (!beforeText) {
-    return {
-      prefix: "",
-      match: "",
-      suffix: "",
-      isTruncated: false,
-      isFound: false,
-    };
-  }
-
-  const cleanText = stripHtml(resumeText);
-  if (!cleanText) {
-    return {
-      prefix: "",
-      match: beforeText,
-      suffix: "",
-      isTruncated: false,
-      isFound: false,
-    };
-  }
-
-  const index = cleanText.indexOf(beforeText);
-  if (index === -1) {
-    return {
-      prefix: "",
-      match: beforeText,
-      suffix: "",
-      isTruncated: false,
-      isFound: false,
-    };
-  }
-
-  const contextLength = 120;
-  const start = Math.max(0, index - contextLength);
-  const end = Math.min(
-    cleanText.length,
-    index + beforeText.length + contextLength,
-  );
-
-  return {
-    prefix: cleanText.slice(start, index),
-    match: beforeText,
-    suffix: cleanText.slice(index + beforeText.length, end),
-    isTruncated: start > 0 || end < cleanText.length,
-    isFound: true,
-  };
-};
-
-const clearEditorSearchHighlights = (documentEditor?: DocumentEditorLike) => {
-  try {
-    documentEditor?.searchResults?.clear?.();
-  } catch {
-    // ignore search clear errors
-  }
-};
-
-const serializedDocumentHasSuggestion = (
-  documentEditor: DocumentEditorLike,
-  beforeText: string,
-  afterText: string,
-) => {
-  try {
-    const serialized = documentEditor.serialize?.();
-    if (typeof serialized !== "string" || !serialized.trim()) {
-      return false;
-    }
-
-    const containsAfterText = serialized.includes(afterText);
-    const stillContainsBeforeText = beforeText
-      ? serialized.includes(beforeText)
-      : false;
-
-    return containsAfterText && (!beforeText || !stillContainsBeforeText);
-  } catch {
-    return false;
-  }
-};
-
-const highlightSuggestionInEditor = (
-  documentEditor: DocumentEditorLike | undefined,
-  beforeText: string,
-) => {
-  if (!documentEditor || !beforeText) return;
-
-  clearEditorSearchHighlights(documentEditor);
-
-  try {
-    if (documentEditor.search?.findAll) {
-      documentEditor.search.findAll(beforeText);
-    } else {
-      documentEditor.search?.find?.(beforeText);
-    }
-    documentEditor.searchResults?.navigateTo?.(1);
-    documentEditor.documentHelper?.clearSelectionHighlight?.();
-    documentEditor.documentHelper?.renderVisiblePages?.(true);
-  } catch {
-    // ignore search errors
-  }
-};
-
-const applySuggestionToEditor = (
-  documentEditor: DocumentEditorLike | undefined,
-  beforeText: string,
-  afterText: string,
-) => {
-  if (!documentEditor || !beforeText || !afterText) return false;
-
-  try {
-    if (typeof documentEditor.search?.replaceAll === "function") {
-      documentEditor.search.replaceAll(beforeText, afterText);
-      if (
-        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
-      ) {
-        return true;
-      }
-    }
-  } catch {
-    // ignore replaceAll errors
-  }
-
-  try {
-    if (typeof documentEditor.search?.replace === "function") {
-      documentEditor.search.replace(beforeText, afterText);
-      if (
-        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
-      ) {
-        return true;
-      }
-    }
-  } catch {
-    // ignore replace errors
-  }
-
-  try {
-    documentEditor.search?.findAll?.(beforeText);
-    const resultsLength = documentEditor.searchResults?.length ?? 0;
-    if (resultsLength > 0) {
-      documentEditor.searchResults?.navigateTo?.(1);
-      documentEditor.editor?.insertText?.(afterText);
-      documentEditor.searchResults?.clear?.();
-      if (
-        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
-      ) {
-        return true;
-      }
-    }
-  } catch {
-    // ignore fallback replace errors
-  }
-
-  return false;
-};
-
-const replaceInSfdtNode = (
-  node: unknown,
-  beforeText: string,
-  afterText: string,
-): { next: unknown; changed: boolean } => {
-  if (typeof node === "string") {
-    if (!node.includes(beforeText)) {
-      return { next: node, changed: false };
-    }
-    return {
-      next: node.split(beforeText).join(afterText),
-      changed: true,
-    };
-  }
-
-  if (Array.isArray(node)) {
-    let changed = false;
-    const next = node.map((item) => {
-      const result = replaceInSfdtNode(item, beforeText, afterText);
-      changed = changed || result.changed;
-      return result.next;
-    });
-    return { next, changed };
-  }
-
-  if (node && typeof node === "object") {
-    let changed = false;
-    const record = node as Record<string, unknown>;
-    const nextRecord: Record<string, unknown> = {};
-
-    for (const [key, value] of Object.entries(record)) {
-      const result = replaceInSfdtNode(value, beforeText, afterText);
-      nextRecord[key] = result.next;
-      changed = changed || result.changed;
-    }
-
-    return { next: nextRecord, changed };
-  }
-
-  return { next: node, changed: false };
-};
-
-const applySuggestionViaSfdtRewrite = async (
-  documentEditor: DocumentEditorLike | undefined,
-  beforeText: string,
-  afterText: string,
-) => {
-  if (!documentEditor || !beforeText || !afterText) return false;
-
-  if (typeof documentEditor.serialize !== "function") return false;
-
-  try {
-    const sfdtText = documentEditor.serialize();
-    if (!sfdtText?.trim()) return false;
-
-    const sfdt = JSON.parse(sfdtText) as Record<string, unknown>;
-    const result = replaceInSfdtNode(sfdt, beforeText, afterText);
-    if (!result.changed) return false;
-
-    if (typeof documentEditor.openAsync === "function") {
-      await documentEditor.openAsync(result.next as Record<string, unknown>);
-    } else {
-      documentEditor.open(result.next as Record<string, unknown>);
-    }
-
-    await delay(250);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const saveEditorDocx = async (
-  documentEditor: DocumentEditorLike | undefined,
-  resumeId: string,
-) => {
-  if (!documentEditor?.saveAsBlob) {
-    return { skipped: true };
-  }
-
-  let blob: Blob | null = null;
-
-  try {
-    blob = await documentEditor.saveAsBlob("Docx");
-  } catch {
-    try {
-      blob = await documentEditor.saveAsBlob("docx");
-    } catch {
-      blob = null;
-    }
-  }
-
-  if (!blob) {
-    throw new Error("Failed to export DOCX from editor.");
-  }
-
-  const formData = new FormData();
-  formData.append("resumeId", resumeId);
-  formData.append("file", blob, `resume-${resumeId}.docx`);
-
-  try {
-    console.log("[SFDT] saveEditorDocx uploading blob info", {
-      size: (blob as Blob).size,
-      type: (blob as Blob).type,
-      name: `resume-${resumeId}.docx`,
-    });
-  } catch {
-    // ignore logging errors
-  }
-
-  const response = await fetch("/api/resume/save-docx", {
-    method: "POST",
-    body: formData,
-  });
-
-  const responseText = await response.text();
-
-  try {
-    console.log("[SFDT] saveEditorDocx response", {
-      status: response.status,
-      ok: response.ok,
-      body: responseText,
-    });
-  } catch {
-    // ignore logging errors
-  }
-
-  if (!response.ok) {
-    let errorMessage = "Failed to update resume file.";
-    try {
-      const parsed = JSON.parse(responseText) as { error?: string };
-      errorMessage = parsed.error || errorMessage;
-    } catch {
-      if (responseText) {
-        errorMessage = responseText;
-      }
-    }
-    throw new Error(errorMessage);
-  }
-
-  try {
-    return responseText ? JSON.parse(responseText) : { success: true };
-  } catch {
-    return { success: true };
-  }
-};
-
-const summarizeSfdtPayload = (payload: string) => {
-  const summary: Record<string, unknown> = {
-    length: payload.length,
-    isJson: false,
-  };
-
-  try {
-    const parsed = JSON.parse(payload) as Record<string, unknown>;
-    summary.isJson = true;
-    summary.keys = Object.keys(parsed).slice(0, 8);
-    summary.optimizeSfdt = parsed.optimizeSfdt === true;
-    summary.hasSec = Array.isArray((parsed as { sec?: unknown }).sec);
-    summary.hasSections = Array.isArray(
-      (parsed as { sections?: unknown }).sections,
-    );
-    if (Array.isArray((parsed as { sec?: unknown[] }).sec)) {
-      summary.secCount = (parsed as { sec: unknown[] }).sec.length;
-    }
-    if (Array.isArray((parsed as { sections?: unknown[] }).sections)) {
-      summary.sectionsCount = (
-        parsed as { sections: unknown[] }
-      ).sections.length;
-    }
-  } catch {
-    // non-JSON payload
-  }
-
-  return summary;
-};
-
-const getEditorContainerElement = (
-  container: DocumentEditorContainerComponent | null,
-) => {
-  const maybe = container as unknown as { element?: HTMLElement };
-  return maybe?.element ?? null;
-};
-
-const logContainerState = (container: HTMLElement | null, label: string) => {
-  if (!container) {
-    console.log("[SFDT] container missing", label);
-    return;
-  }
-
-  const rect = container.getBoundingClientRect();
-  const style = window.getComputedStyle(container);
-  console.log(`[SFDT] container ${label}`, {
-    width: rect.width,
-    height: rect.height,
-    display: style.display,
-    visibility: style.visibility,
-    opacity: style.opacity,
-  });
-};
-
-const waitForContainerReady = async (
-  container: DocumentEditorContainerComponent | null,
-) => {
-  for (let i = 0; i < 10; i += 1) {
-    const element = getEditorContainerElement(container);
-    if (element) {
-      const rect = element.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        return true;
-      }
-    }
-    await delay(100);
-  }
-
-  return false;
-};
-
-const forceEditorRender = (
-  documentEditor: DocumentEditorLike,
-  container: DocumentEditorContainerComponent | null,
-) => {
-  try {
-    if (documentEditor.zoomFactor != null && documentEditor.zoomFactor < 0.2) {
-      documentEditor.zoomFactor = 1;
-    }
-  } catch {
-    // ignore zoom errors
-  }
-
-  try {
-    documentEditor.resize?.();
-  } catch {
-    // ignore resize errors
-  }
-
-  try {
-    container?.resize?.();
-  } catch {
-    // ignore container resize errors
-  }
-
-  try {
-    documentEditor.documentHelper?.renderVisiblePages?.(true);
-  } catch {
-    // ignore render errors
-  }
-};
-
-const ensureLoaded = async (documentEditor: DocumentEditorLike) => {
-  for (let i = 0; i < 10; i += 1) {
-    const loaded = !!documentEditor?.isDocumentLoaded;
-    const domPages = document.querySelectorAll(".e-de-page").length;
-    if (loaded || domPages > 0) return true;
-    await delay(250);
-  }
-  return !!documentEditor?.isDocumentLoaded;
-};
-
-const tryOpenVariants = async (
-  documentEditor: DocumentEditorLike,
-  sfdtText: string,
-  container: DocumentEditorContainerComponent | null,
-) => {
-  let parsed: Record<string, unknown> | null = null;
-  try {
-    parsed = JSON.parse(sfdtText) as Record<string, unknown>;
-  } catch {
-    parsed = null;
-  }
-
-  const variants: Array<SfdtVariant> = [];
-  if (parsed) {
-    variants.push({ kind: "object", value: parsed });
-  }
-  variants.push({ kind: "rawString", value: sfdtText });
-
-  const optimizeOptions = [true, false];
-  const methods: Array<"open" | "openAsync"> = ["open", "openAsync"];
-
-  for (const variant of variants) {
-    for (const optimize of optimizeOptions) {
-      for (const method of methods) {
-        try {
-          if (documentEditor.documentEditorSettings) {
-            try {
-              documentEditor.documentEditorSettings.optimizeSfdt = optimize;
-            } catch {
-              // ignore optimize flag issues
-            }
-          }
-
-          if (method === "open") {
-            documentEditor.open(variant.value);
-          } else if (typeof documentEditor.openAsync === "function") {
-            await documentEditor.openAsync(variant.value);
-          }
-
-          await delay(900);
-          await ensureLoaded(documentEditor);
-          forceEditorRender(documentEditor, container);
-          await delay(200);
-          const domPages = document.querySelectorAll(".e-de-page").length;
-          const pageCount = documentEditor.pageCount || 0;
-
-          if (
-            documentEditor.isDocumentLoaded ||
-            domPages > 0 ||
-            pageCount > 0
-          ) {
-            return true;
-          }
-
-          try {
-            documentEditor.openBlank?.();
-          } catch {
-            // ignore
-          }
-          await delay(200);
-        } catch {
-          // ignore variant errors
-        }
-      }
-    }
-  }
-
-  return false;
-};
-
-const extractSfdtPayload = (responseText: string) => {
-  let payload = responseText.trim();
-  if (!payload) return "";
-
-  if (payload.startsWith('"') && payload.endsWith('"')) {
-    try {
-      payload = JSON.parse(payload);
-    } catch {
-      // keep original payload
-    }
-  }
-
-  if (payload.startsWith("{")) {
-    try {
-      const parsed = JSON.parse(payload) as Record<string, unknown>;
-      if (typeof parsed.sfdt === "string") {
-        return parsed.sfdt;
-      }
-      if (isSfdtLike(parsed)) {
-        return JSON.stringify(parsed);
-      }
-    } catch {
-      // keep original payload
-    }
-  }
-
-  return payload;
-};
 
 const AnalyzeResumeImprovements = ({
   data,
@@ -682,7 +102,6 @@ const AnalyzeResumeImprovements = ({
   const isDocumentOverlayLoading = !isDocumentReady && isDocumentLoading;
 
   const isSuggestionLoading = !!pendingImprovement && isParsedResumeLoading;
-  console.log(resumeLink);
   const { mutateAsync: applyImprovement } = useMutation(
     trpc.resume.applyImprovement.mutationOptions(),
   );
@@ -819,16 +238,7 @@ const AnalyzeResumeImprovements = ({
           throw new Error("Empty SFDT payload");
         }
 
-        console.log("[SFDT] payload summary:", summarizeSfdtPayload(payload));
-        logContainerState(
-          getEditorContainerElement(editorRef.current),
-          "before-open",
-        );
-
-        const containerReady = await waitForContainerReady(editorRef.current);
-        if (!containerReady) {
-          console.warn("[SFDT] container not ready before open");
-        }
+        await waitForContainerReady(editorRef.current);
 
         const opened = await tryOpenVariants(
           documentEditor,
@@ -842,14 +252,6 @@ const AnalyzeResumeImprovements = ({
         if (!cancelled) {
           forceEditorRender(documentEditor, editorRef.current);
           await delay(200);
-          console.log("[SFDT] render state:", {
-            pageCount: documentEditor.pageCount ?? 0,
-            domPages: document.querySelectorAll(".e-de-page").length,
-          });
-          logContainerState(
-            getEditorContainerElement(editorRef.current),
-            "after-open",
-          );
 
           lastLoadedResumeLinkRef.current = resumeLink;
           setIsDocumentLoading(false);
@@ -858,7 +260,6 @@ const AnalyzeResumeImprovements = ({
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to load document";
-        console.warn("Failed to load SFDT:", error);
 
         if (parsedResumeText && documentEditor?.editor) {
           const cleanText = parsedResumeText.replace(/<[^>]*>?/gm, "\n").trim();
@@ -1017,25 +418,6 @@ const AnalyzeResumeImprovements = ({
           throw new Error(
             "Could not apply suggestion to the editor document. Try another suggestion text.",
           );
-        }
-
-        try {
-          if (typeof documentEditor.serialize === "function") {
-            const serialized = documentEditor.serialize();
-
-            console.log("[SFDT] appliedInEditor", {
-              appliedInEditor,
-              serializedLength: serialized?.length ?? 0,
-              containsAfterText: !!pendingImprovement.afterText
-                ? serialized.indexOf(pendingImprovement.afterText) !== -1
-                : false,
-              containsBeforeText: !!pendingImprovement.beforeText
-                ? serialized.indexOf(pendingImprovement.beforeText) !== -1
-                : false,
-            });
-          }
-        } catch {
-          // ignore logging errors
         }
 
         await delay(200);

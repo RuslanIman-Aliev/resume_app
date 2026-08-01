@@ -46,3 +46,6 @@ next-env.d.ts
 .env.sentry-build-plugin
 
 /generated/prisma
+
+# Local scratch / debug dumps (may contain PII)
+tmp_*.json

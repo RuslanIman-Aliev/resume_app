@@ -26,14 +26,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { ResumePagination } from "@/components/resume-pagination";
+import { useUrlPage } from "@/hooks/use-url-page";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -48,19 +42,18 @@ import {
   Trash2,
 } from "lucide-react";
 import Image from "next/image";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Fragment, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ResumeEmpty, ResumeError, ResumeLoading } from "./resume-states";
 
 const ResumeCard = () => {
   const trpc = useTRPC();
   const searchParams = useSearchParams();
-  const pathname = usePathname();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { replace } = useRouter();
-  
+  const { page: currentPage, setPage: handlePageChange } = useUrlPage();
+
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [modalResumeId, setModalResumeId] = useState<string | null>(null);
 
@@ -69,19 +62,8 @@ const ResumeCard = () => {
     name: string;
   } | null>(null);
 
-  const currentPage = Number(searchParams.get("page")) || 1;
   const searchTerm = searchParams.get("search") || undefined;
   const statusFilter = searchParams.get("status") || undefined;
-
-
-  const handlePageChange = useCallback(
-    (pageNumber: number) => {
-      const params = new URLSearchParams(searchParams);
-      params.set("page", pageNumber.toString());
-      replace(`${pathname}?${params.toString()}`, { scroll: true });
-    },
-    [searchParams, pathname, replace],
-  );
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
     trpc.resume.getAll.queryOptions({ page: currentPage, search: searchTerm, status: statusFilter }),
@@ -117,15 +99,6 @@ const ResumeCard = () => {
       router.prefetch(`/ai-coach/${resume.id}`);
     }
   }, [data?.resumes, router]);
-
-  useEffect(() => {
-    if (
-      data?.pagination?.currentPage &&
-      data.pagination.currentPage !== currentPage
-    ) {
-      handlePageChange(data.pagination.currentPage);
-    }
-  }, [data?.pagination?.currentPage, currentPage, handlePageChange]);
 
   const { mutate: analyzeResume, isPending } = useMutation(
     trpc.resume.triggerAnalysis.mutationOptions({
@@ -181,6 +154,7 @@ const ResumeCard = () => {
   };
 
   const pageCount = data?.pagination?.pageCount ?? 1;
+  const activePage = data?.pagination?.currentPage ?? currentPage;
 
   if (isLoading) {
     return <ResumeLoading />;
@@ -521,53 +495,11 @@ const ResumeCard = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Pagination Controls */}
-      {pageCount > 1 && (
-        <div className="mt-8 mb-4 border-t pt-6">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
-                  className={
-                    currentPage === 1
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-
-              {Array.from({ length: pageCount }).map((_, i) => {
-                const pageNumber = i + 1;
-                return (
-                  <PaginationItem key={pageNumber}>
-                    <PaginationLink
-                      onClick={() => handlePageChange(pageNumber)}
-                      isActive={currentPage === pageNumber}
-                      className="cursor-pointer"
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() =>
-                    handlePageChange(Math.min(currentPage + 1, pageCount))
-                  }
-                  className={
-                    currentPage === pageCount
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+      <ResumePagination
+        currentPage={activePage}
+        pageCount={pageCount}
+        onPageChange={handlePageChange}
+      />
     </section>
   );
 };

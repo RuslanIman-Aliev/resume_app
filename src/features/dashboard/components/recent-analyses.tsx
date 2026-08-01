@@ -6,12 +6,9 @@ import { Card } from "@/components/ui/card";
 import { FeedbackState } from "@/components/ui/feedback-state";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  cn,
-  getRelativeTime,
-  getScoreColor,
-  getStatusBadge,
-} from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { getRelativeTime, getScoreColor } from "@/lib/format";
+import { getStatusBadge } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, FileText, RefreshCcw, Sparkles } from "lucide-react";

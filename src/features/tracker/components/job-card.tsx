@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import {
@@ -13,7 +15,7 @@ import type {
   TrackerFormValues,
   applicationStatusValues,
 } from "@/lib/types";
-import { getScoreColor } from "@/lib/utils";
+import { getScoreColor } from "@/lib/format";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -31,6 +33,21 @@ import { useState } from "react";
 import { toast } from "sonner";
 import DialogTracker from "./dialog-tracker";
 
+type StatusColumn = {
+  id: "saved" | "applied" | "screening" | "interview" | "offer" | "rejected";
+  label: string;
+  color: string;
+};
+
+const STATUS_COLUMNS: StatusColumn[] = [
+  { id: "saved", label: "Saved", color: "text-muted-foreground" },
+  { id: "applied", label: "Applied", color: "text-blue-400" },
+  { id: "screening", label: "Screening", color: "text-yellow-400" },
+  { id: "interview", label: "Interview", color: "text-purple-400" },
+  { id: "offer", label: "Offer", color: "text-primary" },
+  { id: "rejected", label: "Rejected", color: "text-red-400" },
+];
+
 /**
  * Job card component for displaying individual job application in kanban/list view.
  * Shows company info, job title, match score, and action menu.
@@ -40,19 +57,6 @@ export const JobCard = ({
 }: {
   application: JobApplicationCard;
 }) => {
-  const columns: {
-    id: "saved" | "applied" | "screening" | "interview" | "offer" | "rejected";
-    label: string;
-    color: string;
-  }[] = [
-    { id: "saved", label: "Saved", color: "text-muted-foreground" },
-    { id: "applied", label: "Applied", color: "text-blue-400" },
-    { id: "screening", label: "Screening", color: "text-yellow-400" },
-    { id: "interview", label: "Interview", color: "text-purple-400" },
-    { id: "offer", label: "Offer", color: "text-primary" },
-    { id: "rejected", label: "Rejected", color: "text-red-400" },
-  ];
-
   const [dialogMode, setDialogMode] = useState<"closed" | "view" | "edit">(
     "closed",
   );
@@ -247,7 +251,7 @@ export const JobCard = ({
                 Move to
                 <ChevronRight className="h-4 w-4 ml-auto" />
               </DropdownMenuItem>
-              {columns.map((status) => (
+              {STATUS_COLUMNS.map((status) => (
                 <DropdownMenuItem
                   key={status.id}
                   onClick={() => onStatusChange(application.id, status.id)}
@@ -310,14 +314,19 @@ export const JobCard = ({
             if (!isOpen) setDialogMode("closed");
           }}
         >
-          <DialogTracker
-            initialData={defaultValues}
-            readOnly={dialogMode === "view"}
-            onClose={() => setDialogMode("closed")}
-            onSubmit={async (values) => {
-             await updateApplication({ id: application.id, ...values });
-            }}
-          />
+          {/* Mount only while open so the form re-initializes from the current
+              application data on each open and we don't keep a react-hook-form
+              instance alive for every card on the board. */}
+          {dialogMode !== "closed" && (
+            <DialogTracker
+              initialData={defaultValues}
+              readOnly={dialogMode === "view"}
+              onClose={() => setDialogMode("closed")}
+              onSubmit={async (values) => {
+                await updateApplication({ id: application.id, ...values });
+              }}
+            />
+          )}
         </Dialog>
 
         {application.nextStep && (

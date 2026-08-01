@@ -2,21 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { KanbanColumn } from "@/features/tracker/components/kanban-column";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import type { TrackerFormValues } from "@/lib/types";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowUpDown,
-  Filter,
-  LayoutGrid,
-  List,
-  Plus,
-  Search,
-} from "lucide-react";
-import { useState } from "react";
+import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import DialogTracker from "./dialog-tracker";
 import { TrackerError, TrackerLoading } from "./tracker-states";
@@ -29,15 +21,24 @@ const MainView = () => {
   );
   const queryClient = useQueryClient();
 
-  const stats = {
-    total: data?.length || 0,
-    saved: data?.filter((a) => a.status === "saved").length || 0,
-    applied: data?.filter((a) => a.status === "applied").length || 0,
-    screening: data?.filter((a) => a.status === "screening").length || 0,
-    interview: data?.filter((a) => a.status === "interview").length || 0,
-    offer: data?.filter((a) => a.status === "offer").length || 0,
-    rejected: data?.filter((a) => a.status === "rejected").length || 0,
-  };
+  const stats = useMemo(() => {
+    const base = {
+      total: data?.length ?? 0,
+      saved: 0,
+      applied: 0,
+      screening: 0,
+      interview: 0,
+      offer: 0,
+      rejected: 0,
+    };
+    // Single pass over the list instead of one filter() per status.
+    for (const application of data ?? []) {
+      if (application.status in base) {
+        base[application.status as keyof typeof base] += 1;
+      }
+    }
+    return base;
+  }, [data]);
 
   const { mutate } = useMutation(
     trpc.tracker.create.mutationOptions({
@@ -129,63 +130,20 @@ const MainView = () => {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-none sm:w-80">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search applications..."
-              className="pl-10 bg-secondary/30 border-border/50"
-              //value={searchQuery}
-              //onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <Button variant="outline" size="icon" className="shrink-0">
-            <Filter className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="shrink-0">
-            <ArrowUpDown className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center border border-border/50 rounded-lg p-1">
-            <Button
-              variant={"ghost"}
-              //variant={viewMode === "kanban" ? "secondary" : "ghost"}
-              size="sm"
-              //onClick={() => setViewMode("kanban")}
-              className="h-8 "
-            >
-              <LayoutGrid className="h-4 w-4 mr-1.5" />
-              Board
+      <div className="flex items-center justify-end gap-4 mb-6">
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Application
             </Button>
-            <Button
-              variant={"secondary"}
-              //variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="sm"
-              // onClick={() => setViewMode("list")}
-              className="h-8"
-            >
-              <List className="h-4 w-4 mr-1.5" />
-              List
-            </Button>
-          </div>
+          </DialogTrigger>
 
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Application
-              </Button>
-            </DialogTrigger>
-
-            <DialogTracker
-              onSubmit={handleAddApplication}
-              onClose={() => setOpen(false)}
-            />
-          </Dialog>
-        </div>
+          <DialogTracker
+            onSubmit={handleAddApplication}
+            onClose={() => setOpen(false)}
+          />
+        </Dialog>
       </div>
       <div className="flex flex-nowrap overflow-x-auto gap-6 pb-8">
         <KanbanColumn

@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { SkillGapItem, SkillsGapData } from "@/lib/types";
-import { cn, getImportanceStyles } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { getImportanceStyles } from "@/lib/ui-config";
 import { AlertTriangle, Check, X } from "lucide-react";
 import { EmptyDataCard } from "./empty-data-card";
 

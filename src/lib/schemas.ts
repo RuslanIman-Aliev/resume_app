@@ -96,6 +96,97 @@ const safeString = (value: string | null | undefined, fallback: string) => {
   return trimmed.length > 0 ? trimmed : fallback;
 };
 
+const quickWinSchema = z.object({
+  title: z.string(),
+  impact: z.enum(["High", "Medium", "Low"]),
+  timeEstimate: z.string(),
+});
+
+const analysisImprovementSchema = z.object({
+  category: z.enum(["Content", "Skills", "Keywords", "Format", "Experience"]),
+  impact: z.enum(["High Impact", "Medium Impact", "Low Impact"]),
+  title: z.string(),
+  description: z.string(),
+  currentText: z.string().nullable(),
+  suggestedText: z.string().nullable(),
+  tips: z.array(z.string()),
+  targetSection: z.enum([
+    "summary",
+    "experience",
+    "education",
+    "projects",
+    "skills",
+  ]),
+  targetId: z.string().optional(),
+});
+
+/**
+ * Structured, section-by-section representation of a resume produced by the
+ * analyzer. Persisted as a JSON column and edited by `resume.applyImprovement`.
+ */
+export const structuredResumeDataSchema = z.object({
+  personalInfo: z.object({
+    name: z.string().optional().default(""),
+    email: z.string().optional().default(""),
+    phone: z.string().optional().default(""),
+    location: z.string().optional().default(""),
+    links: z.array(z.string()).optional().default([]),
+    summary: z.string().optional().default(""),
+  }),
+  experience: z
+    .array(
+      z.object({
+        id: z.string(),
+        company: z.string(),
+        role: z.string(),
+        date: z.string(),
+        bullets: z.array(
+          z.object({
+            id: z.string(),
+            text: z.string(),
+          }),
+        ),
+      }),
+    )
+    .default([]),
+  education: z
+    .array(
+      z.object({
+        id: z.string(),
+        institution: z.string(),
+        degree: z.string(),
+        date: z.string(),
+        bullets: z
+          .array(
+            z.object({
+              id: z.string(),
+              text: z.string(),
+            }),
+          )
+          .default([]),
+      }),
+    )
+    .default([]),
+  projects: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        date: z.string(),
+        bullets: z
+          .array(
+            z.object({
+              id: z.string(),
+              text: z.string(),
+            }),
+          )
+          .default([]),
+      }),
+    )
+    .default([]),
+  skills: z.array(z.string()).default([]),
+});
+
 /**
  * Validation schema for resume analysis results from OpenAI.
  * Includes scores, category breakdowns, keywords, strengths, improvements, and structured resume data.
@@ -110,103 +201,17 @@ export const resumeAnalysisSchema = z.object({
   }),
   keywords: z.array(z.string()),
   strengths: z.array(z.string()),
-  quickWins: z.array(
-    z.object({
-      title: z.string(),
-      impact: z.enum(["High", "Medium", "Low"]),
-      timeEstimate: z.string(),
-    }),
-  ),
-  improvements: z.array(
-    z.object({
-      category: z.enum([
-        "Content",
-        "Skills",
-        "Keywords",
-        "Format",
-        "Experience",
-      ]),
-      impact: z.enum(["High Impact", "Medium Impact", "Low Impact"]),
-      title: z.string(),
-      description: z.string(),
-      currentText: z.string().nullable(),
-      suggestedText: z.string().nullable(),
-      tips: z.array(z.string()),
-      targetSection: z.enum([
-        "summary",
-        "experience",
-        "education",
-        "projects",
-        "skills",
-      ]),
-      targetId: z.string().optional(),
-    }),
-  ),
-  structuredData: z
-    .object({
-      personalInfo: z.object({
-        name: z.string().optional().default(""),
-        email: z.string().optional().default(""),
-        phone: z.string().optional().default(""),
-        location: z.string().optional().default(""),
-        links: z.array(z.string()).optional().default([]),
-        summary: z.string().optional().default(""),
-      }),
-      experience: z
-        .array(
-          z.object({
-            id: z.string(),
-            company: z.string(),
-            role: z.string(),
-            date: z.string(),
-            bullets: z.array(
-              z.object({
-                id: z.string(),
-                text: z.string(),
-              }),
-            ),
-          }),
-        )
-        .default([]),
-      education: z
-        .array(
-          z.object({
-            id: z.string(),
-            institution: z.string(),
-            degree: z.string(),
-            date: z.string(),
-            bullets: z
-              .array(
-                z.object({
-                  id: z.string(),
-                  text: z.string(),
-                }),
-              )
-              .default([]),
-          }),
-        )
-        .default([]),
-      projects: z
-        .array(
-          z.object({
-            id: z.string(),
-            name: z.string(),
-            date: z.string(),
-            bullets: z
-              .array(
-                z.object({
-                  id: z.string(),
-                  text: z.string(),
-                }),
-              )
-              .default([]),
-          }),
-        )
-        .default([]),
-      skills: z.array(z.string()).default([]),
-    })
-    .optional(),
+  quickWins: z.array(quickWinSchema),
+  improvements: z.array(analysisImprovementSchema),
+  structuredData: structuredResumeDataSchema.optional(),
 });
+
+/** A single quick-win suggestion from a resume analysis. */
+export type QuickWin = z.infer<typeof quickWinSchema>;
+/** A single detailed improvement suggestion from a resume analysis. */
+export type AnalysisImprovement = z.infer<typeof analysisImprovementSchema>;
+/** Structured, section-based resume data edited by applyImprovement. */
+export type StructuredResumeData = z.infer<typeof structuredResumeDataSchema>;
 
 /**
  * Validation schema for job match analysis comparing resume against job description.
@@ -283,3 +288,6 @@ export const jobMatchAnalysisSchema = z.object({
   }),
   coverLetterText: z.string(),
 });
+
+/** A single improvement suggestion from a job-match analysis. */
+export type JobMatchImprovement = z.infer<typeof jobMatchImprovementSchema>;

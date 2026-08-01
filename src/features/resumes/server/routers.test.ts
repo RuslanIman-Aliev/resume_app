@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCallerFactory } from "@/trpc/init";
 import { resumeRouter } from "@/features/resumes/server/routers";
+import { resetRateLimit } from "@/lib/rate-limit";
 
 const prismaMock = vi.hoisted(() => ({
   resume: {
@@ -56,6 +57,7 @@ const session = { user: { id: "user_123" } };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetRateLimit();
   headersMock.mockResolvedValue(new Headers());
   authMock.api.getSession.mockResolvedValue(session);
 });
@@ -271,7 +273,12 @@ describe("resumeRouter", () => {
 
     expect(prismaMock.resume.findFirst).toHaveBeenCalledWith({
       where: { id: "resume_1", userId: session.user.id },
-      select: { parsedContent: true, resumeName: true, postedRole: true },
+      select: {
+        parsedContent: true,
+        resumeName: true,
+        postedRole: true,
+        resumeLink: true,
+      },
     });
     expect(result).toEqual({ resume });
   });
@@ -309,6 +316,30 @@ describe("resumeRouter", () => {
     await expect(
       caller.triggerAnalysis({ resumeId: "resume_404" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rate-limits repeated analysis triggers for the same user", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      parsedContent: "Parsed content",
+      resumeName: "Resume",
+      postedRole: "Role",
+    });
+    inngestMock.send.mockResolvedValue({});
+
+    const caller = createCaller({});
+
+    // The limit is 5 triggers per user per window.
+    for (let i = 0; i < 5; i += 1) {
+      await caller.triggerAnalysis({ resumeId: "resume_1" });
+    }
+    expect(inngestMock.send).toHaveBeenCalledTimes(5);
+
+    await expect(
+      caller.triggerAnalysis({ resumeId: "resume_1" }),
+    ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+
+    // The blocked request must not have dispatched a job.
+    expect(inngestMock.send).toHaveBeenCalledTimes(5);
   });
 
   it("returns the latest analysis result", async () => {

@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+import { serverEnv } from "@/lib/env.server";
 
-const DOCUMENT_EDITOR_SERVICE_URL = process.env.DOCUMENT_EDITOR_SERVICE_URL;
+const DOCUMENT_EDITOR_SERVICE_URL = serverEnv.DOCUMENT_EDITOR_SERVICE_URL;
+
+// Uploads are capped at 4MB, but the editor can also relay larger SFDT JSON.
+const MAX_IMPORT_SIZE_BYTES = 15 * 1024 * 1024;
 
 const normalizeServiceUrl = (value: string) =>
   value.endsWith("/") ? value : `${value}/`;
 
 export async function POST(request: Request) {
   try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const serviceUrl = DOCUMENT_EDITOR_SERVICE_URL;
 
     if (!serviceUrl) {
@@ -17,31 +28,19 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    console.log(
-      "[Import proxy] form entries:",
-      Array.from(formData.entries()).map(([key, value]) => [
-        key,
-        value instanceof File
-          ? {
-              type: "file",
-              name: value.name,
-              size: value.size,
-              mimeType: value.type,
-            }
-          : { type: typeof value, value },
-      ]),
+    const uploadedFile = Array.from(formData.values()).find(
+      (value): value is File => value instanceof File,
     );
-    const uploadedFile = Array.from(formData.values()).find((value) => {
-      return (
-        value !== null &&
-        typeof value === "object" &&
-        "arrayBuffer" in value &&
-        "size" in value
-      );
-    }) as (Blob & { name?: string }) | undefined;
 
     if (!uploadedFile) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    if (uploadedFile.size > MAX_IMPORT_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: "File exceeds max size" },
+        { status: 413 },
+      );
     }
 
     const uploadedText = await uploadedFile.text().catch(() => "");
@@ -93,7 +92,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Import proxy error:", error);
+    logError("Import proxy error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
