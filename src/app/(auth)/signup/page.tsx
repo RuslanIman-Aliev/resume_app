@@ -7,9 +7,16 @@ export const metadata: Metadata = {
   description: "Create an AI-Tailor account and start optimizing your resume.",
 };
 
-const SignUpPage = async () => {
+const SignUpPage = async ({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) => {
   await requireUnauth();
-  return <SignUpForm />;
+  const { error } = await searchParams;
+  return (
+    <SignUpForm oauthError={typeof error === "string" ? error : undefined} />
+  );
 };
 
 export default SignUpPage;

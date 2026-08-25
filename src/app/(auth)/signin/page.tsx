@@ -7,9 +7,16 @@ export const metadata: Metadata = {
   description: "Sign in to your AI-Tailor account.",
 };
 
-const SignInPage = async () => {
+const SignInPage = async ({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) => {
   await requireUnauth();
-  return <SignInForm />;
+  const { error } = await searchParams;
+  return (
+    <SignInForm oauthError={typeof error === "string" ? error : undefined} />
+  );
 };
 
 export default SignInPage;

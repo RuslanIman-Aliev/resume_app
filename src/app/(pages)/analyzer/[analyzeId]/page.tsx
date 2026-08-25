@@ -1,6 +1,7 @@
 import { AnalyzeResumeClient } from "@/features/analyzer/components/analyze-resume-client";
 import { requireAuth } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
+import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -62,23 +63,32 @@ const AnalyzeResume = async ({ params }: PageProps) => {
     notFound();
   }
 
+  const queryClient = getQueryClient();
+  // Prefetch so AnalyzeResumeClient hydrates without a client fetch. A match
+  // still being analyzed resolves to NOT_FOUND, which is not dehydrated, so
+  // the client falls back to its own fetch-and-poll path.
+  void queryClient.prefetchQuery(
+    trpc.resume.getJobMatchResult.queryOptions({ applicationId: analyzeId }),
+  );
+
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 pb-6">
-      {/* <Button
-        variant={"ghost"}
-        asChild
-        className="hover:bg-primary! hover:text-black"
-      >
-        <Link href="/analyzer" className="text-sm font-medium">
-          &larr; Back to Analyzer
-        </Link>
-      </Button> */}
+    <HydrateClient>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 pb-6">
+        {/* <Button
+          variant={"ghost"}
+          asChild
+          className="hover:bg-primary! hover:text-black"
+        >
+          <Link href="/analyzer" className="text-sm font-medium">
+            &larr; Back to Analyzer
+          </Link>
+        </Button> */}
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <AnalyzeResumeClient />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <AnalyzeResumeClient />
+        </div>
       </div>
-
-    </div>
+    </HydrateClient>
   );
 };
 
