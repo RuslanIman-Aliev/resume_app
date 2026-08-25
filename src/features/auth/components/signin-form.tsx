@@ -17,18 +17,33 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { authClient } from "@/lib/auth-client";
+import {
+  authClient,
+  getOAuthErrorMessage,
+  signInWithGoogle,
+} from "@/lib/auth-client";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { SignInFormData, signInFormSchema } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-export function SignInForm() {
+export function SignInForm({ oauthError }: { oauthError?: string }) {
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
+
+  // `account_not_linked` gets a persistent hint below instead of a toast, since
+  // it asks the user to do something rather than just reporting a failure.
+  const isNotLinked = oauthError === "account_not_linked";
+
+  // Better Auth redirects failed social sign-ins back here as `?error=<code>`.
+  useEffect(() => {
+    if (!oauthError || isNotLinked) return;
+    toast.error(getOAuthErrorMessage(oauthError));
+    router.replace("/signin");
+  }, [oauthError, isNotLinked, router]);
   const form = useForm<SignInFormData>({
     resolver: zodResolver(signInFormSchema),
     defaultValues: {
@@ -65,6 +80,21 @@ export function SignInForm() {
     );
   }
 
+  async function onGoogleSignIn() {
+    setIsPending(true);
+
+    const { error } = await signInWithGoogle({ errorCallbackURL: "/signin" });
+
+    if (error) {
+      toast.error(
+        getErrorFeedback(error, {
+          fallbackMessage: "An error occurred during Google sign in.",
+        }).message,
+      );
+      setIsPending(false);
+    }
+  }
+
   return (
     <Card className="relative mt-8 w-full max-w-md gap-0 overflow-hidden rounded-2xl border border-white/10 bg-linear-to-b from-black via-zinc-950 to-zinc-900/90 py-0 shadow-2xl shadow-black/40 backdrop-blur motion-safe:animate-[fade-up_600ms_ease-out]">
       <div
@@ -99,8 +129,13 @@ export function SignInForm() {
       </CardHeader>
       <form id="form-signin" onSubmit={form.handleSubmit(onSubmit)}>
         <CardContent className="relative z-10 px-6 pb-4">
+          {isNotLinked && (
+            <p className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-muted-foreground">
+              An account with this email already exists. Sign in with your
+              password below, then connect Google under Settings.
+            </p>
+          )}
           <FieldGroup className="gap-4 py-4">
-           
             <Controller
               name="email"
               control={form.control}
@@ -175,6 +210,7 @@ export function SignInForm() {
             className="h-11 w-full border-white/10 bg-black/55 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] hover:bg-zinc-900"
             disabled={isPending}
             type="button"
+            onClick={onGoogleSignIn}
           >
             Sign In with Google
           </Button>

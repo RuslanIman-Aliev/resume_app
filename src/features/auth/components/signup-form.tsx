@@ -17,18 +17,29 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { authClient } from "@/lib/auth-client";
+import {
+  authClient,
+  getOAuthErrorMessage,
+  signInWithGoogle,
+} from "@/lib/auth-client";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { signUpFormSchema, type SignUpFormData } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-export function SignUpForm() {
+export function SignUpForm({ oauthError }: { oauthError?: string }) {
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
+
+  // Better Auth redirects failed social sign-ins back here as `?error=<code>`.
+  useEffect(() => {
+    if (!oauthError) return;
+    toast.error(getOAuthErrorMessage(oauthError));
+    router.replace("/signup");
+  }, [oauthError, router]);
   const form = useForm<SignUpFormData>({
     resolver: zodResolver(signUpFormSchema),
     defaultValues: {
@@ -66,6 +77,23 @@ export function SignUpForm() {
         },
       },
     );
+  }
+
+  async function onGoogleSignUp() {
+    setIsPending(true);
+
+    const { error } = await signInWithGoogle({ errorCallbackURL: "/signup" });
+
+    // A successful call redirects the browser to Google, so we only get here
+    // when the flow failed to start — keep the button disabled otherwise.
+    if (error) {
+      toast.error(
+        getErrorFeedback(error, {
+          fallbackMessage: "An error occurred during Google sign up.",
+        }).message,
+      );
+      setIsPending(false);
+    }
   }
 
   return (
@@ -230,6 +258,7 @@ export function SignUpForm() {
             className="h-11 w-full border-white/10 bg-black/55 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] hover:bg-zinc-900"
             disabled={isPending}
             type="button"
+            onClick={onGoogleSignUp}
           >
             Sign Up with Google
           </Button>

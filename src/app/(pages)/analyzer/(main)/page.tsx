@@ -1,5 +1,6 @@
 import AnalyzerInfo from "@/features/analyzer/components/analyzer-info";
 import AnalyzerTabs from "@/features/analyzer/components/analyzer-tabs";
+import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -8,15 +9,23 @@ export const metadata: Metadata = {
 };
 
 const AnalyzerPage = () => {
+  const queryClient = getQueryClient();
+  // Prefetch on the server so AnalyzerTabs hydrates without a client fetch.
+  void queryClient.prefetchQuery(
+    trpc.resume.getResumesAndAnalyses.queryOptions(),
+  );
+
   return (
-    <div>
-      <section className="max-w-7xl grid grid-cols-3 gap-6 mx-auto">
-        <div className="col-span-2">
-          <AnalyzerTabs />
-        </div>
-        <AnalyzerInfo />
-      </section>
-    </div>
+    <HydrateClient>
+      <div>
+        <section className="max-w-7xl grid grid-cols-3 gap-6 mx-auto">
+          <div className="col-span-2">
+            <AnalyzerTabs />
+          </div>
+          <AnalyzerInfo />
+        </section>
+      </div>
+    </HydrateClient>
   );
 };
 
