@@ -260,6 +260,26 @@ export type SkillsGapData = {
 };
 
 /**
+ * A skill required by the job posting that is already present in the resume.
+ */
+export type MatchingSkillItem = {
+  /** The name of the skill. */
+  skill: string;
+  /** How important the skill is for the job, when the model reported it. */
+  importance: SkillImportance | null;
+};
+
+/**
+ * A skill required by the job posting that is missing from the resume.
+ */
+export type MissingSkillItem = {
+  /** The name of the skill. */
+  skill: string;
+  /** How much the missing skill hurts the match, when the model reported it. */
+  impact: SkillImportance | null;
+};
+
+/**
  * Analysis of keywords found or missing from the resume based on the job posting.
  */
 export type KeywordsGapData = {

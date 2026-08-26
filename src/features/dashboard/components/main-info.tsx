@@ -30,7 +30,6 @@ const stats = [
     bgColor: "bg-chart-2/10",
   },
   {
-    // Current-state, like the pipeline bar: positions sitting at this stage now.
     key: "interviews" as const,
     label: "In Interviews",
     icon: Calendar,

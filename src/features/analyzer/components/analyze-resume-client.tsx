@@ -5,12 +5,22 @@ import { useJobMatchPusher } from "@/hooks/usePusher";
 import {
   ApplicationData,
   KeywordsGapData,
+  MatchingSkillItem,
+  MissingSkillItem,
   RequirementsMatchData,
+  SkillImportance,
   SkillsGapData,
 } from "@/lib/types";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Sparkles, Target, TrendingUp, Zap } from "lucide-react";
+import {
+  FileText,
+  Mail,
+  Sparkles,
+  Target,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
 import dynamic from "next/dynamic";
 import {
   useParams,
@@ -19,6 +29,7 @@ import {
   useSearchParams,
 } from "next/navigation";
 import { useCallback } from "react";
+import AnalyzeCoverLetter from "./analyze-cover-letter";
 import AnalyzeKeywords from "./analyze-keywords";
 import AnalyzeRequirementsMatch from "./analyze-requirements-match";
 import {
@@ -68,6 +79,43 @@ const normalizeKeywordsGapData = (value: unknown): KeywordsGapData => {
     found: Array.isArray(data.found) ? data.found : [],
     missing: Array.isArray(data.missing) ? data.missing : [],
   };
+};
+
+const skillImportanceValues: readonly string[] = [
+  "Critical",
+  "High",
+  "Medium",
+  "Low",
+];
+
+const normalizeSkillImportance = (value: unknown): SkillImportance | null =>
+  typeof value === "string" && skillImportanceValues.includes(value)
+    ? (value as SkillImportance)
+    : null;
+
+const normalizeMatchingSkills = (value: unknown): MatchingSkillItem[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) =>
+    isRecord(item) && typeof item.skill === "string"
+      ? [
+          {
+            skill: item.skill,
+            importance: normalizeSkillImportance(item.importance),
+          },
+        ]
+      : [],
+  );
+};
+
+const normalizeMissingSkills = (value: unknown): MissingSkillItem[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) =>
+    isRecord(item) && typeof item.skill === "string"
+      ? [{ skill: item.skill, impact: normalizeSkillImportance(item.impact) }]
+      : [],
+  );
 };
 
 const normalizeRequirementsMatchData = (
@@ -145,6 +193,12 @@ export const AnalyzeResumeClient = () => {
     .requirementsMatch;
   const requirementsMatchData =
     normalizeRequirementsMatchData(rawRequirementsMatch);
+  const matchingSkills = normalizeMatchingSkills(
+    (appData as { matchingSkills?: unknown }).matchingSkills,
+  );
+  const missingSkills = normalizeMissingSkills(
+    (appData as { missingSkills?: unknown }).missingSkills,
+  );
   const improvementsArray = (appData as unknown as { improvements?: unknown[] })
     .improvements;
   const improvementsCount = improvementsArray?.length || 0;
@@ -207,6 +261,13 @@ export const AnalyzeResumeClient = () => {
             Keywords
           </TabsTrigger>
           <TabsTrigger
+            value="cover-letter"
+            className="text-white! py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+          >
+            <Mail className="h-4 w-4 mr-2" />
+            Cover Letter
+          </TabsTrigger>
+          <TabsTrigger
             value="original"
             className="text-white! py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
           >
@@ -232,6 +293,15 @@ export const AnalyzeResumeClient = () => {
               applicationId={appData.id}
             />
           </div>
+        </TabsContent>
+        <TabsContent value="cover-letter" className="mt-4 flex-1 min-h-0">
+          <AnalyzeCoverLetter
+            coverLetterText={appData.coverLetterText ?? null}
+            matchingSkills={matchingSkills}
+            missingSkills={missingSkills}
+            companyName={appData.companyName ?? null}
+            jobTitle={appData.jobTitle ?? null}
+          />
         </TabsContent>
         <TabsContent value="original" className="mt-4 flex-1 min-h-0">
           <div className="flex h-full min-h-0 flex-col">
