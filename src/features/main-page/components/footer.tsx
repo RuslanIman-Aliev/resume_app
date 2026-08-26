@@ -31,10 +31,13 @@ const footerLinks = {
 export function Footer() {
   return (
     <footer className="border-t border-border/50 bg-card/30">
-      <div className="container mx-auto max-w-7xl px-4 py-12">
+      <div className="container mx-auto max-w-7xl px-4 py-12 md:py-16">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-5">
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-2.5 mb-4">
+            <Link
+              href="/"
+              className="flex min-h-11 items-center gap-2.5 mb-4 md:min-h-0"
+            >
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <Sparkles className="h-5 w-5" />
               </div>
@@ -51,12 +54,12 @@ export function Footer() {
           {/* Product */}
           <div>
             <h3 className="font-semibold text-foreground mb-4">Product</h3>
-            <ul className="space-y-3">
+            <ul className="space-y-1 md:space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors md:inline md:min-h-0"
                   >
                     {link.label}
                   </Link>
@@ -68,12 +71,12 @@ export function Footer() {
           {/* Resources */}
           <div>
             <h3 className="font-semibold text-foreground mb-4">Resources</h3>
-            <ul className="space-y-3">
+            <ul className="space-y-1 md:space-y-3">
               {footerLinks.resources.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors md:inline md:min-h-0"
                   >
                     {link.label}
                   </Link>
@@ -85,12 +88,12 @@ export function Footer() {
           {/* Company */}
           <div>
             <h3 className="font-semibold text-foreground mb-4">Company</h3>
-            <ul className="space-y-3">
+            <ul className="space-y-1 md:space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors md:inline md:min-h-0"
                   >
                     {link.label}
                   </Link>
@@ -102,12 +105,12 @@ export function Footer() {
           {/* Legal */}
           <div>
             <h3 className="font-semibold text-foreground mb-4">Legal</h3>
-            <ul className="space-y-3">
+            <ul className="space-y-1 md:space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors md:inline md:min-h-0"
                   >
                     {link.label}
                   </Link>
@@ -125,7 +128,7 @@ export function Footer() {
           <div className="flex items-center gap-6">
             <Link
               href="https://twitter.com"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex size-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors md:size-5"
             >
               <span className="sr-only">Twitter</span>
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
@@ -134,7 +137,7 @@ export function Footer() {
             </Link>
             <Link
               href="https://github.com"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex size-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors md:size-5"
             >
               <span className="sr-only">GitHub</span>
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
@@ -147,7 +150,7 @@ export function Footer() {
             </Link>
             <Link
               href="https://linkedin.com"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex size-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors md:size-5"
             >
               <span className="sr-only">LinkedIn</span>
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">

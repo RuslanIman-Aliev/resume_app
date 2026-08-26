@@ -60,14 +60,15 @@ const ResumeManager = () => {
   };
 
   return (
-    <section className="w-full md:px-10">
+    <section className="w-full px-4 sm:px-6 md:px-10">
       <h1 className="text-3xl font-bold mb-6">Resume Manager</h1>
 
-      <div className="flex items-center w-full justify-between mb-6">
-        <div className="flex w-full">
+      <div className="flex flex-col gap-3 w-full mb-6 md:flex-row md:items-center md:justify-between md:gap-0">
+        <div className="flex flex-col gap-3 w-full sm:flex-row sm:gap-0">
           <Field orientation="horizontal" className="max-w-md">
-            <InputGroup>
+            <InputGroup className="h-12 sm:h-8">
               <InputGroupInput
+                className="h-full sm:h-8"
                 id="inline-start-input"
                 placeholder="Search resumes..."
                 value={searchTerm}
@@ -83,7 +84,7 @@ const ResumeManager = () => {
             value={searchParams.get("status") || "all"}
             onValueChange={handleStatusChange}
           >
-            <SelectTrigger className="w-35 ml-4">
+            <SelectTrigger className="w-full min-h-11 sm:w-35 sm:ml-4 sm:min-h-0">
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
@@ -94,7 +95,7 @@ const ResumeManager = () => {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 md:w-auto">
           <UploadDialog />
         </div>
       </div>

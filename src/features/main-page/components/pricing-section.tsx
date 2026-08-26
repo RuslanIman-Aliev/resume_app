@@ -55,8 +55,8 @@ const plans = [
 
 const PricingSection = () => {
   return (
-    <section className="w-full bg-background text-center  border-y border-border/50 ">
-      <div className=" max-w-7xl mx-auto container">
+    <section className="w-full bg-background text-center py-12 md:py-20 border-y border-border/50 ">
+      <div className="px-4 sm:px-6 xl:px-0 max-w-7xl mx-auto container">
         <div>
           <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold  tracking-tight text-foreground ">
             Simple, transparent pricing
@@ -65,7 +65,7 @@ const PricingSection = () => {
             Start for free, upgrade when you&apos;re ready
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-6 mt-16 mb-20 md:mb-28 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 mt-8 md:mt-14 max-w-5xl mx-auto">
           {plans.map((plan, index) => (
             <Card
               key={index}
@@ -104,7 +104,7 @@ const PricingSection = () => {
                 <div className="mt-auto">
                   <Link href="/signup" className="block">
                     <Button
-                      className="w-full"
+                      className="w-full h-11 md:h-8"
                       variant={plan.highlighted ? "default" : "outline"}
                     >
                       {plan.cta}

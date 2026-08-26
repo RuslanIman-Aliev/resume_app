@@ -1,5 +1,5 @@
 import prisma from "@/lib/db";
-import { trackerFormSchema } from "@/lib/types";
+import { applicationStatusValues, trackerFormSchema } from "@/lib/types";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import z from "zod";
 
@@ -34,14 +34,7 @@ export const trackerRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        status: z.enum([
-          "saved",
-          "applied",
-          "screening",
-          "interview",
-          "offer",
-          "rejected",
-        ]),
+        status: z.enum(applicationStatusValues),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -59,7 +52,7 @@ export const trackerRouter = createTRPCRouter({
       });
       return { success: true };
     }),
-    
+
   update: protectedProcedure
     .input(
       trackerFormSchema.extend({
@@ -87,4 +80,101 @@ export const trackerRouter = createTRPCRouter({
 
       return updatedJob;
     }),
+  /**
+   * Count of tracked positions per status for the dashboard pipeline bar.
+   * Aggregated in Postgres so the dashboard never pulls the full list just to count.
+   */
+  getPipelineStats: protectedProcedure.query(async ({ ctx }) => {
+    const grouped = await prisma.trackerPosition.groupBy({
+      by: ["status"],
+      where: { userId: ctx.auth.user.id },
+      _count: { _all: true },
+    });
+
+    // Zero-fill every known status so the client can index it without guards.
+    const counts = Object.fromEntries(
+      applicationStatusValues.map((status) => [status, 0]),
+    ) as Record<(typeof applicationStatusValues)[number], number>;
+
+    let total = 0;
+    for (const row of grouped) {
+      total += row._count._all;
+      if (row.status in counts) {
+        counts[row.status as keyof typeof counts] = row._count._all;
+      }
+    }
+
+    return { counts, total };
+  }),
+  get4LatestTrackerJobs: protectedProcedure.query(async ({ ctx }) => {
+    const latestJobs = await prisma.trackerPosition.findMany({
+      where: { userId: ctx.auth.user.id },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+      select: {
+        id: true,
+        company: true,
+        position: true,
+        location: true,
+        status: true,
+        createdAt: true,
+        matchScore: true,
+      },
+    });
+    return latestJobs;
+  }),
+  /**
+   * Headline counters for the dashboard. Every tracker number comes from the
+   * same groupBy that feeds the pipeline bar, so the two blocks can never
+   * disagree, and it costs one round-trip instead of one count per card.
+   * Counts are current-state, matching the pipeline: a position that moved on
+   * to `offer` is no longer counted under `interview`.
+   */
+  getStatistics: protectedProcedure.query(async ({ ctx }) => {
+    const [grouped, analyzed] = await Promise.all([
+      prisma.trackerPosition.groupBy({
+        by: ["status"],
+        where: { userId: ctx.auth.user.id },
+        _count: { _all: true },
+      }),
+      prisma.jobApplication.count({ where: { userId: ctx.auth.user.id } }),
+    ]);
+
+    const byStatus = new Map(
+      grouped.map((row) => [row.status, row._count._all]),
+    );
+    const sum = (...statuses: (typeof applicationStatusValues)[number][]) =>
+      statuses.reduce((total, status) => total + (byStatus.get(status) ?? 0), 0);
+
+    return {
+      analyzed,
+      // `saved` is excluded: a bookmarked job was never applied to.
+      applied: sum("applied", "screening", "interview", "offer", "rejected"),
+      interviews: sum("interview"),
+      offers: sum("offer"),
+    };
+  }),
+  /**
+   * Positions sitting in a live conversation stage, for the dashboard sidebar.
+   * The schema has no interview date yet, so this answers "who is in play",
+   * not "when" - ordered by the most recently touched.
+   */
+  getInterviewStagePositions: protectedProcedure.query(async ({ ctx }) => {
+    const positions = await prisma.trackerPosition.findMany({
+      where: {
+        userId: ctx.auth.user.id,
+        status: { in: ["screening", "interview"] },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 4,
+      select: {
+        id: true,
+        company: true,
+        position: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
+    return positions;
+  }),
 });

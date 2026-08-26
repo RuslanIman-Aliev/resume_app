@@ -18,8 +18,8 @@ const AnalyzerPage = () => {
   return (
     <HydrateClient>
       <div>
-        <section className="max-w-7xl grid grid-cols-3 gap-6 mx-auto">
-          <div className="col-span-2">
+        <section className="max-w-7xl grid grid-cols-1 gap-6 mx-auto px-4 sm:px-6 md:grid-cols-3 xl:px-0">
+          <div className="md:col-span-2">
             <AnalyzerTabs />
           </div>
           <AnalyzerInfo />

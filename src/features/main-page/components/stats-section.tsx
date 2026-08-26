@@ -7,8 +7,8 @@ const stats = [
 
 const StatsSection = () => {
   return (
-    <section className="border-y border-border/50 bg-card/30 mb-20 md:mb-28">
-      <div className="container mx-auto max-w-7xl px-4 py-12">
+    <section className="border-y border-border/50 bg-card/30">
+      <div className="container mx-auto max-w-7xl px-4 py-10 md:py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((stat, index) => (
             <div key={index} className="text-center">

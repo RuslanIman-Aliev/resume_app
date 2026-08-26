@@ -327,6 +327,36 @@ const AnalyzeResumeImprovements = ({
     isEditorReady,
   ]);
 
+  // Re-fit the document when the viewport changes width (device rotation), so
+  // the zoom applyResponsiveZoom picked for the old width does not stay stale.
+  useEffect(() => {
+    if (!isEditorReady) {
+      return;
+    }
+
+    let timeoutId = 0;
+    const handleResize = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        const documentEditor = editorRef.current?.documentEditor as
+          | DocumentEditorLike
+          | undefined;
+
+        if (documentEditor) {
+          forceEditorRender(documentEditor, editorRef.current);
+        }
+      }, 150);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [isEditorReady]);
+
+
   const handleQueueImprovement = (
     improvement: ImprovementTip,
     accordionKey: string,
@@ -545,9 +575,9 @@ const AnalyzeResumeImprovements = ({
                   className="rounded-2xl border border-border/50 bg-card/50"
                 >
                   <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
-                    <div className="flex items-start justify-between w-full text-left gap-4 pr-2">
-                      <div className="flex flex-col gap-1.5 flex-1">
-                        <div className="flex items-center text-lg font-semibold gap-3">
+                    <div className="flex flex-col items-start justify-between w-full text-left gap-2 pr-2 sm:flex-row sm:gap-4">
+                      <div className="flex w-full min-w-0 flex-col gap-1.5 flex-1">
+                        <div className="flex flex-wrap items-center text-lg font-semibold gap-x-3 gap-y-1.5">
                           <Badge
                             variant="outline"
                             className={`font-medium px-2 py-0 h-5 lowercase ${getPriorityStyles(
@@ -620,15 +650,16 @@ const AnalyzeResumeImprovements = ({
                           </p>
                         </div>
                       </div>
-                      <div className="mt-4 flex justify-end gap-3">
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
                         <Button
                           variant="outline"
-                          className="border-border/60 bg-card/60"
+                          className="border-border/60 bg-card/60 min-h-11 w-full sm:min-h-0 sm:w-auto"
                         >
                           <Copy className="h-4 w-4 mr-2" />
                           Copy Suggestion
                         </Button>
                         <Button
+                          className="min-h-11 w-full sm:min-h-0 sm:w-auto"
                           onClick={() =>
                             handleQueueImprovement(
                               improvement,
@@ -672,9 +703,9 @@ const AnalyzeResumeImprovements = ({
                     className="rounded-2xl border border-border/30 bg-card/30"
                   >
                     <AccordionTrigger className="px-5 pt-5 hover:no-underline focus:no-underline cursor-pointer">
-                      <div className="flex items-start justify-between w-full text-left gap-4 pr-2">
-                        <div className="flex flex-col gap-1.5 flex-1">
-                          <div className="flex items-center text-lg font-semibold gap-3">
+                      <div className="flex flex-col items-start justify-between w-full text-left gap-2 pr-2 sm:flex-row sm:gap-4">
+                        <div className="flex w-full min-w-0 flex-col gap-1.5 flex-1">
+                          <div className="flex flex-wrap items-center text-lg font-semibold gap-x-3 gap-y-1.5">
                             <Badge
                               variant="outline"
                               className={`font-medium px-2 py-0 h-5 lowercase opacity-60 ${getPriorityStyles(
@@ -742,7 +773,7 @@ const AnalyzeResumeImprovements = ({
           onOpenChange={handleEditorDialogOpenChange}
         >
           <DialogTitle></DialogTitle>
-          <DialogContent className="w-[95vw]! h-[95vh]! max-h-[95vh]! max-w-[95vw]! mx-auto">
+          <DialogContent className="w-[95vw]! h-[95dvh]! max-h-[95dvh]! max-w-[95vw]! mx-auto">
             <div className="flex h-full flex-col space-y-3">
               <h3 className="text-base font-semibold">Resume Editor</h3>
               {isSuggestionLoading ? (
@@ -751,7 +782,7 @@ const AnalyzeResumeImprovements = ({
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-2">
                         <Skeleton className="h-3 w-32" />
-                        <Skeleton className="h-4 w-80" />
+                        <Skeleton className="h-4 w-full max-w-80" />
                       </div>
                       <div className="flex gap-2">
                         <Skeleton className="h-9 w-20" />
@@ -781,6 +812,7 @@ const AnalyzeResumeImprovements = ({
                       </div>
                       <div className="flex gap-2">
                         <Button
+                          className="min-h-11 sm:min-h-0"
                           onClick={handleApplyPending}
                           disabled={isApplyingSuggestion}
                         >
@@ -793,6 +825,7 @@ const AnalyzeResumeImprovements = ({
                         </Button>
                         <Button
                           variant="outline"
+                          className="min-h-11 sm:min-h-0"
                           onClick={handleCancelPending}
                           disabled={isApplyingSuggestion}
                         >

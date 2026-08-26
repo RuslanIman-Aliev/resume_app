@@ -7,8 +7,12 @@ const prismaMock = vi.hoisted(() => ({
   trackerPosition: {
     create: vi.fn(),
     findMany: vi.fn(),
+    groupBy: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+  },
+  jobApplication: {
+    count: vi.fn(),
   },
 }));
 
@@ -149,5 +153,94 @@ describe("trackerRouter", () => {
       code: "UNAUTHORIZED",
     });
     expect(prismaMock.trackerPosition.findMany).not.toHaveBeenCalled();
+  });
+
+  it("zero-fills pipeline stats for statuses with no tracked positions", async () => {
+    prismaMock.trackerPosition.groupBy.mockResolvedValue([
+      { status: "applied", _count: { _all: 3 } },
+      { status: "offer", _count: { _all: 1 } },
+    ]);
+
+    const caller = createCaller({});
+    const result = await caller.getPipelineStats();
+
+    expect(prismaMock.trackerPosition.groupBy).toHaveBeenCalledWith({
+      by: ["status"],
+      where: { userId: session.user.id },
+      _count: { _all: true },
+    });
+    expect(result).toEqual({
+      counts: {
+        saved: 0,
+        applied: 3,
+        screening: 0,
+        interview: 0,
+        offer: 1,
+        rejected: 0,
+      },
+      total: 4,
+    });
+  });
+
+  it("derives every headline counter from a single status groupBy", async () => {
+    prismaMock.trackerPosition.groupBy.mockResolvedValue([
+      { status: "saved", _count: { _all: 5 } },
+      { status: "applied", _count: { _all: 3 } },
+      { status: "screening", _count: { _all: 2 } },
+      { status: "interview", _count: { _all: 4 } },
+      { status: "offer", _count: { _all: 1 } },
+      { status: "rejected", _count: { _all: 6 } },
+    ]);
+    prismaMock.jobApplication.count.mockResolvedValue(9);
+
+    const caller = createCaller({});
+    const result = await caller.getStatistics();
+
+    expect(result).toEqual({
+      analyzed: 9,
+      // Everything except the 5 bookmarked-but-never-sent positions.
+      applied: 16,
+      interviews: 4,
+      offers: 1,
+    });
+    expect(prismaMock.trackerPosition.groupBy).toHaveBeenCalledWith({
+      by: ["status"],
+      where: { userId: session.user.id },
+      _count: { _all: true },
+    });
+  });
+
+  it("reports zeroed statistics for a user with no tracked positions", async () => {
+    prismaMock.trackerPosition.groupBy.mockResolvedValue([]);
+    prismaMock.jobApplication.count.mockResolvedValue(0);
+
+    const caller = createCaller({});
+
+    await expect(caller.getStatistics()).resolves.toEqual({
+      analyzed: 0,
+      applied: 0,
+      interviews: 0,
+      offers: 0,
+    });
+  });
+
+  it("lists only the current user's positions in a live conversation stage", async () => {
+    const positions = [{ id: "app_1", status: "interview" }];
+    prismaMock.trackerPosition.findMany.mockResolvedValue(positions);
+
+    const caller = createCaller({});
+    const result = await caller.getInterviewStagePositions();
+
+    expect(prismaMock.trackerPosition.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: session.user.id,
+          status: { in: ["screening", "interview"] },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 4,
+      }),
+    );
+    expect(result).toEqual(positions);
   });
 });

@@ -9,7 +9,7 @@ const actions = [
     title: "Analyze Job",
     description: "Paste a job description to extract requirements",
     icon: FileText,
-    href: "/",
+    href: "/analyzer",
     color: "text-primary",
     bgColor: "bg-primary/10",
     primary: true,
@@ -19,16 +19,16 @@ const actions = [
     title: "Upload Resume",
     description: "Upload your resume for AI optimization",
     icon: Upload,
-    href: "/resume",
+    href: "/resumes",
     color: "text-chart-2",
     bgColor: "bg-chart-2/10",
   },
   {
     id: "tailor",
     title: "Tailor Resume",
-    description: "Customize your resume for a specific job",
+    description: "Apply AI suggestions from a past analysis",
     icon: Sparkles,
-    href: "/tailor",
+    href: "/recent-analyzer",
     color: "text-chart-4",
     bgColor: "bg-chart-4/10",
   },
@@ -37,7 +37,7 @@ const actions = [
     title: "Track Application",
     description: "Add a new job application to your tracker",
     icon: Target,
-    href: "/applications/new",
+    href: "/tracker",
     color: "text-chart-5",
     bgColor: "bg-chart-5/10",
   },
@@ -58,7 +58,13 @@ const QuickActions = () => {
                     bgColor,
                   }) => (
                     <div key={id} className="">
-                      <div className="flex   items-center gap-3 w-full rounded-lg  py-2 px-4 transition-all hover:border-border hover:bg-secondary/50">
+                      {/* The whole row carries the hover state, so the whole row
+                          is the link — not just the text next to the icon. */}
+                      <Link
+                        href={href}
+                        prefetch
+                        className="flex   items-center gap-3 w-full rounded-lg  py-2 px-4 transition-all hover:border-border hover:bg-secondary/50"
+                      >
                         <Avatar
                           className={`flex ${bgColor}  items-center justify-center rounded-lg  h-8 w-8 text-sm font-bold `}
                         >
@@ -69,13 +75,13 @@ const QuickActions = () => {
                           </AvatarFallback>
                         </Avatar>
 
-                        <Link href={href} className="w-full">
+                        <div className="flex min-h-11 w-full flex-col justify-center sm:block sm:min-h-0">
                           <div className="text-md">{title}</div>
                           <div className="text-xs text-muted-foreground">
                             {description}
                           </div>
-                        </Link>
-                      </div>
+                        </div>
+                      </Link>
                     </div>
                   ),
                 )}

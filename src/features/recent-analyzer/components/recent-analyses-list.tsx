@@ -279,7 +279,7 @@ const RecentAnalysesList = () => {
 
   return (
     <>
-      <div className="flex gap-6 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6 sm:grid-cols-4 sm:gap-6">
         <CardComponent
           title="Total Analyses"
           value={data?.totalAnalyses ?? 0}
@@ -302,7 +302,7 @@ const RecentAnalysesList = () => {
         />
       </div>
 
-      <div className="flex flex-col justify-center items-center sm:flex-row gap-4 mb-6">
+      <div className="flex flex-col justify-center items-stretch gap-4 mb-6 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -310,13 +310,13 @@ const RecentAnalysesList = () => {
             placeholder="Search by job title or company..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 rounded-md border border-border/50 bg-secondary/30 text-sm placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full h-11 sm:h-10 pl-10 pr-4 rounded-md border border-border/50 bg-secondary/30 text-base md:text-sm placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2 flex-1 min-h-11 sm:flex-none sm:min-h-0">
                 <Filter className="h-4 w-4" />
                 {SCORE_FILTER_LABELS[filterScore]}
               </Button>
@@ -339,7 +339,7 @@ const RecentAnalysesList = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2 flex-1 min-h-11 sm:flex-none sm:min-h-0">
                 <ArrowUpDown className="h-4 w-4" />
                 {SORT_LABELS[sortBy]}
               </Button>
@@ -388,8 +388,8 @@ const RecentAnalysesList = () => {
                     <span className="text-xl font-bold">{score}%</span>
                   </div>
 
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 flex-col gap-1.5 flex-1">
+                    <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
                         {analysis.jobTitle}
                       </h3>

@@ -44,20 +44,20 @@ const FeatureSection = () => {
   return (
     <section
       id="features"
-      className=" max-w-7xl mx-auto container bg-background  text-center  "
+      className="px-4 sm:px-6 xl:px-0 py-12 md:py-20 max-w-7xl mx-auto container bg-background  text-center  "
     >
-      <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold  tracking-tight text-foreground mt-6">
+      <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold  tracking-tight text-foreground">
         Everything you need to land your next role
       </h2>
       <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
         Powerful AI tools designed to give you an unfair advantage in your job
         search.
       </p>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6  mt-16 mb-20 md:mb-28">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8 md:mt-14">
         {features.map((feature, index) => (
           <Card
             key={index}
-            className="bg-card/50 border border-border/50 hover:border-primary/30 transition-colors text-left p-6 rounded-lg"
+            className="bg-card/50 border border-border/50 hover:border-primary/30 transition-colors text-left p-4 sm:p-6 rounded-lg"
           >
             <CardContent>
               <div className="flex items-center justify-center w-12 rounded-lg h-12 bg-primary/10 my-5">

@@ -90,7 +90,7 @@ const RecentAnalyses = () => {
     <section>
       <Card className="p-6">
         <h1 className="text-lg font-bold mb-2">Recent Analyses</h1>
-        <ScrollArea className="h-100 w-full rounded-md border border-border/50 bg-secondary/10 p-4">
+        <ScrollArea className="h-100 w-full rounded-md border border-border/50 bg-secondary/10 p-4 [&_[data-slot=scroll-area-viewport]>div]:block!">
           {!data?.analyses?.length ? (
             <FeedbackState
               status="default"
@@ -131,9 +131,9 @@ const RecentAnalyses = () => {
                       </AvatarFallback>
                     </Avatar>
 
-                    <div className="w-full">
-                      <div className="flex justify-between">
-                        <div className="gap-2 flex items-center">
+                    <div className="w-full min-w-0">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:gap-0">
+                        <div className="gap-2 flex items-center min-w-0">
                           <span className="truncate font-medium text-sm">
                             {postedRole
                               ? postedRole.charAt(0).toUpperCase() +
@@ -142,7 +142,7 @@ const RecentAnalyses = () => {
                           </span>
                           {getStatusBadge(status)}
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-4">
                           {keywords.slice(0, 2).map((skill, index) => (
                             <Badge
                               key={`keyword-${skill}-${index}`}
@@ -196,7 +196,7 @@ const RecentAnalyses = () => {
             )
           )}
         </ScrollArea>
-        <div className=" flex items-center justify-center gap-2 rounded-lg border border-dashed border-border p-4 text-muted-foreground">
+        <div className=" flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border p-4 text-muted-foreground sm:flex-row">
           <Sparkles className="h-4 w-4" />
           <span className="text-sm">
             Analyze more jobs to improve your match accuracy
@@ -205,7 +205,7 @@ const RecentAnalyses = () => {
             asChild
             size="sm"
             variant="link"
-            className="text-primary px-0 hover:text-primary/80"
+            className="text-primary px-0 hover:text-primary/80 h-11 sm:h-7"
           >
             <Link href="/resumes" prefetch>
               Analyze Now

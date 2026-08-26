@@ -152,8 +152,8 @@ const MainScoreCard = () => {
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="col-span-2 border border-border/50 bg-card/50">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Card className="md:col-span-2 border border-border/50 bg-card/50">
           <CardHeader>
             <h3 className="text-xl font-semibold">Resume Score</h3>
             <p className="text-sm text-muted-foreground">
@@ -161,7 +161,7 @@ const MainScoreCard = () => {
               {data?.analysis?.resume?.resumeName || "Untitled Resume"}
             </p>
           </CardHeader>
-          <CardContent className="flex gap-4 items-center justify-center">
+          <CardContent className="flex flex-col gap-4 items-center justify-center md:flex-row">
             <div>
               <ChartContainer
                 config={chartConfig}
@@ -240,7 +240,7 @@ const MainScoreCard = () => {
                 improvement. Focus on the high-impact suggestions below to
                 increase your score and stand out to recruiters.
               </p>
-              <div className="flex w-full gap-2 mt-4">
+              <div className="flex w-full flex-col gap-2 mt-4 sm:flex-row">
                 <div className="p-3 rounded-lg bg-primary/10 flex gap-3 flex-1 ">
                   <CheckCircle2 className="h-6 w-6 text-primary" />
                   <div className="flex flex-col">
@@ -280,7 +280,7 @@ const MainScoreCard = () => {
                 data?.analysis.quickWins.map((win, index) => (
                   <div
                     key={`${win.title}-${index}`}
-                    className="flex gap-3 justify-between items-center"
+                    className="flex flex-col gap-1 justify-between items-start sm:flex-row sm:gap-3 sm:items-center"
                   >
                     <div className="flex items-center">
                       <Dot className="h-10 w-10 text-primary  mt-1" />

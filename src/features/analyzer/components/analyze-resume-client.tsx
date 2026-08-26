@@ -177,38 +177,38 @@ export const AnalyzeResumeClient = () => {
           router.push(`${pathname}?tab=${val}`, { scroll: false })
         }
       >
-        <TabsList className="bg-background p-1">
+        <TabsList className="bg-background p-1 w-full max-w-full justify-start overflow-x-auto group-data-horizontal/tabs:h-auto md:w-fit md:justify-center md:overflow-x-visible md:group-data-horizontal/tabs:h-8">
           <TabsTrigger
             value="overview"
-            className="text-white!  py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+            className="text-white!  py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
           >
             <Target className="h-4 w-4 mr-2" />
             Overview
           </TabsTrigger>
           <TabsTrigger
             value="improvements"
-            className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+            className="text-white! py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
           >
             <TrendingUp className="h-4 w-4 mr-2" />
             Improvements
           </TabsTrigger>
           <TabsTrigger
             value="skills-gap"
-            className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+            className="text-white! py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
           >
             <Zap className="h-4 w-4 mr-2" />
             Skills Gap
           </TabsTrigger>
           <TabsTrigger
             value="keywords"
-            className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+            className="text-white! py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
           >
             <Sparkles className="h-4 w-4 mr-2" />
             Keywords
           </TabsTrigger>
           <TabsTrigger
             value="original"
-            className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+            className="text-white! py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
           >
             <FileText className="h-4 w-4 mr-2" />
             Original Resume

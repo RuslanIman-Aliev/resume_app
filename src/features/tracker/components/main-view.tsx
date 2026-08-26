@@ -44,9 +44,7 @@ const MainView = () => {
     trpc.tracker.create.mutationOptions({
       onSuccess: async () => {
         toast.info("Application added successfully!");
-        await queryClient.invalidateQueries({
-          queryKey: trpc.tracker.getAll.queryKey(),
-        });
+        await queryClient.invalidateQueries(trpc.tracker.pathFilter());
       },
       onError: (error) => {
         toast.error(
@@ -133,7 +131,7 @@ const MainView = () => {
       <div className="flex items-center justify-end gap-4 mb-6">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="h-11 w-full sm:h-8 sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Add Application
             </Button>

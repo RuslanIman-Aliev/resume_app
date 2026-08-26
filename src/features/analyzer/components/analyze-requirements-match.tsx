@@ -123,7 +123,7 @@ const AnalyzeRequirementsMatch = ({
               </div>
               <Button
                 onClick={onViewImprovements}
-                className="shrink-0 bg-primary! text-primary-foreground! hover:bg-primary/90! self-start sm:self-auto ml-16 sm:ml-0"
+                className="shrink-0 bg-primary! text-primary-foreground! hover:bg-primary/90! self-start sm:self-auto min-h-11 w-full sm:min-h-0 sm:w-auto"
               >
                 View Improvements
                 <ChevronRight className="ml-1 h-4 w-4" />

@@ -73,7 +73,7 @@ const DialogTracker = ({
   });
 
   return (
-    <DialogContent className="sm:max-w-125">
+    <DialogContent className="sm:max-w-125 [&>[data-slot=dialog-close]]:size-11 sm:[&>[data-slot=dialog-close]]:size-7">
       <DialogHeader>
         <DialogTitle>{isEditing ? "Edit" : "Add"} Application</DialogTitle>
         <DialogDescription>
@@ -84,7 +84,7 @@ const DialogTracker = ({
       </DialogHeader>
 
       <form onSubmit={handleSubmit}>
-        <FieldGroup className="space-y-4 py-4 px-2 max-h-[60vh] overflow-y-auto">
+        <FieldGroup className="space-y-4 py-4 px-2 max-h-[60dvh] overflow-y-auto">
           <Controller
             name="company"
             disabled={readOnly}
@@ -99,7 +99,7 @@ const DialogTracker = ({
                     id="tracker-company"
                     aria-invalid={fieldState.invalid}
                     placeholder="e.g., Stripe"
-                    className="pl-10"
+                    className="pl-10 h-11 md:h-8"
                   />
                 </div>
                 {fieldState.invalid && (
@@ -121,6 +121,7 @@ const DialogTracker = ({
                   id="tracker-position"
                   aria-invalid={fieldState.invalid}
                   placeholder="e.g., Senior Frontend Engineer"
+                  className="h-11 md:h-8"
                 />
                 {fieldState.invalid && (
                   <FieldError errors={[fieldState.error]} />
@@ -143,7 +144,7 @@ const DialogTracker = ({
                     id="tracker-location"
                     aria-invalid={fieldState.invalid}
                     placeholder="e.g., San Francisco, CA (Remote)"
-                    className="pl-10"
+                    className="pl-10 h-11 md:h-8"
                   />
                 </div>
                 {fieldState.invalid && (
@@ -167,7 +168,7 @@ const DialogTracker = ({
                     id="tracker-salary"
                     aria-invalid={fieldState.invalid}
                     placeholder="e.g., $150k - $180k"
-                    className="pl-10"
+                    className="pl-10 h-11 md:h-8"
                   />
                 </div>
                 {fieldState.invalid && (
@@ -188,6 +189,7 @@ const DialogTracker = ({
                   <SelectTrigger
                     id="tracker-status"
                     aria-invalid={fieldState.invalid}
+                    className="min-h-11 md:min-h-0"
                   >
                     <SelectValue placeholder="Select a status" />
                   </SelectTrigger>
@@ -222,7 +224,7 @@ const DialogTracker = ({
                     type="url"
                     aria-invalid={fieldState.invalid}
                     placeholder="https://..."
-                    className="pl-10"
+                    className="pl-10 h-11 md:h-8"
                   />
                 </div>
                 {fieldState.invalid && (
@@ -253,7 +255,7 @@ const DialogTracker = ({
                     id="tracker-contact-name"
                     aria-invalid={fieldState.invalid}
                     placeholder="e.g., John Smith"
-                    className="pl-10"
+                    className="pl-10 h-11 md:h-8"
                   />
                 </div>
                 {fieldState.invalid && (
@@ -281,7 +283,7 @@ const DialogTracker = ({
                     type="email"
                     aria-invalid={fieldState.invalid}
                     placeholder="recruiter@company.com"
-                    className="pl-10"
+                    className="pl-10 h-11 md:h-8"
                   />
                 </div>
                 {fieldState.invalid && (
@@ -314,12 +316,18 @@ const DialogTracker = ({
         </FieldGroup>
 
         <DialogFooter className="pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="h-11 md:h-8"
+          >
             Cancel
           </Button>
           <Button
             type="submit"
             disabled={form.formState.isSubmitting || readOnly}
+            className="h-11 md:h-8"
           >
             {form.formState.isSubmitting
               ? "Saving..."

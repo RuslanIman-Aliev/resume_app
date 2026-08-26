@@ -11,11 +11,13 @@ const prismaMock = vi.hoisted(() => ({
     findFirst: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
+    deleteMany: vi.fn(),
   },
   resumeAnalysis: {
     findFirst: vi.fn(),
     findMany: vi.fn(),
     count: vi.fn(),
+    update: vi.fn(),
   },
   jobApplication: {
     create: vi.fn(),
@@ -36,6 +38,9 @@ const inngestMock = vi.hoisted(() => ({
   send: vi.fn(),
 }));
 
+// The real module is `server-only`, which throws under the jsdom test env.
+const deleteUploadThingFilesByUrlMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/db", () => ({
   default: prismaMock,
 }));
@@ -50,6 +55,10 @@ vi.mock("next/headers", () => ({
 
 vi.mock("@/inngest/client", () => ({
   inngest: inngestMock,
+}));
+
+vi.mock("@/lib/uploadthing-files", () => ({
+  deleteUploadThingFilesByUrl: deleteUploadThingFilesByUrlMock,
 }));
 
 const createCaller = createCallerFactory(resumeRouter);
@@ -764,5 +773,96 @@ describe("resumeRouter", () => {
         newText: "Updated summary text",
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("marks the resume analysis suggestion applied when there is no application", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      id: "resume_1",
+      parsedContent: "Old summary text",
+      structuredData: {
+        personalInfo: { summary: "Old summary text" },
+      },
+    });
+    prismaMock.resume.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.resumeAnalysis.findFirst.mockResolvedValue({
+      id: "analysis_1",
+      improvements: [
+        {
+          title: "Strengthen Summary",
+          currentText: "Old summary text",
+          suggestedText: "New summary text",
+          targetSection: "summary",
+        },
+        {
+          title: "Unrelated",
+          currentText: "Something else",
+          suggestedText: "Another thing",
+          targetSection: "skills",
+        },
+      ],
+    });
+    prismaMock.resumeAnalysis.update.mockResolvedValue({});
+
+    const caller = createCaller({});
+    await caller.applyImprovement({
+      resumeId: "resume_1",
+      targetSection: "summary",
+      previousText: "Old summary text",
+      newText: "New summary text",
+    });
+
+    expect(prismaMock.resumeAnalysis.update).toHaveBeenCalledWith({
+      where: { id: "analysis_1" },
+      data: {
+        improvements: [
+          {
+            title: "Strengthen Summary",
+            currentText: "Old summary text",
+            suggestedText: "New summary text",
+            targetSection: "summary",
+            isApplied: true,
+          },
+          {
+            title: "Unrelated",
+            currentText: "Something else",
+            suggestedText: "Another thing",
+            targetSection: "skills",
+          },
+        ],
+      },
+    });
+    expect(prismaMock.jobApplication.update).not.toHaveBeenCalled();
+  });
+
+  it("deletes stored files after removing a resume", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      resumeLink: "https://utfs.io/f/file-key",
+      resumePreviewLink: "https://utfs.io/f/preview-key",
+    });
+    prismaMock.resume.deleteMany.mockResolvedValue({ count: 1 });
+
+    const caller = createCaller({});
+    const result = await caller.deleteResume({ resumeId: "resume_1" });
+
+    expect(prismaMock.resume.deleteMany).toHaveBeenCalledWith({
+      where: { id: "resume_1", userId: session.user.id },
+    });
+    expect(deleteUploadThingFilesByUrlMock).toHaveBeenCalledWith(
+      ["https://utfs.io/f/file-key", "https://utfs.io/f/preview-key"],
+      expect.any(String),
+    );
+    expect(result).toEqual({ success: true });
+  });
+
+  it("does not touch storage when the resume is not the caller's", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue(null);
+    prismaMock.resume.deleteMany.mockResolvedValue({ count: 0 });
+
+    const caller = createCaller({});
+
+    await expect(
+      caller.deleteResume({ resumeId: "resume_1" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(deleteUploadThingFilesByUrlMock).not.toHaveBeenCalled();
   });
 });

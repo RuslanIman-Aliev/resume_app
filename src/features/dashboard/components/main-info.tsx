@@ -1,7 +1,18 @@
-import { Button } from "@/components/ui/button";
+"use client";
 import { Card, CardContent } from "@/components/ui/card";
+import { FeedbackState } from "@/components/ui/feedback-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Calendar, FileText, Send, TrendingUpIcon, Trophy } from "lucide-react";
+import { useTRPC } from "@/trpc/client";
+import { useQuery } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  Calendar,
+  FileText,
+  RefreshCcw,
+  Send,
+  Trophy,
+} from "lucide-react";
 
 const stats = [
   {
@@ -19,8 +30,9 @@ const stats = [
     bgColor: "bg-chart-2/10",
   },
   {
+    // Current-state, like the pipeline bar: positions sitting at this stage now.
     key: "interviews" as const,
-    label: "Interviews",
+    label: "In Interviews",
     icon: Calendar,
     color: "text-chart-4",
     bgColor: "bg-chart-4/10",
@@ -34,87 +46,68 @@ const stats = [
   },
 ];
 
-const statsData = {
-  analyzed: { value: 156, change: 34, trend: "up" as const },
-  applied: { value: 89, change: 22, trend: "up" as const },
-  interviews: { value: 24, change: 15, trend: "up" as const },
-  offers: { value: 5, change: 25, trend: "up" as const },
-};
-
 const MainInfo = () => {
+  const trpc = useTRPC();
+  const { data, isLoading, isError, refetch, isFetching } = useQuery(
+    trpc.tracker.getStatistics.queryOptions(),
+  );
+
   return (
     <>
-      <div className="flex justify-between items-center">
-        <div className="flex flex-col">
-          <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
-          <p className="text-lg text-muted-foreground">
-            Track your job search progress and recent activity
-          </p>
-        </div>
-        <div>
-          {["7d", "30d", "90d"].map((option) => (
-            <Button
-              variant="ghost"
-              key={option}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                option === "7d"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {option === "7d"
-                ? "7 Days"
-                : option === "30d"
-                  ? "30 Days"
-                  : "90 Days"}
-            </Button>
-          ))}
-        </div>
+      <div className="flex flex-col">
+        <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
+        <p className="text-lg text-muted-foreground">
+          Track your job search progress and recent activity
+        </p>
       </div>
 
-      <div className="mt-6 grid  sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Content for the selected time range */}
-
-        {stats.map(({ key, label, icon: Icon, color, bgColor }) => {
-          const { value, change, trend } = statsData[key];
-          return (
+      {isError ? (
+        <Card className="mt-6 p-6">
+          <FeedbackState
+            status="error"
+            layout="inline"
+            icon={<AlertTriangle className="h-6 w-6 text-destructive" />}
+            title="Unable to load your job search stats"
+            description="Please try again in a moment."
+            primaryAction={{
+              label: "Retry",
+              onClick: () => refetch(),
+              disabled: isFetching,
+              icon: (
+                <RefreshCcw
+                  className={cn("h-4 w-4", isFetching && "animate-spin")}
+                />
+              ),
+              variant: "secondary",
+            }}
+          />
+        </Card>
+      ) : (
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stats.map(({ key, label, icon: Icon, color, bgColor }) => (
             <Card key={key} className="flex gap-4 ">
               <CardContent className="p-6 space-y-2 overflow-hidden relative">
                 <div className="flex items-center justify-between">
                   <div className={cn(" p-2.5 rounded-lg ", bgColor)}>
                     <Icon className={`h-5 w-5  ${color}`} />
                   </div>
-                  <div
-                    className={`flex items-center gap-1 text-xs font-medium ${
-                      trend === "up"
-                        ? "text-success"
-                        : trend === "down"
-                          ? "text-destructive"
-                          : "text-muted-foreground"
-                    }`}
-                  >
-                    {trend === "up" ? (
-                      <TrendingUpIcon className="h-3 w-3" />
-                    ) : trend === "down" ? (
-                      <TrendingUpIcon className="h-3 w-3 rotate-180" />
-                    ) : null}
-
-                    <span>
-                      {change > 0 ? "+" : ""}
-                      {change}%
-                    </span>
-                  </div>
                 </div>
-                <p className="text-3xl font-bold tracking-tight">{value}</p>
+                {isLoading ? (
+                  <Skeleton className="h-9 w-14" />
+                ) : (
+                  <p className="text-3xl font-bold tracking-tight">
+                    {data?.[key] ?? 0}
+                  </p>
+                )}
                 <p className="text-sm  text-muted-foreground">{label}</p>
                 <div
                   className={`absolute -bottom-8 -right-8 h-24 w-24 rounded-full ${bgColor} opacity-50 blur-2xl`}
                 />
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </>
   );
 };

@@ -8,24 +8,57 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getErrorFeedback } from "@/lib/error-feedback";
 import { getCategoryConfig, getPriorityConfig } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, ArrowRight, Lightbulb, Sparkles } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Lightbulb,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { ImprovementsError, ImprovementsSkeleton } from "./improvements-status";
 
 const ImprovementsSection = () => {
   const [filter, setFilter] = useState<"all" | "high" | "medium" | "low">(
     "all",
   );
+  const [applyingKey, setApplyingKey] = useState<string | null>(null);
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const params = useParams();
   const resumeId = params.id as string;
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery(
     trpc.resume.getImprovements.queryOptions({ resumeId }),
+  );
+
+  const { mutate: applyImprovement } = useMutation(
+    trpc.resume.applyImprovement.mutationOptions({
+      onSuccess: () => {
+        // The edit lands in the resume's structured content, not in the DOCX
+        // file — that rewrite only happens in the analyzer, where the document
+        // editor is mounted. Say so rather than implying the file changed.
+        toast.success("Suggestion applied to your resume content.");
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getImprovements.queryKey({ resumeId }),
+        });
+      },
+      onError: (error) => {
+        toast.error(
+          getErrorFeedback(error, {
+            fallbackMessage: "Failed to apply this suggestion.",
+          }).message,
+        );
+      },
+      onSettled: () => setApplyingKey(null),
+    }),
   );
 
   const filteredImprovements = useMemo(() => {
@@ -48,14 +81,14 @@ const ImprovementsSection = () => {
   }
   return (
     <section>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 items-start justify-between sm:flex-row sm:items-center sm:gap-0">
         <div className="flex flex-col">
           <h2 className="text-xl font-bold">Improvement Suggestions</h2>
           <p className="text-muted-foreground">
             {filteredImprovements.length} suggestions to improve your resume
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Filter:</span>
           {["all", "high", "medium", "low"].map((f) => (
             <Button
@@ -63,7 +96,7 @@ const ImprovementsSection = () => {
               variant={filter === f ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setFilter(f as typeof filter)}
-              className="capitalize hover:bg-primary!"
+              className="capitalize hover:bg-primary! min-h-11 sm:min-h-0"
             >
               {f === "all" ? "All" : `${f} Impact`}
             </Button>
@@ -90,8 +123,8 @@ const ImprovementsSection = () => {
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
                       <CategoryIcon className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <div className="flex flex-col gap-1 ">
-                      <div className="flex flex-row gap-2">
+                    <div className="flex min-w-0 flex-col gap-1 ">
+                      <div className="flex flex-row flex-wrap gap-2">
                         <Badge variant="outline" className={category.color}>
                           {category.label}
                         </Badge>
@@ -153,10 +186,44 @@ const ImprovementsSection = () => {
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-border/30">
-                      <Button>
-                        Apply This Suggestion
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
+                      {improvement.isApplied ? (
+                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Applied to your resume
+                        </div>
+                      ) : (
+                        <Button
+                          className="min-h-11 w-full sm:min-h-0 sm:w-auto"
+                          // A suggestion with no replacement text has nothing to
+                          // write back, so there is no action to offer.
+                          disabled={
+                            !improvement.suggestedText?.trim() ||
+                            applyingKey !== null
+                          }
+                          onClick={() => {
+                            setApplyingKey(accordionItemValue);
+                            applyImprovement({
+                              resumeId,
+                              targetSection: improvement.targetSection,
+                              targetId: improvement.targetId,
+                              previousText: improvement.currentText ?? undefined,
+                              newText: improvement.suggestedText ?? "",
+                            });
+                          }}
+                        >
+                          {applyingKey === accordionItemValue ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Applying...
+                            </>
+                          ) : (
+                            <>
+                              Apply This Suggestion
+                              <ArrowRight className="h-4 w-4 ml-2" />
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </AccordionContent>

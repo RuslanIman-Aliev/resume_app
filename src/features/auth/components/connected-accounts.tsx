@@ -91,7 +91,7 @@ export function ConnectedAccounts({ oauthError }: { oauthError?: string }) {
         Connect Google to sign in with one click instead of your password.
       </p>
 
-      <div className="mt-6 flex items-center justify-between gap-4 rounded-lg border p-4">
+      <div className="mt-6 flex flex-col items-start justify-between gap-4 rounded-lg border p-4 sm:flex-row sm:items-center">
         <div className="min-w-0">
           <p className="font-medium">Google</p>
           {isLoading ? (
@@ -110,13 +110,18 @@ export function ConnectedAccounts({ oauthError }: { oauthError?: string }) {
           (google ? (
             <Button
               variant="outline"
+              className="min-h-11 w-full sm:min-h-0 sm:w-auto"
               onClick={onDisconnect}
               disabled={isPending}
             >
               Disconnect
             </Button>
           ) : (
-            <Button onClick={onConnect} disabled={isPending}>
+            <Button
+              className="min-h-11 w-full sm:min-h-0 sm:w-auto"
+              onClick={onConnect}
+              disabled={isPending}
+            >
               {isPending ? "Connecting..." : "Connect"}
             </Button>
           ))}

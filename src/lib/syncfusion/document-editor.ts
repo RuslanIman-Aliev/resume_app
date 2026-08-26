@@ -178,6 +178,42 @@ export const waitForContainerReady = async (
   return false;
 };
 
+/** Width of a rendered document page (A4) in CSS pixels at 100% zoom. */
+const EDITOR_PAGE_WIDTH = 794;
+/** At or above this container width the desktop zoom (1) is kept untouched. */
+const EDITOR_DESKTOP_WIDTH = 768;
+/** Zoom floor: below this the 11pt body text stops being readable. */
+const EDITOR_MIN_ZOOM = 0.75;
+
+/**
+ * Scales the document down on narrow containers so most of the page width fits
+ * without shrinking the text past readability; whatever still does not fit stays
+ * reachable through the wrapper's horizontal scroll. Desktop keeps zoom 1.
+ */
+export const applyResponsiveZoom = (
+  documentEditor: DocumentEditorLike,
+  container: DocumentEditorContainerComponent | null,
+) => {
+  try {
+    const width = getEditorContainerElement(container)?.clientWidth ?? 0;
+
+    if (!width || width >= EDITOR_DESKTOP_WIDTH) {
+      // Only restore, never override a zoom the editor already settled on.
+      if ((documentEditor.zoomFactor ?? 1) < 1) {
+        documentEditor.zoomFactor = 1;
+      }
+      return;
+    }
+
+    documentEditor.zoomFactor = Math.max(
+      EDITOR_MIN_ZOOM,
+      Math.min(1, width / EDITOR_PAGE_WIDTH),
+    );
+  } catch {
+    // ignore zoom errors
+  }
+};
+
 /** Nudges the editor to re-layout: normalizes zoom, resizes, re-renders pages. */
 export const forceEditorRender = (
   documentEditor: DocumentEditorLike,
@@ -190,6 +226,8 @@ export const forceEditorRender = (
   } catch {
     // ignore zoom errors
   }
+
+  applyResponsiveZoom(documentEditor, container);
 
   try {
     documentEditor.resize?.();

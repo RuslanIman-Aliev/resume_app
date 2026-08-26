@@ -75,7 +75,7 @@ const AnalyzerTabs = () => {
   };
 
   return (
-    <Card className="w-full p-6">
+    <Card className="w-full p-4 sm:p-6">
       <CardHeader className="p-0">
         <div className="flex gap-2 items-center">
           <FileTextIcon className="size-6 text-primary" />
@@ -88,7 +88,7 @@ const AnalyzerTabs = () => {
 
       <Textarea
         placeholder="Paste the job description here..."
-        className="min-h-75 max-h-100 resize-none bg-secondary/30 border-border/50 focus:border-primary/50"
+        className="min-h-40 max-h-100 sm:min-h-75 resize-none bg-secondary/30 border-border/50 focus:border-primary/50"
         value={inputJobDescription}
         onChange={(e) => setInputJobDescription(e.target.value)}
       />
@@ -96,7 +96,7 @@ const AnalyzerTabs = () => {
       <div className="mt-6 space-y-3">
         <h3 className="font-medium">Select your resume to compare</h3>
 
-        <ScrollArea className="h-100 w-full rounded-md border border-border/50 bg-secondary/10 p-4">
+        <ScrollArea className="h-72 sm:h-100 w-full rounded-md border border-border/50 bg-secondary/10 p-4">
           {isLoading ? (
             <AnalyzerLoading />
           ) : isError ? (
@@ -132,8 +132,8 @@ const AnalyzerTabs = () => {
                       </Avatar>
 
                       <div className="flex-1 w-full min-w-0 pr-6">
-                        <div className="flex justify-between items-center mb-1">
-                          <div className="gap-2 flex items-center">
+                        <div className="flex flex-col gap-2 items-start mb-1 sm:flex-row sm:justify-between sm:items-center sm:gap-0">
+                          <div className="gap-2 flex min-w-0 items-center">
                             <span className="truncate font-semibold text-base">
                               {resume.postedRole
                                 ? resume.postedRole.charAt(0).toUpperCase() +
@@ -143,7 +143,7 @@ const AnalyzerTabs = () => {
                             {getStatusBadge(resume.status)}
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex shrink-0 flex-wrap items-center gap-3">
                             {latestAnalysis?.keywords
                               ?.slice(0, 2)
                               .map((skill, index) => (
@@ -176,7 +176,7 @@ const AnalyzerTabs = () => {
 
                         <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="flex items-center gap-1 truncate max-w-50">
+                            <div className="flex items-center gap-1 truncate sm:max-w-50">
                               <span className="truncate">
                                 {resume.resumeName
                                   ? resume.resumeName.charAt(0).toUpperCase() +
@@ -203,7 +203,7 @@ const AnalyzerTabs = () => {
       </div>
 
       <Button
-        className="mt-4 p-5 w-full font-bold "
+        className="mt-4 p-5 w-full font-bold min-h-11 sm:min-h-0 "
         disabled={!selectedResumeId || !inputJobDescription.trim()}
         onClick={handleClick}
       >

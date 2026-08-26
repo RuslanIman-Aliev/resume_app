@@ -1,13 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ImprovementsSection from "@/features/ai-coach/components/improvements-section";
 import MainScoreCard from "@/features/ai-coach/components/main-score-card";
-import {
-  CheckCircle2,
-  MessageSquare,
-  Sparkles,
-  Target,
-  TrendingUp,
-} from "lucide-react";
+import { Sparkles, Target, TrendingUp } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -74,7 +68,7 @@ const AiCoachPage = async ({ params }: PageProps) => {
   return (
     <HydrateClient>
       <section className="">
-        <div className="max-w-7xl mx-auto flex flex-col my-10">
+        <div className="max-w-7xl mx-auto flex flex-col my-10 px-4 sm:px-6 xl:px-0">
           <div className="flex flex-row gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
               <Sparkles className="h-5 w-5" />
@@ -89,35 +83,24 @@ const AiCoachPage = async ({ params }: PageProps) => {
             className=" text-white flex flex-col gap-1! mt-4"
             defaultValue="overview"
           >
-            <TabsList className="bg-background p-1">
+            <TabsList className="bg-background p-1 w-full max-w-full justify-start overflow-x-auto group-data-horizontal/tabs:h-auto md:w-fit md:justify-center md:overflow-x-visible md:group-data-horizontal/tabs:h-8">
               <TabsTrigger
                 value="overview"
-                className="text-white!  py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+                className="text-white!  py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
               >
                 <Target className="h-4 w-4 mr-2" />
                 Overview
               </TabsTrigger>
               <TabsTrigger
                 value="improvements"
-                className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
+                className="text-white! py-1 px-3 h-auto min-h-11 flex-none md:h-[calc(100%-1px)] md:min-h-0 md:flex-1 data-[state=active]:text-black! data-[state=active]:bg-primary!"
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Improvements
               </TabsTrigger>
-              <TabsTrigger
-                value="action-plan"
-                className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Action Plan
-              </TabsTrigger>
-              <TabsTrigger
-                value="chat"
-                className="text-white! py-1 px-3 data-[state=active]:text-black! data-[state=active]:bg-primary!"
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Ask AI
-              </TabsTrigger>
+              {/* Action Plan and Ask AI are not built yet. They stay out of the
+                  tab list until they have content — a tab that opens onto an
+                  empty panel reads as a broken page, not as a coming feature. */}
             </TabsList>
 
             <TabsContent value="overview" className="mt-4">
