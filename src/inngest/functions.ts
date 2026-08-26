@@ -13,6 +13,32 @@ const client = Sentry.instrumentOpenAiClient(openai, {
   recordOutputs: true,
 });
 /**
+ * Per-user ceiling on AI analysis runs, applied to every function below.
+ *
+ * Enforced by Inngest rather than by the in-process limiter in `@/lib/rate-limit`
+ * because that one keeps its counters in a single instance's memory. Vercel runs
+ * these routes as serverless functions: it spins up as many instances as the
+ * load needs and recycles them, so an in-memory ceiling is silently multiplied
+ * by the instance count and reset by every cold start. Inngest counts centrally,
+ * so the limit holds however the platform scales.
+ *
+ * `throttle` delays excess runs rather than discarding them. `rateLimit` would
+ * drop the event outright, and since the client waits for a Pusher message that
+ * the dropped run would have sent, the UI would spin forever.
+ *
+ * `concurrency` keyed by user stops one person from holding several analyses in
+ * flight at once - the burst that costs the most in the shortest time.
+ *
+ * Both are keyed on `event.data.userId`, so every event that triggers these
+ * functions has to carry it; without the field the key resolves to nothing and
+ * the limit silently becomes global across all users.
+ */
+const PER_USER_ANALYSIS_LIMITS = {
+  throttle: { limit: 20, period: "1h", key: "event.data.userId" },
+  concurrency: { limit: 1, key: "event.data.userId" },
+} as const;
+
+/**
  * Inngest function that analyzes a resume against a target role using OpenAI.
  * Generates AI-powered insights, calculates scores, and saves results to database.
  * Notifies client via Pusher when analysis completes.
@@ -20,7 +46,11 @@ const client = Sentry.instrumentOpenAiClient(openai, {
  * @returns Analysis result object with scores, keywords, strengths, and improvements
  */
 export const analyzeResume = inngest.createFunction(
-  { id: "analyze-resume", triggers: { event: "app/resume.analyzed" } },
+  {
+    id: "analyze-resume",
+    triggers: { event: "app/resume.analyzed" },
+    ...PER_USER_ANALYSIS_LIMITS,
+  },
   // The function receives the parsed resume content and the target role, then generates a prompt for the OpenAI API to analyze the resume against the target role. The result is returned after a brief pause.
   async ({ event, step }) => {
     const resumeText = getPrompt(
@@ -105,6 +135,7 @@ export const analyzeJobMatched = inngest.createFunction(
   {
     id: "analyze-job-matched",
     triggers: { event: "app/job-matched.analyzed" },
+    ...PER_USER_ANALYSIS_LIMITS,
   },
   // The function receives the parsed resume content and the target role, then generates a prompt for the OpenAI API to analyze the resume against the target role. The result is returned after a brief pause.
   async ({ event, step }) => {
