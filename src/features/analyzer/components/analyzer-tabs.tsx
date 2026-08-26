@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { cn } from "@/lib/utils";
 import { getRelativeTime, getScoreColor } from "@/lib/format";
+import { formatRoleLabel } from "@/lib/format";
 import { getStatusBadge } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -135,10 +136,8 @@ const AnalyzerTabs = () => {
                         <div className="flex flex-col gap-2 items-start mb-1 sm:flex-row sm:justify-between sm:items-center sm:gap-0">
                           <div className="gap-2 flex min-w-0 items-center">
                             <span className="truncate font-semibold text-base">
-                              {resume.postedRole
-                                ? resume.postedRole.charAt(0).toUpperCase() +
-                                  resume.postedRole.slice(1).toLowerCase()
-                                : "Untitled Role"}
+                              {formatRoleLabel(resume.postedRole) ||
+                                "Untitled Role"}
                             </span>
                             {getStatusBadge(resume.status)}
                           </div>

@@ -29,7 +29,7 @@ export const analyzeResume = inngest.createFunction(
     );
     const result = await step.run("handle-task", async () => {
       const response = await client.chat.completions.create({
-        model: "gpt-5.4",
+        model: serverEnv.OPENAI_MODEL,
         messages: [
           {
             role: "user",
@@ -114,7 +114,7 @@ export const analyzeJobMatched = inngest.createFunction(
     );
     const result = await step.run("handle-task", async () => {
       const response = await client.chat.completions.create({
-        model: "gpt-5.4",
+        model: serverEnv.OPENAI_MODEL,
         messages: [
           {
             role: "user",

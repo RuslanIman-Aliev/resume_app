@@ -13,14 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useResumeUpload } from "@/features/resumes/hooks/use-resume-upload";
+import { TARGET_ROLE_SUGGESTIONS } from "@/lib/ui-config";
 import { Upload } from "lucide-react";
 
 /**
@@ -122,32 +116,23 @@ export const UploadDialog = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="targetRole">Target Role</Label>
-              <Select value={targetRole} onValueChange={setTargetRole}>
-                <SelectTrigger className="min-h-11 md:min-h-0">
-                  <SelectValue placeholder="Select target role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="software-engineer">
-                    Software Engineer
-                  </SelectItem>
-                  <SelectItem value="frontend-developer">
-                    Frontend Developer
-                  </SelectItem>
-                  <SelectItem value="backend-developer">
-                    Backend Developer
-                  </SelectItem>
-                  <SelectItem value="full-stack">
-                    Full Stack Developer
-                  </SelectItem>
-                  <SelectItem value="data-engineer">Data Engineer</SelectItem>
-                  <SelectItem value="product-manager">
-                    Product Manager
-                  </SelectItem>
-                  <SelectItem value="ux-designer">UX Designer</SelectItem>
-                  <SelectItem value="devops">DevOps Engineer</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                id="targetRole"
+                list="targetRoleSuggestions"
+                placeholder="e.g. Software Engineer, Accountant, Copywriter"
+                value={targetRole}
+                onChange={(e) => setTargetRole(e.target.value)}
+                className="h-11 md:h-8"
+              />
+              {/* A datalist keeps the field free text while still offering the
+                  common roles. A native list is deliberate: the browser gives
+                  keyboard and screen-reader behaviour that a hand-rolled
+                  suggestion popover would have to reimplement. */}
+              <datalist id="targetRoleSuggestions">
+                {TARGET_ROLE_SUGGESTIONS.map((role) => (
+                  <option key={role} value={role} />
+                ))}
+              </datalist>
             </div>
           </div>
         )}
@@ -161,7 +146,11 @@ export const UploadDialog = () => {
           <Button
             className="h-11 md:h-8"
             disabled={
-              !file || isUploading || !resumeName || !targetRole || isCreating
+              !file ||
+              isUploading ||
+              !resumeName ||
+              !targetRole.trim() ||
+              isCreating
             }
             onClick={handleUpload}
           >

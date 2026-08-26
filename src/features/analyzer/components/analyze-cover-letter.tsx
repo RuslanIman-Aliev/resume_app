@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getErrorFeedback } from "@/lib/error-feedback";
+import { slugify } from "@/lib/format";
 import type { MatchingSkillItem, MissingSkillItem } from "@/lib/types";
 import { Check, Copy, Download, FileText, X } from "lucide-react";
 import { toast } from "sonner";
@@ -18,19 +19,6 @@ type AnalyzeCoverLetterProps = {
 };
 
 const FALLBACK_FILE_NAME = "cover-letter.txt";
-
-/**
- * Reduces a free-form value to a lowercase, hyphenated ASCII slug.
- * Returns an empty string when nothing usable is left, which happens for
- * non-latin company or job titles - the caller falls back in that case.
- */
-const slugify = (value: string) =>
-  value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 
 /**
  * Builds a `cover-letter-{company}-{position}.txt` file name, dropping parts

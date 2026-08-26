@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import type { ResumeStatusValue } from "@/lib/resume-status";
 import type { ApplicationStatusValue } from "@/lib/types";
 import { Briefcase, Code, FileText, GraduationCap, Target } from "lucide-react";
 
@@ -108,11 +109,32 @@ export const PIPELINE_STAGE_ORDER = [
 ] as const satisfies readonly ApplicationStatusValue[];
 
 /**
- * Labels for `resume.status`, whose stored values are inconsistently cased
- * (`draft` vs `ANALYZED`) and unfit to render as-is.
+ * Suggestions offered under the "Target Role" field on upload.
+ *
+ * The field is free text: the product analyses a resume against whatever role
+ * the person is actually aiming at, and the old fixed dropdown forced an
+ * accountant or a marketer to pick "Other" - which then reached the prompt as
+ * the literal word "other" and had the model score the resume against a role
+ * called "other". These are a shortcut for the common cases, not the allowed
+ * set.
  */
-export const RESUME_STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
+export const TARGET_ROLE_SUGGESTIONS = [
+  "Software Engineer",
+  "Frontend Developer",
+  "Backend Developer",
+  "Full Stack Developer",
+  "Data Engineer",
+  "Product Manager",
+  "UX Designer",
+  "DevOps Engineer",
+] as const;
+
+/**
+ * Labels for `resume.status`. The stored values are `ResumeStatus` enum members
+ * - shouted constants that are unfit to render as-is.
+ */
+export const RESUME_STATUS_LABELS: Record<ResumeStatusValue, string> = {
+  DRAFT: "Draft",
   ANALYZED: "Analyzed",
 };
 
@@ -121,14 +143,16 @@ export const RESUME_STATUS_LABELS: Record<string, string> = {
  * list users reach for. Declared separately from the label map so the filter
  * order does not depend on object key order.
  */
-export const RESUME_STATUS_FILTER_ORDER = ["ANALYZED", "draft"] as const;
+export const RESUME_STATUS_FILTER_ORDER = [
+  "ANALYZED",
+  "DRAFT",
+] as const satisfies readonly ResumeStatusValue[];
 
 /**
- * Resolves a resume status to its label, treating any unrecognised value as a
- * draft - the column defaults to `draft` and only the analysis job promotes it.
+ * Resolves a resume status to its label.
  */
-export const getResumeStatusLabel = (status: string) =>
-  RESUME_STATUS_LABELS[status] ?? RESUME_STATUS_LABELS.draft;
+export const getResumeStatusLabel = (status: ResumeStatusValue) =>
+  RESUME_STATUS_LABELS[status];
 
 /**
  * Maps importance level to Tailwind CSS class names for styling.
@@ -147,13 +171,13 @@ export const getImportanceStyles = (importance: string) => {
 /**
  * Renders the badge for a resume's status.
  *
- * `resume.status` only ever holds `draft` or `ANALYZED`, so every other value
- * is presented as a draft rather than dropped - previously anything
- * unrecognised rendered nothing at all, leaving draft resumes unlabelled.
+ * The column is a `ResumeStatus` enum, so both states are known here and every
+ * resume gets a label - draft rows used to render no badge at all whenever the
+ * lookup missed.
  * @param status - The stored `resume.status` value
  * @returns JSX Badge showing the human-readable label
  */
-export function getStatusBadge(status: string) {
+export function getStatusBadge(status: ResumeStatusValue) {
   const isAnalyzed = status === "ANALYZED";
   return (
     <Badge

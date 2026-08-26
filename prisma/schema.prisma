@@ -88,6 +88,22 @@ model Verification {
 // 2. AI-TAILOR BUSINESS LOGIC MODELS
 // ==========================================
 
+/// Lifecycle of an uploaded resume. `ANALYZED` is set only by the
+/// `analyze-resume` Inngest job once it has written a `ResumeAnalysis`.
+enum ResumeStatus {
+  DRAFT
+  ANALYZED
+}
+
+/// Lifecycle of a job-match analysis. `TO_APPLY` is the row created by
+/// `triggerJobMatchAnalysis`; the `analyze-job-matched` job promotes it to
+/// `ANALYZED` once the model output has been validated and stored.
+enum JobApplicationStatus {
+  DRAFT
+  TO_APPLY
+  ANALYZED
+}
+
 model Resume {
   id             String   @id @default(cuid())
   userId         String
@@ -97,7 +113,7 @@ model Resume {
   resumeName     String?   
 
   postedRole     String   
-  status         String   @default("draft") 
+  status         ResumeStatus @default(DRAFT)
   parsedContent  String?   @db.Text 
   structuredData Json?    
   resumeLink     String
@@ -143,7 +159,7 @@ model JobApplication {
   coverLetterText  String?           @db.Text
   targetLanguage   String            @default("English") 
   
-  status           String @default("Draft")
+  status           JobApplicationStatus @default(DRAFT)
   
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt

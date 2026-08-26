@@ -7,6 +7,7 @@ import {
 } from "@/lib/resume-content";
 import { createAppError } from "@/lib/app-error";
 import { deleteUploadThingFilesByUrl } from "@/lib/uploadthing-files";
+import { resumeStatusValues } from "@/lib/resume-status";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import type {
   AnalysisImprovement,
@@ -115,7 +116,9 @@ export const resumeRouter = createTRPCRouter({
           limit: z.number().min(1).max(50).default(6),
           page: z.number().min(1).default(1),
           search: z.string().optional(),
-          status: z.string().optional(),
+          // Enum rather than a free string: the value lands straight in the
+          // `where` clause, and `resume.status` is now a two-member enum.
+          status: z.enum(resumeStatusValues).optional(),
         })
         .optional(),
     )

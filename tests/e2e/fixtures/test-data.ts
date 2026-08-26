@@ -24,7 +24,9 @@ export const seedResume = {
   resumeLink: "https://example.com/resume.pdf",
   parsedContent: "Sample parsed content for analysis.",
   resumePreviewLink: null as string | null,
-  status: "ANALYZED",
+  // `as const` so the seed keeps the literal type the `ResumeStatus` enum
+  // column expects instead of widening to `string`.
+  status: "ANALYZED" as const,
 };
 
 export const seedAnalysis = {
