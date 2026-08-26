@@ -41,7 +41,7 @@ export const KanbanColumn = ({
   const displayedJobs = columnJobs.slice(startIndex, endIndex);
 
   return (
-    <div className="flex flex-col w-87.5 shrink-0 bg-card/20 rounded-2xl p-4">
+    <div className="flex flex-col w-72 sm:w-87.5 shrink-0 bg-card/20 rounded-2xl p-4">
       <h3 className={`font-bold mb-4 ${color}`}>
         {title}{" "}
         <Badge variant="secondary" className="h-5 px-1.5 text-xs">
@@ -62,6 +62,7 @@ export const KanbanColumn = ({
             size="sm"
             onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
             disabled={safePage === 1}
+            className="h-11 sm:h-7"
           >
             <ChevronLeft className="h-4 w-4 mr-1" /> Prev
           </Button>
@@ -75,6 +76,7 @@ export const KanbanColumn = ({
             size="sm"
             onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
             disabled={safePage === totalPages}
+            className="h-11 sm:h-7"
           >
             Next <ChevronRight className="h-4 w-4 ml-1" />
           </Button>

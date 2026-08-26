@@ -67,7 +67,7 @@ const AnalyzeKeywords = ({ data }: AnalyzeKeywordsProps) => {
                 <Badge
                   key={`${keyword}-${index}`}
                   variant="outline"
-                  className="border-red-500/30 bg-red-500/10 text-red-500 px-2.5 py-0.5 font-normal flex items-center gap-1.5 cursor-pointer hover:bg-red-500/20 transition-colors"
+                  className="border-red-500/30 bg-red-500/10 text-red-500 px-2.5 py-0.5 font-normal flex items-center gap-1.5 cursor-pointer min-h-11 sm:min-h-0 hover:bg-red-500/20 transition-colors"
                   onClick={() => navigator.clipboard.writeText(keyword)}
                   title="Click to copy"
                 >
@@ -78,8 +78,8 @@ const AnalyzeKeywords = ({ data }: AnalyzeKeywordsProps) => {
           </CardContent>
         </Card>
       </div>
-      <Card className=" mt-6 flex flex-row items-center justify-between">
-        <CardContent className="my-2 flex flex-row items-center justify-between w-full">
+      <Card className=" mt-6 flex flex-col items-stretch justify-between sm:flex-row sm:items-center">
+        <CardContent className="my-2 flex flex-col items-start gap-3 justify-between w-full sm:flex-row sm:items-center sm:gap-0">
           <div>
             <h2 className="text-lg font-semibold">
               {" "}
@@ -90,7 +90,7 @@ const AnalyzeKeywords = ({ data }: AnalyzeKeywordsProps) => {
               keywords.
             </p>
           </div>
-          <Button variant="ghost" className="bg-black">
+          <Button variant="ghost" className="bg-black min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto">
             Generate Resume
           </Button>
         </CardContent>

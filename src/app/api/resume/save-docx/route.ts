@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { UTApi } from "uploadthing/server";
 import prisma from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { extractUploadThingKey } from "@/lib/uploadthing-files";
 
 /**
  * POST /api/resume/save-docx
@@ -40,27 +41,6 @@ const isDocxMimeType = (value: string) =>
   value.includes(
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ) || value.includes("application/msword");
-
-/**
- * Extracts an UploadThing file key from a public URL.
- * Returns null for non-UploadThing URLs or malformed values.
- * @param url - Public URL stored in resumeLink
- * @returns UploadThing file key or null
- */
-const extractUploadThingKey = (url: string) => {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
-    if (!host.includes("uploadthing") && !host.includes("utfs.io")) {
-      return null;
-    }
-
-    const parts = parsed.pathname.split("/").filter(Boolean);
-    return parts.length > 0 ? parts[parts.length - 1] : null;
-  } catch {
-    return null;
-  }
-};
 
 /**
  * Builds a safe DOCX filename based on prior name or resume id.

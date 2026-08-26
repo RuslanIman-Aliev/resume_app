@@ -174,7 +174,7 @@ const ResumeCard = () => {
   }
 
   return (
-    <section className="w-full md:px-10">
+    <section className="w-full px-4 sm:px-6 md:px-10">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
         {data?.resumes.map((resume) => {
           const isAnalyzingCard = analyzingId === resume.id;
@@ -199,7 +199,7 @@ const ResumeCard = () => {
                       <DialogTrigger asChild>
                         <div className="cursor-pointer">
                           <div>
-                            <div className="w-full aspect-[1/1.4] bg-muted border-b relative overflow-hidden">
+                            <div className="w-full aspect-[1/1.4] max-h-64 sm:max-h-none bg-muted border-b relative overflow-hidden">
                               {resume.resumePreviewLink ? (
                                 <Image
                                   src={resume.resumePreviewLink}
@@ -247,14 +247,14 @@ const ResumeCard = () => {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="size-11 shrink-0 sm:size-8"
                                 >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  className="cursor-pointer"
+                                  className="cursor-pointer min-h-11 sm:min-h-0"
                                   onSelect={(e) => {
                                     e.preventDefault();
                                     handleDownload(
@@ -267,7 +267,7 @@ const ResumeCard = () => {
                                   Download
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  className="cursor-pointer"
+                                  className="cursor-pointer min-h-11 sm:min-h-0"
                                   onSelect={(e) => {
                                     e.preventDefault();
                                     // Handle rename logic
@@ -287,7 +287,7 @@ const ResumeCard = () => {
                                       name: resume.resumeName || "this resume",
                                     });
                                   }}
-                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer min-h-11 sm:min-h-0"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete
@@ -317,7 +317,7 @@ const ResumeCard = () => {
                         </div>
                       </div>
 
-                      <DialogContent className="max-w-2xl! w-screen h-[95vh] p-0 overflow-hidden">
+                      <DialogContent className="sm:max-w-2xl! w-full h-[95dvh] p-0 overflow-hidden [&>[data-slot=dialog-close]]:size-11 sm:[&>[data-slot=dialog-close]]:size-7">
                         <DialogTitle className="sr-only">
                           {resume.resumeName} Document Viewer
                         </DialogTitle>
@@ -326,6 +326,7 @@ const ResumeCard = () => {
                             <Image
                               src={resume.resumePreviewLink}
                               fill
+                              sizes="(min-width: 640px) 672px, 100vw"
                               className="object-contain p-0"
                               alt={`${resume.resumeName} full preview`}
                             />
@@ -339,10 +340,11 @@ const ResumeCard = () => {
                     </Dialog>
                   </div>
                   {resume.status === "ANALYZED" ? (
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
                       <Button
                         variant="outline"
                         size="lg"
+                        className="h-11 w-full sm:h-9 sm:w-auto"
                         onClick={() => router.push(`/ai-coach/${resume.id}`)}
                         onMouseEnter={() =>
                           router.prefetch(`/ai-coach/${resume.id}`)
@@ -357,6 +359,7 @@ const ResumeCard = () => {
                       <Button
                         variant="outline"
                         size="lg"
+                        className="h-11 w-full sm:h-9 sm:w-auto"
                         onClick={() => setModalResumeId(resume.id)}
                         disabled={isPending || analyzingId === resume.id}
                       >
@@ -375,6 +378,7 @@ const ResumeCard = () => {
                       <Button
                         variant="outline"
                         size="lg"
+                        className="h-11 w-full sm:h-9 sm:w-auto"
                         onClick={() => handleClick(resume.id)}
                         disabled={isPending || analyzingId === resume.id}
                       >
@@ -431,11 +435,11 @@ const ResumeCard = () => {
                   </div>
 
                   <AlertDialogFooter className="relative z-10 mx-0 mb-0 border-0 bg-transparent p-0 pt-3">
-                    <AlertDialogCancel className="rounded-full">
+                    <AlertDialogCancel className="rounded-full h-11 sm:h-8">
                       Not now
                     </AlertDialogCancel>
                     <AlertDialogAction
-                      className="rounded-full"
+                      className="rounded-full h-11 sm:h-8"
                       onClick={() => {
                         handleClick(resume.id);
                         setModalResumeId(null);
@@ -471,7 +475,9 @@ const ResumeCard = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting} className="h-11 sm:h-8">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={isDeleting}
               onClick={(e) => {
@@ -480,7 +486,7 @@ const ResumeCard = () => {
                   deleteResume({ resumeId: resumeToDelete.id });
                 }
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="h-11 sm:h-8 bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? (
                 <>

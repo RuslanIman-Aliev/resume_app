@@ -28,7 +28,7 @@ const testimonials = [
 
 const TestimonialsSection = () => {
   return (
-    <section className=" max-w-7xl mx-auto container bg-background  text-center  py-20 md:py-26">
+    <section className="px-4 sm:px-6 xl:px-0 max-w-7xl mx-auto container bg-background  text-center  py-12 md:py-20">
       <div>
         <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold  tracking-tight text-foreground ">
           Loved by job seekers everywhere
@@ -38,7 +38,7 @@ const TestimonialsSection = () => {
           AI-Tailor.
         </p>
       </div>
-      <div className="grid md:grid-cols-3 gap-6 mt-16 ">
+      <div className="grid md:grid-cols-3 gap-6 mt-8 md:mt-14">
         {testimonials.map((testimonial, index) => (
           <Card key={index} className="h-full flex flex-col">
             <CardContent className="text-left flex flex-col h-full">
@@ -48,7 +48,7 @@ const TestimonialsSection = () => {
                 ))}
               </div>
 
-              <p className="text-foreground my-4 max-w-75">
+              <p className="text-foreground my-4 max-w-none md:max-w-75">
                 &quot;{testimonial.quote}&quot;
               </p>
 

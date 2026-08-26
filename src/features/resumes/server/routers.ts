@@ -5,6 +5,7 @@ import {
   normalizeResumeParsedContent,
   updateResumeParsedContent,
 } from "@/lib/resume-content";
+import { deleteUploadThingFilesByUrl } from "@/lib/uploadthing-files";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import type {
   AnalysisImprovement,
@@ -22,6 +23,25 @@ import z from "zod";
  * budget / flooding the Inngest queue.
  */
 const AI_TRIGGER_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
+
+/**
+ * A stored resume-analysis improvement plus the applied flag that
+ * `applyImprovement` writes back onto it. The flag is not part of the model
+ * output contract, so it only ever exists on rows the user has acted on.
+ */
+export type AppliedAnalysisImprovement = AnalysisImprovement & {
+  isApplied?: boolean;
+};
+
+/**
+ * Compares two suggestion texts, treating null, undefined and "" as the same
+ * empty value. The model may omit `currentText` entirely, and the client turns
+ * that into `undefined` on the way back, so a strict `===` would never match.
+ */
+const isSameSuggestionText = (
+  a: string | null | undefined,
+  b: string | null | undefined,
+) => (a ?? "").trim() === (b ?? "").trim();
 
 /**
  * Rejects an AI-trigger call that exceeds the per-user rate limit with a
@@ -330,7 +350,7 @@ export const resumeRouter = createTRPCRouter({
       }
 
       return {
-        improvements: analysis.improvements as AnalysisImprovement[],
+        improvements: analysis.improvements as AppliedAnalysisImprovement[],
       };
     }),
   /**
@@ -749,6 +769,49 @@ export const resumeRouter = createTRPCRouter({
             data: updateData,
           });
         }
+      } else {
+        // 5. No applicationId means the call came from the AI Coach, where the
+        // suggestions live on the resume's own analysis instead. Mark it there
+        // so the applied state survives a reload the same way it does for a
+        // job match.
+        const analysis = await prisma.resumeAnalysis.findFirst({
+          where: {
+            resumeId: input.resumeId,
+            resume: { userId: ctx.auth.user.id },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, improvements: true },
+        });
+
+        if (analysis && Array.isArray(analysis.improvements)) {
+          const improvements =
+            analysis.improvements as unknown as AppliedAnalysisImprovement[];
+
+          let matched = false;
+          const updatedImprovements = improvements.map((imp) => {
+            if (
+              !matched &&
+              imp.targetSection === input.targetSection &&
+              imp.targetId === input.targetId &&
+              isSameSuggestionText(imp.currentText, input.previousText) &&
+              isSameSuggestionText(imp.suggestedText, input.newText)
+            ) {
+              matched = true;
+              return { ...imp, isApplied: true };
+            }
+            return imp;
+          });
+
+          if (matched) {
+            await prisma.resumeAnalysis.update({
+              where: { id: analysis.id },
+              data: {
+                improvements:
+                  updatedImprovements as unknown as Prisma.InputJsonValue,
+              },
+            });
+          }
+        }
       }
 
       return { success: true, changed: true };
@@ -756,6 +819,13 @@ export const resumeRouter = createTRPCRouter({
   deleteResume: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // Read the file URLs before the row disappears — afterwards there is no
+      // way left to find the blobs this resume owns in storage.
+      const resume = await prisma.resume.findFirst({
+        where: { id: input.resumeId, userId: ctx.auth.user.id },
+        select: { resumeLink: true, resumePreviewLink: true },
+      });
+
       // deleteMany lets us scope by the non-unique userId safely and returns a
       // count instead of throwing when nothing matches.
       const result = await prisma.resume.deleteMany({
@@ -771,6 +841,13 @@ export const resumeRouter = createTRPCRouter({
           message: "Resume not found",
         });
       }
+
+      // The row is gone, so the delete already succeeded from the user's point
+      // of view. Storage cleanup is best-effort and never fails the mutation.
+      await deleteUploadThingFilesByUrl(
+        [resume?.resumeLink, resume?.resumePreviewLink],
+        "Failed to delete resume files from storage",
+      );
 
       return { success: true };
     }),

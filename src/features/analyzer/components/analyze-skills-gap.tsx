@@ -12,7 +12,7 @@ type AnalyzeSkillsGapProps = {
 
 const SkillRow = ({ skillItem }: { skillItem: SkillGapItem }) => (
   <div className="flex flex-row items-center justify-between gap-3 py-1.5">
-    <div className="flex items-center gap-3">
+    <div className="flex min-w-0 items-center gap-3">
       {skillItem.matched ? (
         <Check className="h-4 w-4 shrink-0 text-emerald-500" />
       ) : (
@@ -20,7 +20,7 @@ const SkillRow = ({ skillItem }: { skillItem: SkillGapItem }) => (
       )}
       <span
         className={cn(
-          "text-[18px]",
+          "text-[18px] min-w-0 break-words",
           skillItem.matched
             ? "text-muted-foreground"
             : "font-medium text-foreground",
@@ -33,7 +33,7 @@ const SkillRow = ({ skillItem }: { skillItem: SkillGapItem }) => (
       <Badge
         variant="outline"
         className={cn(
-          "px-2 py-0 h-5 text-[11px] uppercase font-medium",
+          "px-2 py-0 h-5 shrink-0 text-[11px] uppercase font-medium",
           getImportanceStyles(skillItem.importance),
         )}
       >

@@ -6,6 +6,7 @@ import { extractSfdtFromZipBase64 } from "@/lib/sfdt/extract-zip";
 import { isSfdtLike } from "@/lib/sfdt/is-sfdt";
 import { normalizeSfdtText } from "@/lib/sfdt/normalize";
 import { saveEditorDocx } from "@/lib/sfdt/resume-docx-api";
+import { applyResponsiveZoom } from "@/lib/syncfusion/document-editor";
 import "@/lib/syncfusion/setup";
 import { useTRPC } from "@/trpc/client";
 import { DocumentEditorContainerComponent } from "@syncfusion/ej2-react-documenteditor";
@@ -645,6 +646,9 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           }
         }
 
+        // Fit the page into narrow viewports; a no-op at desktop widths.
+        applyResponsiveZoom(editor, editorRef.current);
+
         // Force a layout pass so the internal iframe gets sized
         try {
           if (editor.resize) {
@@ -741,6 +745,45 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     isDocumentReady,
   ]);
 
+  // Re-fit the document when the viewport changes width (device rotation), so
+  // the zoom applyResponsiveZoom picked for the old width does not stay stale.
+  useEffect(() => {
+    if (!isEditorReady) {
+      return;
+    }
+
+    let timeoutId = 0;
+    const handleResize = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        const editor = editorRef.current?.documentEditor as
+          | DocumentEditorLike
+          | undefined;
+
+        if (!editor) {
+          return;
+        }
+
+        applyResponsiveZoom(editor, editorRef.current);
+
+        try {
+          editor.resize?.();
+          editorRef.current?.resize?.();
+        } catch {
+          // ignore resize errors
+        }
+      }, 150);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [isEditorReady]);
+
+
   const isGlobalLoading = isLoading || isDocumentLoading;
 
   return (
@@ -753,7 +796,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 shadow-sm">
+      <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 shadow-sm sm:flex-row sm:items-center">
         <div>
           <h3 className="text-sm font-semibold">Resume Editor</h3>
           <p className="text-xs text-muted-foreground">
@@ -761,15 +804,17 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             UploadThing.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto sm:shrink-0">
           <Button
             variant="outline"
+            className="min-h-11 flex-1 sm:min-h-0 sm:flex-none"
             onClick={handleCancelDocument}
             disabled={isGlobalLoading || isSavingDocument}
           >
             Cancel
           </Button>
           <Button
+            className="min-h-11 flex-1 sm:min-h-0 sm:flex-none"
             onClick={handleSaveDocument}
             disabled={isGlobalLoading || isSavingDocument || !resumeLink}
           >
@@ -781,10 +826,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         </div>
       </div>
 
-      <div
-        className="relative flex-1 overflow-hidden rounded-xl border border-border/60 shadow-sm document-editor-container-wrapper"
-        style={{ minHeight: "calc(100vh - 10rem)" }}
-      >
+      <div className="relative flex-1 overflow-hidden rounded-xl border border-border/60 shadow-sm document-editor-container-wrapper min-h-[calc(100dvh-10rem)]">
         <style>{`
           .document-editor-container-wrapper .e-documenteditorcontainer {
             border-radius: 0.75rem;

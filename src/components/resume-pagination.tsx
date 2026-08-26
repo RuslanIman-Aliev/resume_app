@@ -34,11 +34,11 @@ export function ResumePagination({
           <PaginationItem>
             <PaginationPrevious
               onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
-              className={
+              className={`h-11 min-w-11 sm:h-8 sm:min-w-0 ${
                 currentPage === 1
                   ? "pointer-events-none opacity-50"
                   : "cursor-pointer"
-              }
+              }`}
             />
           </PaginationItem>
 
@@ -49,7 +49,7 @@ export function ResumePagination({
                 <PaginationLink
                   onClick={() => onPageChange(pageNumber)}
                   isActive={currentPage === pageNumber}
-                  className="cursor-pointer"
+                  className="cursor-pointer size-11 sm:size-8"
                 >
                   {pageNumber}
                 </PaginationLink>
@@ -60,11 +60,11 @@ export function ResumePagination({
           <PaginationItem>
             <PaginationNext
               onClick={() => onPageChange(Math.min(currentPage + 1, pageCount))}
-              className={
+              className={`h-11 min-w-11 sm:h-8 sm:min-w-0 ${
                 currentPage === pageCount
                   ? "pointer-events-none opacity-50"
                   : "cursor-pointer"
-              }
+              }`}
             />
           </PaginationItem>
         </PaginationContent>

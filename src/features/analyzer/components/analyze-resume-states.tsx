@@ -13,7 +13,7 @@ type AnalyzeResumeErrorProps = {
 export const AnalyzeResumeLoading = () => {
   return (
     <div className="space-y-6">
-      <div className="grid max-md:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <Card
             key={`resume-result-skeleton-${index}`}
@@ -136,7 +136,7 @@ export const AnalyzeResumePending = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] py-12 px-4 animate-in fade-in duration-700">
+    <div className="flex flex-col items-center justify-center min-h-[60dvh] py-12 px-4 animate-in fade-in duration-700">
       
       <div className="relative mb-8">
         <div className="absolute inset-0 blur-2xl bg-primary/20 rounded-full animate-pulse" />

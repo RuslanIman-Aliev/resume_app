@@ -4,9 +4,9 @@ import Link from "next/link";
 
 const CTASection = () => {
   return (
-    <section className="w-full">
-      <div className="mb-20 md:mt-32 md:mb-28 max-w-7xl mx-auto container overflow-hidden rounded-2xl bg-primary/10 border border-primary/20  text-center py-15 ">
-        <div className="absolute inset-0 -z-10">
+    <section className="w-full px-4 sm:px-6 xl:px-0 py-12 md:py-20">
+      <div className="max-w-7xl mx-auto container overflow-hidden rounded-2xl bg-primary/10 border border-primary/20  text-center py-15 ">
+        <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-125 h-75 bg-primary/30 rounded-full blur-[100px] opacity-50" />
         </div>
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground max-w-2xl mx-auto text-balance">
@@ -17,7 +17,7 @@ const CTASection = () => {
           AI-Tailor.
         </p>
         <div className="mt-5 flex flex-col  items-center justify-center gap-4">
-          <div className="flex flex-row gap-5">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
             <Button size="lg" className="h-12 px-8 text-base" asChild>
               <Link href="/signup">
                 Start Free Trial

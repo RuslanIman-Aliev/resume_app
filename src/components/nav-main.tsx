@@ -98,8 +98,12 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between ">
-        <Link href="/dashboard" prefetch className="flex items-center gap-2.5">
+      <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 xl:px-0">
+        <Link
+          href="/dashboard"
+          prefetch
+          className="flex min-h-11 items-center gap-2.5 md:min-h-0"
+        >
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Sparkles className="h-5 w-5" />
           </div>
@@ -134,44 +138,17 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Mobile Nav */}
-        <div className="md:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {navItems.map((item) => (
-                <DropdownMenuItem key={item.id} asChild>
-                  <Link
-                    href={item.href}
-                    prefetch
-                    onMouseEnter={() => router.prefetch(item.href)}
-                    onFocus={() => router.prefetch(item.href)}
-                    className="flex items-center gap-2"
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Desktop Nav */}
-
         <div className="flex items-center gap-3">
           {isPending ? (
-            <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+            <div className="flex h-11 w-11 items-center justify-center md:h-9 md:w-9">
+              <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+            </div>
           ) : session ? (
             <DropdownMenu>
               <DropdownMenuTrigger className="cursor-pointer" asChild>
                 <Button
                   variant="ghost"
-                  className="relative h-9 w-9 rounded-full"
+                  className="relative h-11 w-11 rounded-full md:h-9 md:w-9"
                 >
                   <Avatar className="h-9 w-9">
                     <AvatarImage
@@ -219,11 +196,42 @@ export function Header() {
             </DropdownMenu>
           ) : (
             <Link href="/signup">
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-11 px-4 text-sm md:h-7 md:px-2.5 md:text-[0.8rem]"
+              >
                 Sign Up
               </Button>
             </Link>
           )}
+
+          {/* Mobile Nav */}
+          <div className="md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-11">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {navItems.map((item) => (
+                  <DropdownMenuItem key={item.id} asChild>
+                    <Link
+                      href={item.href}
+                      prefetch
+                      onMouseEnter={() => router.prefetch(item.href)}
+                      onFocus={() => router.prefetch(item.href)}
+                      className="flex min-h-11 items-center gap-2"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </header>

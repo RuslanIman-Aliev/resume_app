@@ -45,10 +45,15 @@ export const UploadDialog = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className="hover:bg-primary/80 cursor-pointer" asChild>
-        <Button onClick={() => setOpen(true)}>Upload Resume</Button>
+        <Button
+          onClick={() => setOpen(true)}
+          className="h-11 w-full md:h-8 md:w-auto"
+        >
+          Upload Resume
+        </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md [&>[data-slot=dialog-close]]:size-11 sm:[&>[data-slot=dialog-close]]:size-7">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             Upload Resume
@@ -112,12 +117,13 @@ export const UploadDialog = () => {
                 placeholder="e.g., Software Engineer - General"
                 value={resumeName}
                 onChange={(e) => setResumeName(e.target.value)}
+                className="h-11 md:h-8"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="targetRole">Target Role</Label>
               <Select value={targetRole} onValueChange={setTargetRole}>
-                <SelectTrigger>
+                <SelectTrigger className="min-h-11 md:min-h-0">
                   <SelectValue placeholder="Select target role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,9 +154,12 @@ export const UploadDialog = () => {
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline" className="h-11 md:h-8">
+              Cancel
+            </Button>
           </DialogClose>
           <Button
+            className="h-11 md:h-8"
             disabled={
               !file || isUploading || !resumeName || !targetRole || isCreating
             }

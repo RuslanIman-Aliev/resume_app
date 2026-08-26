@@ -67,9 +67,7 @@ export const JobCard = ({
     trpc.tracker.update.mutationOptions({
       onSuccess: () => {
         toast.success("Application updated!");
-        queryClient.invalidateQueries({
-          queryKey: trpc.tracker.getAll.queryKey(),
-        });
+        queryClient.invalidateQueries(trpc.tracker.pathFilter());
         setDialogMode("closed");
       },
       onError: () => {
@@ -119,9 +117,7 @@ export const JobCard = ({
       },
 
       onSettled: () => {
-        queryClient.invalidateQueries({
-          queryKey: trpc.tracker.getAll.queryKey(),
-        });
+        queryClient.invalidateQueries(trpc.tracker.pathFilter());
       },
     }),
   );
@@ -163,9 +159,7 @@ export const JobCard = ({
       },
 
       onSettled: () => {
-        queryClient.invalidateQueries({
-          queryKey: trpc.tracker.getAll.queryKey(),
-        });
+        queryClient.invalidateQueries(trpc.tracker.pathFilter());
       },
     }),
   );
@@ -199,15 +193,15 @@ export const JobCard = ({
     <>
       <div className="group bg-card/80 border border-border/50 rounded-lg p-3 hover:border-primary/30 transition-colors cursor-grab active:cursor-grabbing">
         <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-sm font-bold">
               {application.company?.charAt(0) || "?"}
             </div>
-            <div>
+            <div className="min-w-0">
               <h4 className="font-medium text-sm leading-tight">
                 {application.company || "Unnamed Company"}
               </h4>
-              <p className="text-xs text-muted-foreground truncate max-w-35">
+              <p className="text-xs text-muted-foreground truncate max-w-full sm:max-w-35">
                 {application.position || "Unnamed Position"}
               </p>
             </div>
@@ -218,24 +212,30 @@ export const JobCard = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="size-11 shrink-0 transition-opacity sm:size-6 sm:opacity-0 sm:group-hover:opacity-100"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setDialogMode("view")}>
+              <DropdownMenuItem
+                onClick={() => setDialogMode("view")}
+                className="min-h-11 sm:min-h-0"
+              >
                 <Eye className="h-4 w-4 mr-2" />
                 Show Info
               </DropdownMenuItem>
 
               {/* 4. Update your Edit button */}
-              <DropdownMenuItem onClick={() => setDialogMode("edit")}>
+              <DropdownMenuItem
+                onClick={() => setDialogMode("edit")}
+                className="min-h-11 sm:min-h-0"
+              >
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
               {application.url && (
-                <DropdownMenuItem asChild>
+                <DropdownMenuItem asChild className="min-h-11 sm:min-h-0">
                   <a
                     href={application.url}
                     target="_blank"
@@ -247,7 +247,7 @@ export const JobCard = ({
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-muted-foreground">
+              <DropdownMenuItem className="text-muted-foreground min-h-11 sm:min-h-0">
                 Move to
                 <ChevronRight className="h-4 w-4 ml-auto" />
               </DropdownMenuItem>
@@ -255,7 +255,7 @@ export const JobCard = ({
                 <DropdownMenuItem
                   key={status.id}
                   onClick={() => onStatusChange(application.id, status.id)}
-                  className="pl-6"
+                  className="pl-6 min-h-11 sm:min-h-0"
                 >
                   <span className={status.color}>{status.label}</span>
                 </DropdownMenuItem>
@@ -263,7 +263,7 @@ export const JobCard = ({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => deleteApplication({ id: application.id })}
-                className="text-red-400"
+                className="text-red-400 min-h-11 sm:min-h-0"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete

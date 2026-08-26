@@ -5,14 +5,14 @@ import Link from "next/link";
 
 const HeroSection = () => {
   return (
-    <section className="pb-20 md:pt-32 md:pb-28 max-w-7xl mx-auto container bg-background  text-center ">
+    <section className="px-4 sm:px-6 xl:px-0 pt-20 pb-12 md:pt-32 md:pb-20 max-w-7xl mx-auto container bg-background  text-center ">
       <div className="flex items-center justify-center">
         <Badge className="border-primary/30 bg-primary/10 text-primary text-sm rounded-full border p-3">
           Now with GPT-5 Integration
         </Badge>
       </div>
       <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-foreground mt-6">
-        Land your dream <br /> job{" "}
+        Land your dream <br className="hidden sm:inline" /> job{" "}
         <span className="text-primary">3x faster</span> with AI
       </h1>
       <p className="text-lg md:text-xl text-muted-foreground text-pretty mt-6 max-w-xl  mx-auto">

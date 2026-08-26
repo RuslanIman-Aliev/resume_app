@@ -48,7 +48,7 @@ export const TrackerLoading = () => {
         {Array.from({ length: 6 }).map((_, columnIndex) => (
           <Card
             key={`tracker-column-skeleton-${columnIndex}`}
-            className="w-87.5 shrink-0 border-border/50 bg-card/20"
+            className="w-72 sm:w-87.5 shrink-0 border-border/50 bg-card/20"
           >
             <CardHeader className="space-y-3 pb-4 pt-4">
               <div className="flex items-center justify-between gap-3">

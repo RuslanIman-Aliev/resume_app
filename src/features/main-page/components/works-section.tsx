@@ -26,9 +26,9 @@ const steps = [
 
 const HowItWorksSection = () => {
   return (
-    <section className="w-full text-center py-20 md:py-26  border-y border-border/50 bg-card/30 ">
-      <div className="mx-auto  max-w-7xl container ">
-        <div className="mb-16">
+    <section className="w-full text-center py-12 md:py-20  border-y border-border/50 bg-card/30 ">
+      <div className="mx-auto px-4 sm:px-6 xl:px-0 max-w-7xl container ">
+        <div className="mb-8 md:mb-14">
           <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold  tracking-tight text-foreground ">
             How it works
           </h2>
