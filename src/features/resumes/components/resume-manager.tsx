@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/select";
 import { UploadDialog } from "@/features/resumes/components/upload-dialog";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import {
+  RESUME_STATUS_FILTER_ORDER,
+  RESUME_STATUS_LABELS,
+} from "@/lib/ui-config";
 import { SearchIcon, SlidersHorizontal } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -90,8 +94,11 @@ const ResumeManager = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="ANALYZED">Analyzed</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
+              {RESUME_STATUS_FILTER_ORDER.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {RESUME_STATUS_LABELS[status]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

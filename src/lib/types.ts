@@ -318,6 +318,13 @@ export type RequirementsMatchData = {
   preferred: RequirementItem[];
 };
 
+/**
+ * The tracker funnel, in the order a position moves through it.
+ *
+ * These are the literal values stored in `tracker_position.status`. Anything
+ * user-visible comes from `TRACKER_STATUS_CONFIG` in `@/lib/ui-config`, which
+ * is keyed by this list - keep the two in step when adding a stage.
+ */
 export const applicationStatusValues = [
   "saved",
   "applied",
@@ -326,6 +333,9 @@ export const applicationStatusValues = [
   "offer",
   "rejected",
 ] as const;
+
+export type ApplicationStatusValue = (typeof applicationStatusValues)[number];
+
 export const trackerFormSchema = z.object({
   company: z.string().min(1, "Company name is required."),
   position: z.string().min(1, "Position is required."),

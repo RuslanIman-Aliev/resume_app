@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { KanbanColumn } from "@/features/tracker/components/kanban-column";
 import { getErrorFeedback } from "@/lib/error-feedback";
-import type { TrackerFormValues } from "@/lib/types";
+import type { ApplicationStatusValue, TrackerFormValues } from "@/lib/types";
+import { KANBAN_COLUMN_ORDER, TRACKER_STATUS_CONFIG } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
@@ -22,22 +23,16 @@ const MainView = () => {
   const queryClient = useQueryClient();
 
   const stats = useMemo(() => {
-    const base = {
-      total: data?.length ?? 0,
-      saved: 0,
-      applied: 0,
-      screening: 0,
-      interview: 0,
-      offer: 0,
-      rejected: 0,
-    };
+    const counts = Object.fromEntries(
+      KANBAN_COLUMN_ORDER.map((status) => [status, 0]),
+    ) as Record<ApplicationStatusValue, number>;
     // Single pass over the list instead of one filter() per status.
     for (const application of data ?? []) {
-      if (application.status in base) {
-        base[application.status as keyof typeof base] += 1;
+      if (application.status in counts) {
+        counts[application.status as ApplicationStatusValue] += 1;
       }
     }
-    return base;
+    return { total: data?.length ?? 0, counts };
   }, [data]);
 
   const { mutate } = useMutation(
@@ -95,36 +90,21 @@ const MainView = () => {
           <p className="text-2xl font-bold">{stats.total}</p>
           <p className="text-xs text-muted-foreground">Total</p>
         </div>
-        <div className="rounded-lg border border-border/50 bg-card/50 p-3 text-center">
-          <p className="text-2xl font-bold text-muted-foreground">
-            {stats.saved}
-          </p>
-          <p className="text-xs text-muted-foreground">Saved</p>
-        </div>
-        <div className="rounded-lg border border-border/50 bg-card/50 p-3 text-center">
-          <p className="text-2xl font-bold text-blue-400">{stats.applied}</p>
-          <p className="text-xs text-muted-foreground">Applied</p>
-        </div>
-        <div className="rounded-lg border border-border/50 bg-card/50 p-3 text-center">
-          <p className="text-2xl font-bold text-yellow-400">
-            {stats.screening}
-          </p>
-          <p className="text-xs text-muted-foreground">Screening</p>
-        </div>
-        <div className="rounded-lg border border-border/50 bg-card/50 p-3 text-center">
-          <p className="text-2xl font-bold text-purple-400">
-            {stats.interview}
-          </p>
-          <p className="text-xs text-muted-foreground">Interview</p>
-        </div>
-        <div className="rounded-lg border border-border/50 bg-card/50 p-3 text-center">
-          <p className="text-2xl font-bold text-primary">{stats.offer}</p>
-          <p className="text-xs text-muted-foreground">Offer</p>
-        </div>
-        <div className="rounded-lg border border-border/50 bg-card/50 p-3 text-center">
-          <p className="text-2xl font-bold text-red-400">{stats.rejected}</p>
-          <p className="text-xs text-muted-foreground">Rejected</p>
-        </div>
+        {KANBAN_COLUMN_ORDER.map((status) => (
+          <div
+            key={status}
+            className="rounded-lg border border-border/50 bg-card/50 p-3 text-center"
+          >
+            <p
+              className={`text-2xl font-bold ${TRACKER_STATUS_CONFIG[status].textClass}`}
+            >
+              {stats.counts[status]}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {TRACKER_STATUS_CONFIG[status].label}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Controls */}
@@ -144,42 +124,15 @@ const MainView = () => {
         </Dialog>
       </div>
       <div className="flex flex-nowrap overflow-x-auto gap-6 pb-8">
-        <KanbanColumn
-          title="Saved"
-          status="saved"
-          color="text-muted-foreground"
-          allJobs={data || []}
-        />
-        <KanbanColumn
-          title="Applied"
-          status="applied"
-          color="text-blue-400"
-          allJobs={data || []}
-        />
-        <KanbanColumn
-          title="Screening"
-          status="screening"
-          color="text-yellow-400"
-          allJobs={data || []}
-        />
-        <KanbanColumn
-          title="Interview"
-          status="interview"
-          color="text-purple-400"
-          allJobs={data || []}
-        />
-        <KanbanColumn
-          title="Offer"
-          status="offer"
-          color="text-green-400"
-          allJobs={data || []}
-        />
-        <KanbanColumn
-          title="Rejected"
-          status="rejected"
-          color="text-red-400"
-          allJobs={data || []}
-        />
+        {KANBAN_COLUMN_ORDER.map((status) => (
+          <KanbanColumn
+            key={status}
+            title={TRACKER_STATUS_CONFIG[status].label}
+            status={status}
+            color={TRACKER_STATUS_CONFIG[status].textClass}
+            allJobs={data || []}
+          />
+        ))}
       </div>
     </main>
   );

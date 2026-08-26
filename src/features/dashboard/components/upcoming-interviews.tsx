@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { FeedbackState } from "@/components/ui/feedback-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRelativeTime } from "@/lib/format";
+import { getTrackerStatusPresentation } from "@/lib/ui-config";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
@@ -17,16 +18,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-const stageLabels: Record<string, string> = {
-  screening: "Screening",
-  interview: "Interview",
-};
-
-const stageColors: Record<string, string> = {
-  screening: "bg-chart-4/10 text-chart-4",
-  interview: "bg-chart-2/10 text-chart-2",
-};
 
 const UpcomingInterviews = () => {
   const trpc = useTRPC();
@@ -120,9 +111,9 @@ const UpcomingInterviews = () => {
                   <div className="truncate font-medium">{company}</div>
                   <Badge
                     variant="secondary"
-                    className={`text-xs shrink-0 ${stageColors[status] ?? ""}`}
+                    className={`text-xs shrink-0 ${getTrackerStatusPresentation(status).badgeClass}`}
                   >
-                    {stageLabels[status] ?? status}
+                    {getTrackerStatusPresentation(status).label}
                   </Badge>
                 </div>
 

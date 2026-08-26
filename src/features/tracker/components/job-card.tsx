@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import type {
+  ApplicationStatusValue,
   JobApplicationCard,
   TrackerFormValues,
-  applicationStatusValues,
 } from "@/lib/types";
+import { KANBAN_COLUMN_ORDER, TRACKER_STATUS_CONFIG } from "@/lib/ui-config";
 import { getScoreColor } from "@/lib/format";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,21 +33,6 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import DialogTracker from "./dialog-tracker";
-
-type StatusColumn = {
-  id: "saved" | "applied" | "screening" | "interview" | "offer" | "rejected";
-  label: string;
-  color: string;
-};
-
-const STATUS_COLUMNS: StatusColumn[] = [
-  { id: "saved", label: "Saved", color: "text-muted-foreground" },
-  { id: "applied", label: "Applied", color: "text-blue-400" },
-  { id: "screening", label: "Screening", color: "text-yellow-400" },
-  { id: "interview", label: "Interview", color: "text-purple-400" },
-  { id: "offer", label: "Offer", color: "text-primary" },
-  { id: "rejected", label: "Rejected", color: "text-red-400" },
-];
 
 /**
  * Job card component for displaying individual job application in kanban/list view.
@@ -169,7 +155,7 @@ export const JobCard = ({
     position: application.position || "",
     location: application.location || "",
     salary: application.salary || "",
-    status: application.status as (typeof applicationStatusValues)[number],
+    status: application.status as ApplicationStatusValue,
     url: application.url || "",
     notes: application.notes || "",
     contactName: application.contactName || "",
@@ -178,13 +164,7 @@ export const JobCard = ({
 
   function onStatusChange(
     applicationId: string,
-    statusId:
-      | "saved"
-      | "applied"
-      | "screening"
-      | "interview"
-      | "offer"
-      | "rejected",
+    statusId: ApplicationStatusValue,
   ) {
     updateStatus({ id: applicationId, status: statusId });
   }
@@ -251,13 +231,15 @@ export const JobCard = ({
                 Move to
                 <ChevronRight className="h-4 w-4 ml-auto" />
               </DropdownMenuItem>
-              {STATUS_COLUMNS.map((status) => (
+              {KANBAN_COLUMN_ORDER.map((status) => (
                 <DropdownMenuItem
-                  key={status.id}
-                  onClick={() => onStatusChange(application.id, status.id)}
+                  key={status}
+                  onClick={() => onStatusChange(application.id, status)}
                   className="pl-6 min-h-11 sm:min-h-0"
                 >
-                  <span className={status.color}>{status.label}</span>
+                  <span className={TRACKER_STATUS_CONFIG[status].textClass}>
+                    {TRACKER_STATUS_CONFIG[status].label}
+                  </span>
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />

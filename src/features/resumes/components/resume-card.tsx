@@ -10,7 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -29,6 +28,7 @@ import {
 import { ResumePagination } from "@/components/resume-pagination";
 import { useUrlPage } from "@/hooks/use-url-page";
 import { getErrorFeedback } from "@/lib/error-feedback";
+import { getStatusBadge } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -189,9 +189,7 @@ const ResumeCard = () => {
                 }`}
               >
                 <CardHeader className="flex items-center justify-between">
-                  <div>
-                    <Badge>{resume.status}</Badge>
-                  </div>
+                  <div>{getStatusBadge(resume.status)}</div>
                 </CardHeader>
                 <CardContent className="">
                   <div className="flex flex-col pb-2">
