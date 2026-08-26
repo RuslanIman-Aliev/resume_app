@@ -35,3 +35,46 @@ export function getScoreColor(score: number) {
   if (score >= 70) return "text-chart-4";
   return "text-chart-5";
 }
+
+/**
+ * Reduces a free-form value to a lowercase, hyphenated ASCII slug.
+ *
+ * Returns an empty string when nothing usable is left, which happens for
+ * non-latin company names, job titles or resume names - callers are expected to
+ * fall back to a generic name in that case rather than emitting a bare
+ * extension.
+ * @param value - Arbitrary user-supplied text
+ * @returns The slug, or an empty string if the value has no ASCII content
+ */
+export function slugify(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Renders `resume.postedRole` for display.
+ *
+ * The field used to be a fixed dropdown that stored slugs (`software-engineer`),
+ * and those rows still exist; it is free text now. Slugs are expanded into
+ * words, while anything a person typed keeps its own casing - the previous
+ * lowercasing turned "Senior QA Engineer" into "Senior qa engineer".
+ * @param role - The stored role value.
+ * @returns A display label, or an empty string when there is no role.
+ */
+export function formatRoleLabel(role: string | null | undefined) {
+  const value = role?.trim();
+  if (!value) return "";
+
+  const isLegacySlug = !value.includes(" ") && value === value.toLowerCase();
+  if (!isLegacySlug) return value;
+
+  return value
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}

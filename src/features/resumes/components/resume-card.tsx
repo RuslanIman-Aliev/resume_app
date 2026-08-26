@@ -33,12 +33,15 @@ import { Label } from "@/components/ui/label";
 import { ResumePagination } from "@/components/resume-pagination";
 import { useUrlPage } from "@/hooks/use-url-page";
 import { getErrorFeedback } from "@/lib/error-feedback";
+import { formatRoleLabel } from "@/lib/format";
+import { parseResumeStatusFilter } from "@/lib/resume-status";
 import { getStatusBadge } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Clock,
   Download,
+  FileDown,
   FileText,
   Loader2,
   MoreVertical,
@@ -61,6 +64,15 @@ import { ResumeEmpty, ResumeError, ResumeLoading } from "./resume-states";
  */
 type ResumeListData = inferRouterOutputs<AppRouter>["resume"]["getAll"];
 
+/**
+ * Whether the stored file is already a PDF.
+ *
+ * When it is, "Download" and "Download PDF" would hand back the same bytes, so
+ * the menu shows a single entry instead of two that do the same thing.
+ */
+const isStoredAsPdf = (fileName: string | null) =>
+  (fileName ?? "").toLowerCase().endsWith(".pdf");
+
 const ResumeCard = () => {
   const trpc = useTRPC();
   const searchParams = useSearchParams();
@@ -69,6 +81,7 @@ const ResumeCard = () => {
   const { page: currentPage, setPage: handlePageChange } = useUrlPage();
 
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
   const [modalResumeId, setModalResumeId] = useState<string | null>(null);
 
   const [resumeToDelete, setResumeToDelete] = useState<{
@@ -86,7 +99,12 @@ const ResumeCard = () => {
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const searchTerm = searchParams.get("search") || undefined;
-  const statusFilter = searchParams.get("status") || undefined;
+  // Parsed rather than passed through: `getAll` now validates the filter as
+  // an enum, and an unrecognised `?status=` must fall back to "all" instead
+  // of failing the query. The resumes page prefetch parses it the same way.
+  const statusFilter = parseResumeStatusFilter(
+    searchParams.get("status") ?? undefined,
+  );
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery(
     trpc.resume.getAll.queryOptions({ page: currentPage, search: searchTerm, status: statusFilter }),
@@ -244,6 +262,56 @@ const ResumeCard = () => {
     }
   };
 
+  /**
+   * Downloads the resume as PDF, converting it server-side when the stored file
+   * is a DOCX.
+   *
+   * The blob comes back from our own route rather than from UploadThing, so the
+   * file name and content type are the ones the route sets - a direct link to
+   * the stored DOCX would save a .docx no matter what the anchor asked for.
+   */
+  const handleDownloadPdf = async (resumeId: string) => {
+    setExportingPdfId(resumeId);
+    let blobUrl: string | null = null;
+
+    try {
+      const response = await fetch("/api/resume/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeId }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || "Failed to export the resume as PDF.");
+      }
+
+      const blob = await response.blob();
+      blobUrl = window.URL.createObjectURL(blob);
+
+      // The route already decided the file name; mirror it so the save dialog
+      // and the Content-Disposition header cannot disagree.
+      const disposition = response.headers.get("Content-Disposition") ?? "";
+      const nameMatch = disposition.match(/filename="([^"]+)"/);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = nameMatch?.[1] ?? "resume.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      toast.error(
+        getErrorFeedback(error, {
+          fallbackMessage: "Failed to export the resume as PDF.",
+        }).message,
+      );
+    } finally {
+      if (blobUrl) window.URL.revokeObjectURL(blobUrl);
+      setExportingPdfId(null);
+    }
+  };
+
   const pageCount = data?.pagination?.pageCount ?? 1;
   const activePage = data?.pagination?.currentPage ?? currentPage;
 
@@ -353,8 +421,27 @@ const ResumeCard = () => {
                                   }}
                                 >
                                   <Download className="h-4 w-4 mr-2" />
-                                  Download
+                                  {isStoredAsPdf(resume.fileName)
+                                    ? "Download"
+                                    : "Download DOCX"}
                                 </DropdownMenuItem>
+                                {isStoredAsPdf(resume.fileName) ? null : (
+                                  <DropdownMenuItem
+                                    className="cursor-pointer min-h-11 sm:min-h-0"
+                                    disabled={exportingPdfId === resume.id}
+                                    onSelect={(e) => {
+                                      e.preventDefault();
+                                      handleDownloadPdf(resume.id);
+                                    }}
+                                  >
+                                    {exportingPdfId === resume.id ? (
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    ) : (
+                                      <FileDown className="h-4 w-4 mr-2" />
+                                    )}
+                                    Download PDF
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   className="cursor-pointer min-h-11 sm:min-h-0"
                                   onSelect={(e) => {
@@ -391,7 +478,7 @@ const ResumeCard = () => {
                           </div>
                           <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
                             <Target className="h-3.5 w-3.5" />
-                            {resume.postedRole}
+                            {formatRoleLabel(resume.postedRole)}
                           </p>
                         </div>
 

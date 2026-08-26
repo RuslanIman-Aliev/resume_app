@@ -1,5 +1,6 @@
 import ResumeCard from "@/features/resumes/components/resume-card";
 import ResumeManager from "@/features/resumes/components/resume-manager";
+import { parseResumeStatusFilter } from "@/lib/resume-status";
 import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 import type { Metadata } from "next";
 
@@ -26,7 +27,7 @@ const ResumesPage = async ({
     trpc.resume.getAll.queryOptions({
       page: Number(firstValue(params.page)) || 1,
       search: firstValue(params.search),
-      status: firstValue(params.status),
+      status: parseResumeStatusFilter(firstValue(params.status)),
     }),
   );
 

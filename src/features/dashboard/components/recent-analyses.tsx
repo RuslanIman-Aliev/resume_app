@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getRelativeTime, getScoreColor } from "@/lib/format";
+import { formatRoleLabel } from "@/lib/format";
 import { getStatusBadge } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
@@ -135,10 +136,7 @@ const RecentAnalyses = () => {
                       <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:gap-0">
                         <div className="gap-2 flex items-center min-w-0">
                           <span className="truncate font-medium text-sm">
-                            {postedRole
-                              ? postedRole.charAt(0).toUpperCase() +
-                                postedRole.slice(1).toLowerCase()
-                              : ""}
+                            {formatRoleLabel(postedRole)}
                           </span>
                           {getStatusBadge(status)}
                         </div>

@@ -5,6 +5,10 @@ import { z } from "zod";
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
+  // Defaulted rather than required: the model is a tuning knob, not a
+  // credential, and an unset value should keep the app booting on the model
+  // the analysis prompts were written against.
+  OPENAI_MODEL: z.string().min(1).default("gpt-5.4"),
   CONVERT_API_SECRET: z.string().min(1).optional(),
   NEXT_PUBLIC_AUTH_URL: z.string().url(),
   NEXT_PUBLIC_SITE_URL: z.string().url().default("https://ai-tailor.app"),

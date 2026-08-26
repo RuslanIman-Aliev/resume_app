@@ -201,6 +201,37 @@ describe("resumeRouter", () => {
     expect(prismaMock.resume.findMany).not.toHaveBeenCalled();
   });
 
+  it("rejects a status filter outside the ResumeStatus enum", async () => {
+    const caller = createCaller({});
+
+    // The filter arrives from a `?status=` URL parameter and is spread straight
+    // into the `where` clause, so anything outside the enum has to be refused
+    // before it reaches Prisma. "draft" is the pre-migration spelling.
+    await expect(caller.getAll({ status: "draft" as never })).rejects.toThrow();
+
+    expect(prismaMock.resume.count).not.toHaveBeenCalled();
+    expect(prismaMock.resume.findMany).not.toHaveBeenCalled();
+  });
+
+  it("applies a valid status filter to both the count and the page query", async () => {
+    prismaMock.resume.count.mockResolvedValue(1);
+    prismaMock.resume.findMany.mockResolvedValue([{ id: "resume_1" }]);
+
+    const caller = createCaller({});
+    await caller.getAll({ status: "ANALYZED" });
+
+    // Both queries have to carry the same filter, otherwise the total count
+    // and the returned page describe different sets and pagination lies.
+    expect(prismaMock.resume.count).toHaveBeenCalledWith({
+      where: { userId: session.user.id, status: "ANALYZED" },
+    });
+    expect(prismaMock.resume.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: session.user.id, status: "ANALYZED" },
+      }),
+    );
+  });
+
   it("paginates results and clamps page values", async () => {
     prismaMock.resume.count.mockResolvedValue(10);
     const resumes = [{ id: "resume_1" }];
