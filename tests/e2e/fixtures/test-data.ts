@@ -4,6 +4,18 @@ export const testUser = {
   password: "Password123!",
 };
 
+/**
+ * Enough cards in one column to prove the column scrolls rather than paginates.
+ * They all sit in `saved`, which is the column the board opens on.
+ */
+export const seedTrackerPositions = Array.from({ length: 10 }, (_, index) => ({
+  id: `tracker_e2e_${index + 1}`,
+  company: `Column Co ${index + 1}`,
+  position: "Column Scroll Engineer",
+  location: "Remote",
+  status: "saved",
+}));
+
 export const seedResume = {
   id: "resume_e2e_1",
   fileName: "e2e-resume.pdf",

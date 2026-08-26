@@ -865,4 +865,99 @@ describe("resumeRouter", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(deleteUploadThingFilesByUrlMock).not.toHaveBeenCalled();
   });
+
+  describe("rename", () => {
+    it("renames only the display name, scoped to the caller", async () => {
+      prismaMock.resume.updateMany.mockResolvedValue({ count: 1 });
+
+      const caller = createCaller({});
+      const result = await caller.rename({
+        resumeId: "resume_1",
+        resumeName: "Backend Engineer 2026",
+      });
+
+      expect(prismaMock.resume.updateMany).toHaveBeenCalledWith({
+        where: { id: "resume_1", userId: session.user.id },
+        data: { resumeName: "Backend Engineer 2026" },
+      });
+      expect(result).toEqual({
+        success: true,
+        resumeName: "Backend Engineer 2026",
+      });
+    });
+
+    it("never writes the file name or storage links", async () => {
+      prismaMock.resume.updateMany.mockResolvedValue({ count: 1 });
+
+      const caller = createCaller({});
+      await caller.rename({ resumeId: "resume_1", resumeName: "New name" });
+
+      const { data } = prismaMock.resume.updateMany.mock.calls[0][0];
+      expect(Object.keys(data)).toEqual(["resumeName"]);
+      expect(data).not.toHaveProperty("fileName");
+      expect(data).not.toHaveProperty("resumeLink");
+      expect(data).not.toHaveProperty("resumePreviewLink");
+    });
+
+    it("trims surrounding whitespace before saving", async () => {
+      prismaMock.resume.updateMany.mockResolvedValue({ count: 1 });
+
+      const caller = createCaller({});
+      await caller.rename({
+        resumeId: "resume_1",
+        resumeName: "   Padded name   ",
+      });
+
+      expect(prismaMock.resume.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { resumeName: "Padded name" } }),
+      );
+    });
+
+    it.each([
+      ["an empty string", ""],
+      ["a whitespace-only string", "   "],
+      ["a tab and newline only", "\t\n"],
+    ])("rejects %s without hitting the database", async (_label, name) => {
+      const caller = createCaller({});
+
+      await expect(
+        caller.rename({ resumeId: "resume_1", resumeName: name }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(prismaMock.resume.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects a name longer than the allowed maximum", async () => {
+      const caller = createCaller({});
+
+      await expect(
+        caller.rename({
+          resumeId: "resume_1",
+          resumeName: "a".repeat(121),
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(prismaMock.resume.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("returns NOT_FOUND when renaming a resume owned by someone else", async () => {
+      // The row exists, but not for this user — updateMany matches nothing.
+      prismaMock.resume.updateMany.mockResolvedValue({ count: 0 });
+
+      const caller = createCaller({});
+
+      await expect(
+        caller.rename({
+          resumeId: "someone_elses_resume",
+          resumeName: "Hijacked",
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+      expect(prismaMock.resume.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "someone_elses_resume",
+          userId: session.user.id,
+        },
+        data: { resumeName: "Hijacked" },
+      });
+    });
+  });
 });

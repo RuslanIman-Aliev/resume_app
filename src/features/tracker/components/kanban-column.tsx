@@ -1,15 +1,22 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import type { JobApplicationCard } from "@/lib/types";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import type { ApplicationStatusValue, JobApplicationCard } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { useDroppable } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { useMemo } from "react";
 import { JobCard } from "./job-card";
 
 /**
  * Kanban column component that groups job applications by status.
- * Displays a filtered list of jobs with client-side pagination.
+ *
+ * The whole column is a drop target, so a card can be released anywhere over
+ * it - including the empty space below the last card, which is why the list
+ * keeps a minimum height even when there is nothing in it.
  */
 export const KanbanColumn = ({
   title,
@@ -18,70 +25,51 @@ export const KanbanColumn = ({
   color,
 }: {
   title: string;
-  status: string;
+  status: ApplicationStatusValue;
   allJobs: JobApplicationCard[];
   color: string;
 }) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 2;
-
   const columnJobs = useMemo(
     () => allJobs.filter((job) => job.status === status),
     [allJobs, status],
   );
 
-  const totalPages = Math.ceil(columnJobs.length / ITEMS_PER_PAGE);
-  // Clamp during render instead of syncing via an effect: when the column
-  // shrinks (e.g. after a drag or delete) the page stays in range without an
-  // extra render pass or flash.
-  const safePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
-  const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const jobIds = useMemo(() => columnJobs.map((job) => job.id), [columnJobs]);
 
-  const displayedJobs = columnJobs.slice(startIndex, endIndex);
+  const { setNodeRef, isOver } = useDroppable({
+    id: status,
+    data: { type: "column", status },
+  });
 
   return (
-    <div className="flex flex-col w-72 sm:w-87.5 shrink-0 bg-card/20 rounded-2xl p-4">
+    <div
+      className={cn(
+        "flex flex-col w-72 sm:w-87.5 shrink-0 rounded-2xl p-4 transition-colors",
+        isOver ? "bg-primary/5 ring-2 ring-primary/40" : "bg-card/20",
+      )}
+    >
       <h3 className={`font-bold mb-4 ${color}`}>
         {title}{" "}
         <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-          {columnJobs.length} 
+          {columnJobs.length}
         </Badge>
       </h3>
 
-      <div className="flex flex-col gap-4 flex-1">
-        {displayedJobs.map((job) => (
-          <JobCard key={job.id} application={job} />
-        ))}
+      {/* The list scrolls instead of paginating. Height is capped in dvh so the
+          mobile browser's collapsing address bar doesn't leave the column
+          taller than the visible viewport. `overscroll-contain` keeps a flick
+          at the end of the list from scrolling the page behind it. */}
+      <div
+        ref={setNodeRef}
+        data-testid={`kanban-column-${status}`}
+        className="flex flex-col gap-4 flex-1 min-h-24 max-h-[60dvh] overflow-y-auto overscroll-contain pr-1"
+      >
+        <SortableContext items={jobIds} strategy={verticalListSortingStrategy}>
+          {columnJobs.map((job) => (
+            <JobCard key={job.id} application={job} />
+          ))}
+        </SortableContext>
       </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
-            disabled={safePage === 1}
-            className="h-11 sm:h-7"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" /> Prev
-          </Button>
-
-          <span className="text-xs text-muted-foreground">
-            Page {safePage} of {totalPages}
-          </span>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
-            disabled={safePage === totalPages}
-            className="h-11 sm:h-7"
-          >
-            Next <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

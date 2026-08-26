@@ -1,4 +1,14 @@
 "use client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +25,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyDataCard } from "@/features/analyzer/components/empty-data-card";
 import { useUrlPage } from "@/hooks/use-url-page";
 import { useTRPC } from "@/trpc/client";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { getErrorFeedback } from "@/lib/error-feedback";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpDown,
@@ -24,13 +40,17 @@ import {
   Clock,
   FileTextIcon,
   Filter,
+  Loader2,
+  MoreVertical,
   Search,
   SearchX,
   Target,
+  Trash2,
   TrendingUpIcon,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 type ScoreFilter = "all" | "high" | "medium" | "low";
 type SortBy = "date" | "score";
@@ -109,9 +129,15 @@ const CardComponent = ({
 };
 const RecentAnalysesList = () => {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
+  const [analysisToDelete, setAnalysisToDelete] = useState<{
+    id: string;
+    jobTitle: string;
+    companyName: string;
+  } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const filterScore = getScoreFilterFromParams(searchParams);
@@ -203,6 +229,28 @@ const RecentAnalysesList = () => {
     }),
     placeholderData: keepPreviousData,
   });
+
+  const { mutate: deleteAnalysis, isPending: isDeleting } = useMutation(
+    trpc.jobApplication.deleteJobApplication.mutationOptions({
+      onSuccess: () => {
+        toast.success("Analysis deleted successfully!");
+        setAnalysisToDelete(null);
+      },
+      onError: (error) => {
+        toast.error(
+          getErrorFeedback(error, {
+            fallbackMessage: "Failed to delete analysis.",
+          }).message,
+        );
+        setAnalysisToDelete(null);
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({
+          queryKey: trpc.jobApplication.getJobApplication.queryKey(),
+        });
+      },
+    }),
+  );
 
   const pageCount = data?.pagination?.pageCount ?? 1;
   const activePage = data?.pagination?.currentPage ?? currentPage;
@@ -427,12 +475,105 @@ const RecentAnalysesList = () => {
                       </div>
                     </div>
                   </div>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Actions for ${analysis.jobTitle}`}
+                        className="size-11 shrink-0 sm:size-8"
+                        // The whole card navigates on click, so the menu has to
+                        // keep its own clicks from bubbling up to it.
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setAnalysisToDelete({
+                            id: analysis.id,
+                            jobTitle: analysis.jobTitle ?? "this analysis",
+                            companyName: analysis.companyName ?? "",
+                          });
+                        }}
+                        className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer min-h-11 sm:min-h-0"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardContent>
               </Card>
             );
           })
         )}
       </div>
+
+      <AlertDialog
+        open={!!analysisToDelete}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setAnalysisToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this analysis?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This permanently deletes the analysis for{" "}
+                  <strong>{analysisToDelete?.jobTitle}</strong>
+                  {analysisToDelete?.companyName
+                    ? ` at ${analysisToDelete.companyName}`
+                    : ""}
+                  , including its match score, improvements, skills gap and any
+                  generated cover letter. This cannot be undone.
+                </p>
+                <p>
+                  Your resume is not affected, and the matching card in your job
+                  tracker stays where it is — only this analysis record is
+                  removed.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting} className="h-11 sm:h-8">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={(e) => {
+                // Hold the dialog open until the mutation settles.
+                e.preventDefault();
+                if (analysisToDelete) {
+                  deleteAnalysis({ applicationId: analysisToDelete.id });
+                }
+              }}
+              className="h-11 sm:h-8 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Analysis"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <ResumePagination
         currentPage={activePage}
         pageCount={pageCount}

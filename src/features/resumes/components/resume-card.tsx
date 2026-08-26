@@ -15,6 +15,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
@@ -25,6 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ResumePagination } from "@/components/resume-pagination";
 import { useUrlPage } from "@/hooks/use-url-page";
 import { getErrorFeedback } from "@/lib/error-feedback";
@@ -43,9 +48,18 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import type { AppRouter } from "@/trpc/routers/_app";
+import type { inferRouterOutputs } from "@trpc/server";
 import { ResumeEmpty, ResumeError, ResumeLoading } from "./resume-states";
+
+/**
+ * Shape held by every cached `resume.getAll` page. The optimistic rename patch
+ * rewrites entries of this type in place, so it is derived from the router
+ * rather than hand-written — a change to the procedure surfaces here.
+ */
+type ResumeListData = inferRouterOutputs<AppRouter>["resume"]["getAll"];
 
 const ResumeCard = () => {
   const trpc = useTRPC();
@@ -61,6 +75,15 @@ const ResumeCard = () => {
     id: string;
     name: string;
   } | null>(null);
+
+  const [resumeToRename, setResumeToRename] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  // Lets the submit handler put focus back on the field when validation
+  // rejects the name, instead of leaving the dialog with nothing focused.
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const searchTerm = searchParams.get("search") || undefined;
   const statusFilter = searchParams.get("status") || undefined;
@@ -90,6 +113,74 @@ const ResumeCard = () => {
       },
     }),
   );
+
+  const { mutate: renameResume, isPending: isRenaming } = useMutation(
+    trpc.resume.rename.mutationOptions({
+      // Patch every cached `getAll` page so the new name shows up immediately,
+      // and hand the previous snapshot to onError for the rollback.
+      onMutate: async (variables) => {
+        const queryKey = trpc.resume.getAll.queryKey();
+        await queryClient.cancelQueries({ queryKey });
+
+        const previous = queryClient.getQueriesData<ResumeListData>({
+          queryKey,
+        });
+
+        queryClient.setQueriesData<ResumeListData>({ queryKey }, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            resumes: old.resumes.map((item) =>
+              item.id === variables.resumeId
+                ? { ...item, resumeName: variables.resumeName }
+                : item,
+            ),
+          };
+        });
+
+        return { previous };
+      },
+      onSuccess: () => {
+        toast.success("Resume renamed successfully!");
+        setResumeToRename(null);
+      },
+      onError: (error, _variables, context) => {
+        // Put back exactly what each cache entry held before the patch.
+        for (const [key, snapshot] of context?.previous ?? []) {
+          queryClient.setQueryData(key, snapshot);
+        }
+        toast.error(
+          getErrorFeedback(error, {
+            fallbackMessage: "Failed to rename resume.",
+          }).message,
+        );
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getAll.queryKey(),
+        });
+      },
+    }),
+  );
+
+  const submitRename = () => {
+    if (!resumeToRename) return;
+
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      toast.error("Resume name cannot be empty.");
+      renameInputRef.current?.focus();
+      return;
+    }
+
+    // Nothing changed — close without spending a request.
+    if (trimmed === resumeToRename.name) {
+      setResumeToRename(null);
+      return;
+    }
+
+    renameResume({ resumeId: resumeToRename.id, resumeName: trimmed });
+  };
 
   useEffect(() => {
     if (!data?.resumes?.length) return;
@@ -268,7 +359,12 @@ const ResumeCard = () => {
                                   className="cursor-pointer min-h-11 sm:min-h-0"
                                   onSelect={(e) => {
                                     e.preventDefault();
-                                    // Handle rename logic
+                                    const currentName = resume.resumeName ?? "";
+                                    setResumeToRename({
+                                      id: resume.id,
+                                      name: currentName,
+                                    });
+                                    setRenameValue(currentName);
                                   }}
                                 >
                                   <Pencil className="h-4 w-4 mr-2" />
@@ -452,6 +548,76 @@ const ResumeCard = () => {
           );
         })}
       </div>
+
+      {/* Rename dialog, pre-filled with the current display name. */}
+      <Dialog
+        open={!!resumeToRename}
+        onOpenChange={(open) => {
+          // Esc and outside-click both route through here; block them mid-flight
+          // so the dialog cannot vanish while the mutation is still running.
+          if (!open && !isRenaming) {
+            setResumeToRename(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename resume</DialogTitle>
+            <DialogDescription>
+              This changes the display name only. The uploaded file and its
+              download link stay exactly as they are.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitRename();
+            }}
+          >
+            <div className="grid gap-2">
+              <Label htmlFor="resume-rename-input">Resume name</Label>
+              <Input
+                id="resume-rename-input"
+                ref={renameInputRef}
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                disabled={isRenaming}
+                maxLength={120}
+                autoFocus
+                placeholder="e.g. Frontend Engineer 2026"
+                className="h-11 sm:h-10"
+              />
+            </div>
+
+            <DialogFooter className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isRenaming}
+                onClick={() => setResumeToRename(null)}
+                className="h-11 sm:h-8"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isRenaming || !renameValue.trim()}
+                className="h-11 sm:h-8"
+              >
+                {isRenaming ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* 4. The centralized Delete Confirmation Modal */}
       <AlertDialog

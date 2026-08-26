@@ -1,3 +1,4 @@
+import { createAppError } from "@/lib/app-error";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import z from "zod";
@@ -133,5 +134,39 @@ export const jobApplicationRouter = createTRPCRouter({
           currentPage: page,
         },
       };
+    }),
+
+  /**
+   * Deletes a single job application analysis owned by the current user.
+   *
+   * Scope note: `TrackerPosition` has no foreign key to `JobApplication` — it
+   * stores `company`/`position` as plain strings — so there is no reliable link
+   * from an analysis back to a kanban card. Matching on company + title would
+   * be a guess (casing, "Acme" vs "Acme Inc.", several roles at one company),
+   * and a wrong guess silently destroys a position the user is actively
+   * tracking. This deletes the analysis row only; the tracker card is left
+   * untouched, and the confirmation dialog says so.
+   */
+  deleteJobApplication: protectedProcedure
+    .input(z.object({ applicationId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // deleteMany scopes by the non-unique userId and returns a count rather
+      // than throwing, so another user's id reads as NOT_FOUND instead of
+      // confirming that the row exists.
+      const result = await prisma.jobApplication.deleteMany({
+        where: {
+          id: input.applicationId,
+          userId: ctx.auth.user.id,
+        },
+      });
+
+      if (result.count === 0) {
+        throw createAppError({
+          code: "NOT_FOUND",
+          message: "Analysis not found",
+        });
+      }
+
+      return { success: true };
     }),
 });

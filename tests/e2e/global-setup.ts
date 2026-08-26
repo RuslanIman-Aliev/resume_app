@@ -5,7 +5,12 @@ import dotenv from "dotenv";
 import { parseSetCookieHeader } from "better-auth/cookies";
 import prisma from "../../src/lib/db";
 import { auth } from "../../src/lib/auth";
-import { seedAnalysis, seedResume, testUser } from "./fixtures/test-data";
+import {
+  seedAnalysis,
+  seedResume,
+  seedTrackerPositions,
+  testUser,
+} from "./fixtures/test-data";
 
 const storageStatePath = path.resolve(
   process.cwd(),
@@ -152,6 +157,13 @@ export default async function globalSetup(config: FullConfig) {
       improvements: seedAnalysis.improvements,
       keywords: seedAnalysis.keywords,
     },
+  });
+
+  await prisma.trackerPosition.createMany({
+    data: seedTrackerPositions.map((position) => ({
+      ...position,
+      userId: user.id,
+    })),
   });
 
   await prisma.$disconnect();

@@ -2,17 +2,54 @@
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { JobCardDragOverlay } from "@/features/tracker/components/job-card";
 import { KanbanColumn } from "@/features/tracker/components/kanban-column";
+import { useUpdateApplicationStatus } from "@/features/tracker/hooks/use-update-application-status";
 import { getErrorFeedback } from "@/lib/error-feedback";
-import type { ApplicationStatusValue, TrackerFormValues } from "@/lib/types";
+import type {
+  ApplicationStatusValue,
+  JobApplicationCard,
+  TrackerFormValues,
+} from "@/lib/types";
+import { applicationStatusValues } from "@/lib/types";
 import { KANBAN_COLUMN_ORDER, TRACKER_STATUS_CONFIG } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
+import type {
+  Announcements,
+  DragEndEvent,
+  DragStartEvent,
+  ScreenReaderInstructions,
+} from "@dnd-kit/core";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MeasuringStrategy,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import DialogTracker from "./dialog-tracker";
 import { TrackerError, TrackerLoading } from "./tracker-states";
+
+const isApplicationStatus = (
+  value: unknown,
+): value is ApplicationStatusValue =>
+  typeof value === "string" &&
+  (applicationStatusValues as readonly string[]).includes(value);
+
+const screenReaderInstructions: ScreenReaderInstructions = {
+  draggable:
+    "To move an application to another stage, press space or enter on its move handle. " +
+    "Use the arrow keys to move between stages, then press space or enter to drop it. " +
+    "Press escape to cancel. The move menu on each card does the same thing without dragging.",
+};
 
 const MainView = () => {
   const [open, setOpen] = useState(false);
@@ -22,18 +59,26 @@ const MainView = () => {
   );
   const queryClient = useQueryClient();
 
+  const jobs: JobApplicationCard[] = useMemo(() => data ?? [], [data]);
+
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeJob = useMemo(
+    () => jobs.find((job) => job.id === activeId) ?? null,
+    [jobs, activeId],
+  );
+
   const stats = useMemo(() => {
     const counts = Object.fromEntries(
       KANBAN_COLUMN_ORDER.map((status) => [status, 0]),
     ) as Record<ApplicationStatusValue, number>;
     // Single pass over the list instead of one filter() per status.
-    for (const application of data ?? []) {
+    for (const application of jobs) {
       if (application.status in counts) {
         counts[application.status as ApplicationStatusValue] += 1;
       }
     }
-    return { total: data?.length ?? 0, counts };
-  }, [data]);
+    return { total: jobs.length, counts };
+  }, [jobs]);
 
   const { mutate } = useMutation(
     trpc.tracker.create.mutationOptions({
@@ -49,6 +94,95 @@ const MainView = () => {
         );
       },
     }),
+  );
+
+  // Shared with the card's "Move to" menu: a drag and a menu pick are the same
+  // mutation, so they optimistically update and roll back identically.
+  const { mutate: updateStatus } = useUpdateApplicationStatus();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      // Without a distance threshold every press on the handle would start a
+      // drag and swallow the click that opens the card's menu.
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const describeJob = useCallback(
+    (id: string | number | null | undefined) => {
+      const job = jobs.find((candidate) => candidate.id === id);
+      if (!job) return "application";
+      return `${job.position || "application"} at ${job.company || "unnamed company"}`;
+    },
+    [jobs],
+  );
+
+  /**
+   * Which column a drop landed on.
+   *
+   * Both droppables carry their status in `data`: the column itself, and every
+   * card in it. That means releasing over a card counts as releasing over its
+   * column, without having to special-case the two.
+   */
+  const resolveDropStatus = useCallback((over: DragEndEvent["over"]) => {
+    const status = (over?.data.current as { status?: unknown } | undefined)
+      ?.status;
+    return isApplicationStatus(status) ? status : null;
+  }, []);
+
+  const announcements: Announcements = useMemo(
+    () => ({
+      onDragStart: ({ active }) =>
+        `Picked up ${describeJob(active.id)}. Use the arrow keys to choose a stage.`,
+      onDragOver: ({ active, over }) => {
+        const status = resolveDropStatus(over);
+        if (!status) return `${describeJob(active.id)} is not over a stage.`;
+        return `${describeJob(active.id)} is over ${TRACKER_STATUS_CONFIG[status].label}.`;
+      },
+      onDragEnd: ({ active, over }) => {
+        const status = resolveDropStatus(over);
+        if (!status)
+          return `${describeJob(active.id)} was dropped outside the board and stayed where it was.`;
+        return `${describeJob(active.id)} was moved to ${TRACKER_STATUS_CONFIG[status].label}.`;
+      },
+      onDragCancel: ({ active }) =>
+        `Moving ${describeJob(active.id)} was cancelled. It stayed where it was.`,
+    }),
+    [describeJob, resolveDropStatus],
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  }, []);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
+
+      const nextStatus = resolveDropStatus(over);
+      if (!nextStatus) return;
+
+      const currentStatus = (
+        active.data.current as { status?: unknown } | undefined
+      )?.status;
+
+      // Only a move across columns means anything. Position within a column
+      // isn't persisted - there is no order column - so a drop back into the
+      // same column is deliberately a no-op rather than a fake reorder that
+      // would evaporate on the next reload.
+      if (currentStatus === nextStatus) return;
+
+      updateStatus({ id: String(active.id), status: nextStatus });
+    },
+    [resolveDropStatus, updateStatus],
   );
 
   function handleAddApplication(values: TrackerFormValues) {
@@ -123,17 +257,38 @@ const MainView = () => {
           />
         </Dialog>
       </div>
-      <div className="flex flex-nowrap overflow-x-auto gap-6 pb-8">
-        {KANBAN_COLUMN_ORDER.map((status) => (
-          <KanbanColumn
-            key={status}
-            title={TRACKER_STATUS_CONFIG[status].label}
-            status={status}
-            color={TRACKER_STATUS_CONFIG[status].textClass}
-            allJobs={data || []}
-          />
-        ))}
-      </div>
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        accessibility={{ announcements, screenReaderInstructions }}
+        // Columns scroll now, so their rectangles move while a drag is in
+        // flight. Measuring once up front would leave dnd-kit aiming at where
+        // the cards used to be.
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="flex flex-nowrap overflow-x-auto gap-6 pb-8">
+          {KANBAN_COLUMN_ORDER.map((status) => (
+            <KanbanColumn
+              key={status}
+              title={TRACKER_STATUS_CONFIG[status].label}
+              status={status}
+              color={TRACKER_STATUS_CONFIG[status].textClass}
+              allJobs={jobs}
+            />
+          ))}
+        </div>
+
+        {/* No drop animation: the optimistic update has already drawn the card
+            in its new column, so animating the overlay back to the old slot
+            would show the move undoing itself. */}
+        <DragOverlay dropAnimation={null}>
+          {activeJob ? <JobCardDragOverlay application={activeJob} /> : null}
+        </DragOverlay>
+      </DndContext>
     </main>
   );
 };
