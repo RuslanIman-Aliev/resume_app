@@ -348,6 +348,34 @@ describe("resumeRouter", () => {
     expect(result).toEqual({ success: true });
   });
 
+  it("puts the throttle key on every event that starts a paid AI run", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      parsedContent: "Parsed content",
+      resumeName: "Resume",
+      postedRole: "Role",
+      structuredData: null,
+    });
+    prismaMock.jobApplication.create.mockResolvedValue({ id: "application_9" });
+    inngestMock.send.mockResolvedValue({});
+
+    const caller = createCaller({});
+    await caller.triggerAnalysis({ resumeId: "resume_1" });
+    await caller.triggerJobMatchAnalysis({
+      resumeId: "resume_1",
+      jobDescription: "Job description",
+    });
+
+    // Both Inngest functions throttle and limit concurrency on
+    // `event.data.userId`. If a payload ever loses that field the key resolves
+    // to nothing and the per-user ceiling silently becomes a single ceiling
+    // shared by everyone - which reads as "the limit still works" right up
+    // until two people use the product at the same time.
+    expect(inngestMock.send).toHaveBeenCalledTimes(2);
+    for (const [event] of inngestMock.send.mock.calls) {
+      expect(event.data).toMatchObject({ userId: session.user.id });
+    }
+  });
+
   it("throws when triggering analysis for missing resume", async () => {
     prismaMock.resume.findFirst.mockResolvedValue(null);
 
@@ -548,6 +576,7 @@ describe("resumeRouter", () => {
       name: "app/job-matched.analyzed",
       data: {
         applicationId: "application_2",
+        userId: session.user.id,
         resumeId: "resume_1",
         jobDescription: "Job description",
         parsedContent: "Parsed content",
@@ -628,6 +657,7 @@ describe("resumeRouter", () => {
       name: "app/job-matched.analyzed",
       data: {
         applicationId: "application_4",
+        userId: session.user.id,
         resumeId: "resume_1",
         jobDescription: "Need frontend engineer",
         parsedContent: JSON.stringify(

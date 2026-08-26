@@ -418,6 +418,9 @@ export const resumeRouter = createTRPCRouter({
         name: "app/job-matched.analyzed",
         data: {
           applicationId: application.id,
+          // Keys the per-user throttle and concurrency limits on the Inngest
+          // function; without it the limit applies to everyone at once.
+          userId: ctx.auth.user.id,
           resumeId: input.resumeId,
           jobDescription: input.jobDescription,
           parsedContent: structuredData
