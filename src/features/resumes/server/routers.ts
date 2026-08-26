@@ -5,6 +5,7 @@ import {
   normalizeResumeParsedContent,
   updateResumeParsedContent,
 } from "@/lib/resume-content";
+import { createAppError } from "@/lib/app-error";
 import { deleteUploadThingFilesByUrl } from "@/lib/uploadthing-files";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import type {
@@ -23,6 +24,12 @@ import z from "zod";
  * budget / flooding the Inngest queue.
  */
 const AI_TRIGGER_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
+
+/**
+ * Upper bound for a resume's display name. Matches the `create` input cap so a
+ * name cannot be renamed into something the upload path would have rejected.
+ */
+const RESUME_NAME_MAX_LENGTH = 120;
 
 /**
  * A stored resume-analysis improvement plus the applied flag that
@@ -816,6 +823,48 @@ export const resumeRouter = createTRPCRouter({
 
       return { success: true, changed: true };
     }),
+  /**
+   * Renames a resume's user-facing display name.
+   *
+   * Only `resumeName` changes. `fileName`, `resumeLink` and `resumePreviewLink`
+   * are the handles the storage layer deletes blobs by, so renaming must never
+   * touch them or the file reference breaks.
+   */
+  rename: protectedProcedure
+    .input(
+      z.object({
+        resumeId: z.string(),
+        // `trim` runs before the length check, so a whitespace-only string
+        // collapses to "" and is rejected by `min(1)`.
+        resumeName: z
+          .string()
+          .trim()
+          .min(1, "Resume name cannot be empty")
+          .max(RESUME_NAME_MAX_LENGTH, "Resume name is too long"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // updateMany scopes by the non-unique userId and returns a count instead
+      // of throwing, so another user's id is indistinguishable from a missing
+      // row — both surface as NOT_FOUND rather than leaking existence.
+      const result = await prisma.resume.updateMany({
+        where: {
+          id: input.resumeId,
+          userId: ctx.auth.user.id,
+        },
+        data: { resumeName: input.resumeName },
+      });
+
+      if (result.count === 0) {
+        throw createAppError({
+          code: "NOT_FOUND",
+          message: "Resume not found",
+        });
+      }
+
+      return { success: true, resumeName: input.resumeName };
+    }),
+
   deleteResume: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .mutation(async ({ ctx, input }) => {

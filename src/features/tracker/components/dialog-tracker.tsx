@@ -28,6 +28,7 @@ import {
   trackerFormSchema,
   TrackerFormValues,
 } from "@/lib/types";
+import { TRACKER_STATUS_CONFIG } from "@/lib/ui-config";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, DollarSign, Link, Mail, MapPin, User } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
@@ -196,7 +197,7 @@ const DialogTracker = ({
                   <SelectContent>
                     {applicationStatusValues.map((status) => (
                       <SelectItem key={status} value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                        {TRACKER_STATUS_CONFIG[status].label}
                       </SelectItem>
                     ))}
                   </SelectContent>

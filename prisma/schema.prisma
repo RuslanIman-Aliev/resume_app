@@ -109,6 +109,7 @@ model Resume {
 
   applications      JobApplication[]
   
+  @@index([userId, createdAt])
   @@map("resume")
 }
 
@@ -147,6 +148,8 @@ model JobApplication {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
+  @@index([userId, createdAt])
+  @@index([userId, updatedAt])
   @@map("job_application")
 }
 
@@ -167,14 +170,8 @@ model ResumeAnalysis {
   improvements    Json
   keywords        String[] 
   createdAt       DateTime @default(now())
-}
 
-enum ApplicationStatus {
-  TO_APPLY
-  APPLIED
-  INTERVIEW
-  REJECTED
-  OFFER
+  @@index([resumeId, createdAt])
 }
 
 model TrackerPosition {
@@ -197,5 +194,6 @@ model TrackerPosition {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([userId, createdAt])
   @@map("tracker_position")
 }

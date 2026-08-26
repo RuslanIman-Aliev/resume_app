@@ -7,6 +7,11 @@ import { Card } from "@/components/ui/card";
 import { FeedbackState } from "@/components/ui/feedback-state";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  getTrackerStatusPresentation,
+  PIPELINE_STAGE_ORDER,
+  TRACKER_STATUS_CONFIG,
+} from "@/lib/ui-config";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
@@ -21,22 +26,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-const pipelineStages = [
-  { id: "saved", label: "Saved", color: "bg-muted" },
-  { id: "applied", label: "Applied", color: "bg-primary" },
-  { id: "screening", label: "Screening", color: "bg-chart-4" },
-  { id: "interview", label: "Interview", color: "bg-chart-2" },
-  { id: "offer", label: "Offer", color: "bg-success" },
-] as const;
-
-const stageColors: Record<string, string> = {
-  saved: "bg-muted text-muted-foreground",
-  applied: "bg-primary/10 text-primary",
-  screening: "bg-chart-4/10 text-chart-4",
-  interview: "bg-chart-2/10 text-chart-2",
-  offer: "bg-success/10 text-success",
-};
 
 const ApplicationPipeline = () => {
   const trpc = useTRPC();
@@ -66,9 +55,9 @@ const ApplicationPipeline = () => {
           <div className="mb-6 space-y-2">
             <Skeleton className="h-2 w-full rounded-full" />
             <div className="flex items-center justify-between">
-              {pipelineStages.map((stage) => (
+              {PIPELINE_STAGE_ORDER.map((status) => (
                 <div
-                  key={`pipeline-stage-skeleton-${stage.id}`}
+                  key={`pipeline-stage-skeleton-${status}`}
                   className="flex flex-col items-center gap-1"
                 >
                   <Skeleton className="h-3 w-4" />
@@ -143,9 +132,11 @@ const ApplicationPipeline = () => {
   }
 
   // Config supplies label/color, the tracker supplies the count.
-  const stages = pipelineStages.map((stage) => ({
-    ...stage,
-    count: pipeline?.counts[stage.id] ?? 0,
+  const stages = PIPELINE_STAGE_ORDER.map((status) => ({
+    id: status,
+    label: TRACKER_STATUS_CONFIG[status].label,
+    barClass: TRACKER_STATUS_CONFIG[status].barClass,
+    count: pipeline?.counts[status] ?? 0,
   }));
   const totalApplications = stages.reduce((acc, stage) => acc + stage.count, 0);
   return (
@@ -160,7 +151,7 @@ const ApplicationPipeline = () => {
               stages.map((stage) => (
                 <div
                   key={stage.id}
-                  className={`h-2 ${stage.color} rounded-full transition-all`}
+                  className={`h-2 ${stage.barClass} rounded-full transition-all`}
                   style={{
                     width: `${(stage.count / totalApplications) * 100}%`,
                     minWidth: stage.count > 0 ? "8px" : "0",
@@ -233,9 +224,9 @@ const ApplicationPipeline = () => {
                         </span>
                         <Badge
                           variant="secondary"
-                          className={`text-xs ${stageColors[stage]}`}
+                          className={`text-xs ${getTrackerStatusPresentation(stage).badgeClass}`}
                         >
-                          {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                          {getTrackerStatusPresentation(stage).label}
                         </Badge>
                       </div>
                       {matchScore !== null && (
