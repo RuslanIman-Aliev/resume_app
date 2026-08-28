@@ -224,6 +224,31 @@ describe("AnalyzeResumeImprovements", () => {
     });
   });
 
+  it("closes the resume editor when the suggestion is cancelled", async () => {
+    render(
+      <AnalyzeResumeImprovements
+        data={createData()}
+        resumeId="resume_1"
+        applicationId="app_1"
+      />,
+    );
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /strengthen summary/i })[0],
+    );
+    fireEvent.click(screen.getByRole("button", { name: /apply to resume/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Resume Editor")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Resume Editor")).not.toBeInTheDocument();
+    });
+  });
+
   it("applies a pending suggestion and saves it", async () => {
     mockMutateAsync.mockResolvedValue({ success: true });
 

@@ -174,6 +174,97 @@ export const normalizeResumeParsedContent = (
 };
 
 /**
+ * Locates `needle` across the given text nodes, tolerating both the element
+ * boundaries and the whitespace runs that separate a quote from the markup it
+ * came from.
+ *
+ * The model quotes a resume line the way a person reads it - "Database
+ * Architecture: Entwarf ein robustes TypeScript-Backend" - while the DOM holds
+ * that line as two text nodes either side of a `<strong>`. Searching each node
+ * on its own missed every such quote, so the suggestion was appended to the end
+ * of the resume instead of replacing the sentence it was written for.
+ *
+ * Returns the span as node indexes plus offsets into those nodes, or null.
+ */
+const findTextSpan = (textNodes: Text[], needle: string) => {
+  const trimmedNeedle = needle.trim();
+  if (!trimmedNeedle) {
+    return null;
+  }
+
+  // Flatten to one string while remembering where every kept character came
+  // from, so a normalized match can be mapped back onto the real nodes.
+  const origins: Array<{ node: number; offset: number }> = [];
+  let haystack = "";
+  let pendingSpace = false;
+
+  textNodes.forEach((textNode, node) => {
+    const { data } = textNode;
+    for (let offset = 0; offset < data.length; offset += 1) {
+      if (/\s/.test(data[offset])) {
+        pendingSpace = haystack.length > 0;
+        continue;
+      }
+      if (pendingSpace) {
+        haystack += " ";
+        origins.push({ node, offset });
+        pendingSpace = false;
+      }
+      haystack += data[offset];
+      origins.push({ node, offset });
+    }
+  });
+
+  const flatNeedle = trimmedNeedle.replace(/\s+/g, " ");
+  const start = haystack.indexOf(flatNeedle);
+  if (start === -1) {
+    return null;
+  }
+
+  const first = origins[start];
+  const last = origins[start + flatNeedle.length - 1];
+
+  return {
+    startNode: first.node,
+    startOffset: first.offset,
+    endNode: last.node,
+    endOffset: last.offset + 1,
+  };
+};
+
+/**
+ * Renders resume HTML as the plain text a reader would see.
+ *
+ * This is what the analysis prompts are given: asked to quote from markup, the
+ * model answers with the text a person reads, so feeding it markup guarantees
+ * quotes that no longer appear in the input they came from.
+ */
+export const resumeContentToPlainText = (
+  value: string | null | undefined,
+): string => {
+  if (typeof value !== "string" || !value.trim()) {
+    return "";
+  }
+
+  const normalized = normalizeResumeParsedContent(value);
+  if (!normalized) {
+    return "";
+  }
+
+  const document = new JSDOM(`<body>${normalized}</body>`).window.document;
+  const blocks: string[] = [];
+
+  document.body.childNodes.forEach((child) => {
+    const text = (child.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (text) {
+      blocks.push(text);
+    }
+  });
+
+  return blocks.join("\n");
+};
+
+/**
  * Updates resume content by replacing old text with new text or appending if no match found.
  * Uses DOM parsing to locate and replace exact text matches in the existing HTML structure.
  * @param currentContent - The current resume HTML content
@@ -202,17 +293,34 @@ export const updateResumeParsedContent = (
     const showText = nodeFilter?.SHOW_TEXT ?? 4;
     const walker = document.createTreeWalker(document.body, showText);
 
+    const textNodes: Text[] = [];
     let currentNode = walker.nextNode();
     while (currentNode) {
-      const textNode = currentNode as Text;
-      const matchIndex = textNode.data.indexOf(trimmedPrevious);
+      textNodes.push(currentNode as Text);
+      currentNode = walker.nextNode();
+    }
 
-      if (matchIndex !== -1) {
-        textNode.data = textNode.data.replace(trimmedPrevious, nextText.trim());
-        return document.body.innerHTML;
+    const match = findTextSpan(textNodes, trimmedPrevious);
+
+    if (match) {
+      const { startNode, startOffset, endNode, endOffset } = match;
+      const startText = textNodes[startNode].data;
+
+      // The replacement lands in the first node of the span and the rest of the
+      // span is cleared. A quote that crosses an element boundary - the usual
+      // shape of a resume bullet, `<strong>Label:</strong> body text` - therefore
+      // keeps the styling of its opening run rather than losing the edit.
+      textNodes[startNode].data =
+        startText.slice(0, startOffset) +
+        nextText.trim() +
+        (startNode === endNode ? startText.slice(endOffset) : "");
+
+      for (let index = startNode + 1; index <= endNode; index += 1) {
+        textNodes[index].data =
+          index === endNode ? textNodes[index].data.slice(endOffset) : "";
       }
 
-      currentNode = walker.nextNode();
+      return document.body.innerHTML;
     }
   }
 

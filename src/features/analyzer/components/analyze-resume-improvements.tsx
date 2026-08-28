@@ -77,6 +77,10 @@ const AnalyzeResumeImprovements = ({
   const [isDocumentLoading, setIsDocumentLoading] = useState(false);
   const [isDocumentReady, setIsDocumentReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // True when the editor holds the plain-text fallback instead of the converted
+  // DOCX. Applying a suggestion writes the editor back over the stored file, so
+  // saving from this state would replace the formatted resume with plain text.
+  const [isFallbackContent, setIsFallbackContent] = useState(false);
 
   const { data: parsedResumeData, isLoading: isParsedResumeLoading } = useQuery(
     {
@@ -207,6 +211,7 @@ const AnalyzeResumeImprovements = ({
       setIsDocumentLoading(true);
       setIsDocumentReady(false);
       setLoadError(null);
+      setIsFallbackContent(false);
 
       try {
         const response = await fetch("/api/docx-to-sfdt", {
@@ -276,7 +281,10 @@ const AnalyzeResumeImprovements = ({
           }
           if (!cancelled) {
             lastLoadedResumeLinkRef.current = resumeLink;
-            setLoadError(null);
+            setIsFallbackContent(true);
+            setLoadError(
+              `${message}. Showing extracted text only - the original formatting could not be loaded, so changes cannot be saved back to the file.`,
+            );
             setIsDocumentReady(true);
           }
         } else if (!cancelled) {
@@ -394,9 +402,11 @@ const AnalyzeResumeImprovements = ({
     }
   };
 
+  // Cancelling is a decision not to touch the resume, so the editor closes with
+  // it rather than leaving the user in a document they no longer have a pending
+  // change for. `handleEditorDialogOpenChange` carries the rest of the teardown.
   const handleCancelPending = () => {
-    setPendingImprovement(null);
-    setPendingKey(null);
+    handleEditorDialogOpenChange(false);
   };
 
   const handleApplyPending = async () => {
@@ -455,17 +465,25 @@ const AnalyzeResumeImprovements = ({
         documentEditor.documentHelper?.renderVisiblePages?.(true);
         await delay(150);
 
-        try {
-          const saveResult = await saveEditorDocx(documentEditor, resumeId);
-          if (saveResult && typeof saveResult.resumeLink === "string") {
-            fileWasUpdated = true;
-            lastLoadedResumeLinkRef.current = saveResult.resumeLink;
-          }
-        } catch (error) {
+        if (isFallbackContent) {
+          // The editor is showing extracted plain text, not the converted DOCX.
+          // Exporting it would upload a formatting-free document and delete the
+          // original file, so the structured data update stands on its own.
           fileSaveError =
-            error instanceof Error
-              ? error.message
-              : "Failed to update resume file.";
+            "Resume file not updated: the document is shown as plain text because it could not be converted.";
+        } else {
+          try {
+            const saveResult = await saveEditorDocx(documentEditor, resumeId);
+            if (saveResult && typeof saveResult.resumeLink === "string") {
+              fileWasUpdated = true;
+              lastLoadedResumeLinkRef.current = saveResult.resumeLink;
+            }
+          } catch (error) {
+            fileSaveError =
+              error instanceof Error
+                ? error.message
+                : "Failed to update resume file.";
+          }
         }
       }
 
@@ -594,7 +612,7 @@ const AnalyzeResumeImprovements = ({
                           {improvement.description}
                         </p>
                       </div>
-                      {improvement.matchScoreBoost != null && (
+                      {improvement.matchScoreBoost > 0 && (
                         <Badge
                           variant="outline"
                           className="border-primary/30 bg-primary/10 text-primary shrink-0 mt-0.5"
@@ -722,7 +740,7 @@ const AnalyzeResumeImprovements = ({
                             {improvement.description}
                           </p>
                         </div>
-                        {improvement.matchScoreBoost != null && (
+                        {improvement.matchScoreBoost > 0 && (
                           <Badge
                             variant="outline"
                             className="border-border/30 bg-border/20 text-muted-foreground shrink-0 mt-0.5 opacity-60"

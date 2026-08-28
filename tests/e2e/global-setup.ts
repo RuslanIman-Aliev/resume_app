@@ -6,6 +6,7 @@ import { parseSetCookieHeader } from "better-auth/cookies";
 import prisma from "../../src/lib/db";
 import { auth } from "../../src/lib/auth";
 import {
+  budgetedRoutes,
   seedAnalysis,
   seedResume,
   seedTrackerPositions,
@@ -16,6 +17,30 @@ const storageStatePath = path.resolve(
   process.cwd(),
   "tests/e2e/.auth/user.json",
 );
+
+/**
+ * The dev server compiles routes on demand, so the first navigation to a route
+ * pays for compilation. The specs that time navigation against a budget would
+ * measure that instead of the page load, so hit those routes once here — signed
+ * in and after seeding, so they render the same work the tests will.
+ */
+const warmBudgetedRoutes = async (baseURL: string) => {
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({
+      storageState: storageStatePath,
+    });
+    const page = await context.newPage();
+
+    for (const route of Object.values(budgetedRoutes)) {
+      await page.goto(new URL(route, baseURL).toString(), {
+        timeout: 120_000,
+      });
+    }
+  } finally {
+    await browser.close();
+  }
+};
 
 const loadEnv = () => {
   dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
@@ -40,8 +65,7 @@ export default async function globalSetup(config: FullConfig) {
 
   const status = signUpResult.status;
   const response = signUpResult.response as
-    | { error?: unknown; token?: unknown }
-    | undefined;
+    { error?: unknown; token?: unknown } | undefined;
   const statusFailed =
     typeof status === "number" && (status < 200 || status >= 300);
 
@@ -62,8 +86,7 @@ export default async function globalSetup(config: FullConfig) {
 
   const signInStatus = signInResult.status;
   const signInResponse = signInResult.response as
-    | { error?: unknown }
-    | undefined;
+    { error?: unknown } | undefined;
   const signInFailed =
     typeof signInStatus === "number" &&
     (signInStatus < 200 || signInStatus >= 300);
@@ -167,4 +190,12 @@ export default async function globalSetup(config: FullConfig) {
   });
 
   await prisma.$disconnect();
+
+  // Warming is an optimisation, not a precondition: if it fails the suite still
+  // runs, and the budgeted specs report the slow navigation themselves.
+  try {
+    await warmBudgetedRoutes(baseURL);
+  } catch (error) {
+    console.warn("[global-setup] Failed to warm budgeted routes:", error);
+  }
 }

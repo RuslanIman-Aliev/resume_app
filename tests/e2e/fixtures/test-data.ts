@@ -66,3 +66,14 @@ export const seedAnalysis = {
     },
   ],
 };
+
+/**
+ * Routes whose navigation is timed against a budget in the specs. The dev
+ * server compiles routes on demand, so global setup warms exactly these before
+ * the suite runs — otherwise the first `goto` per route measures compilation
+ * rather than page load.
+ */
+export const budgetedRoutes = {
+  analyzer: "/analyzer",
+  aiCoach: `/ai-coach/${seedResume.id}`,
+} as const;

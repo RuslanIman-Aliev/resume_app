@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedResume } from "./fixtures/test-data";
+import { budgetedRoutes, seedResume } from "./fixtures/test-data";
 
 test.use({ storageState: "tests/e2e/.auth/user.json" });
 
@@ -19,7 +19,7 @@ test.describe("analyzer", () => {
   test("keeps analyze button disabled when job description is missing", async ({
     page,
   }) => {
-    await gotoWithBudget(page, "/analyzer");
+    await gotoWithBudget(page, budgetedRoutes.analyzer);
 
     const analyzeButton = page.getByRole("button", {
       name: "Analyze Job Description",
@@ -33,7 +33,7 @@ test.describe("analyzer", () => {
   });
 
   test("enables analysis after resume selection", async ({ page }) => {
-    await gotoWithBudget(page, "/analyzer");
+    await gotoWithBudget(page, budgetedRoutes.analyzer);
 
     await expect(page.getByText("Job Description Input")).toBeVisible({
       timeout: 15_000,
@@ -55,7 +55,7 @@ test.describe("analyzer", () => {
   });
 
   test("shows seeded resume details in selector list", async ({ page }) => {
-    await gotoWithBudget(page, "/analyzer");
+    await gotoWithBudget(page, budgetedRoutes.analyzer);
 
     await expect(page.getByText(/job description input/i)).toBeVisible({
       timeout: 15_000,

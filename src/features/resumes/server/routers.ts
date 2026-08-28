@@ -3,6 +3,7 @@ import prisma from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   normalizeResumeParsedContent,
+  resumeContentToPlainText,
   updateResumeParsedContent,
 } from "@/lib/resume-content";
 import { createAppError } from "@/lib/app-error";
@@ -256,7 +257,12 @@ export const resumeRouter = createTRPCRouter({
         data: {
           resumeId: input.resumeId,
           userId: ctx.auth.user.id,
-          parsedContent: resume.parsedContent,
+          // The model is asked to quote resume lines back to us, so it gets the
+          // resume as a reader sees it. Quoting from markup produced anchors
+          // that could not be found again in the text they came from.
+          parsedContent:
+            resumeContentToPlainText(resume.parsedContent) ||
+            resume.parsedContent,
           postedRole: resume.postedRole,
           resumeName: resume.resumeName,
         },
@@ -425,16 +431,19 @@ export const resumeRouter = createTRPCRouter({
           jobDescription: input.jobDescription,
           parsedContent: structuredData
             ? JSON.stringify(structuredData, null, 2)
-            : parsedContent,
+            : resumeContentToPlainText(parsedContent) || parsedContent,
         },
       });
 
       return { applicationId: application.id };
     }),
   /**
-   * Returns a completed job match analysis for a user-owned application.
+   * Returns a job match analysis for a user-owned application.
    *
-   * Only applications with an ANALYZED status are returned.
+   * An application that has not finished analysis resolves successfully with a
+   * null `application` instead of throwing, so the client can poll a stable
+   * success state. NOT_FOUND is reserved for an application that does not
+   * exist or belongs to another user.
    */
   getJobMatchResult: protectedProcedure
     .input(z.object({ applicationId: z.string() }))
@@ -443,7 +452,6 @@ export const resumeRouter = createTRPCRouter({
         where: {
           id: input.applicationId,
           userId: ctx.auth.user.id,
-          status: "ANALYZED",
         },
       });
       if (!application) {
@@ -452,7 +460,10 @@ export const resumeRouter = createTRPCRouter({
           message: "Job application not found",
         });
       }
-      return { application };
+      if (application.status !== "ANALYZED") {
+        return { application: null, status: application.status };
+      }
+      return { application, status: application.status };
     }),
 
   /**

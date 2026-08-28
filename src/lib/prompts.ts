@@ -200,18 +200,16 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   - Keep wording concise and ATS-friendly.
   - Generate a large number of actionable improvements. Do not isolate your feedback to only a few points; aim to find every possible weak point, missing keyword, or phrasing issue and provide a highly specific improvement for each.
 
-  CRITICAL INSTRUCTIONS FOR MATCHSCOREBOOST CALCULATION:
-  - For EACH improvement, calculate a precise matchScoreBoost (1-10 integer) representing the estimated ATS score increase after applying that specific improvement.
-  - Boost calculation rules:
-    * High-impact changes (adding missing critical keywords, required skills, or experience levels): 7-10 points
-    * Medium-impact changes (improving existing wording, adding context, formatting improvements): 4-6 points
-    * Low-impact changes (minor phrasing adjustments, optimization, polish): 1-3 points
-  - Sum of ALL improvements' matchScoreBoost should approximately equal: (estimatedScoreWithAllImprovements - matchScore)
-  - If improvement affects ATS keyword matching: weight higher (8-10)
-  - If improvement affects seniority/experience signaling: weight high (6-8)
-  - If improvement affects formatting/clarity: weight lower (1-4)
-  - NEVER use 0 for matchScoreBoost - every improvement must have measurable impact
-  - The frontend UI will sum these boosts to show users the cumulative expected score improvement
+  MATCH SCORE BOOST RULES:
+  - matchScoreBoost is how many percentage points ONE improvement adds to matchScore. The user sees these numbers on the cards and adds them up, so they must be a budget, not twelve independent guesses.
+  - HARD ARITHMETIC CONSTRAINT: the matchScoreBoost values of ALL improvements MUST sum to exactly (estimatedScoreWithAllImprovements - matchScore). Add them up before you answer and correct them if they do not match.
+  - estimatedScoreWithAllImprovements must never exceed 100, and must be realistic: rewriting bullet points cannot satisfy a hard requirement the candidate does not meet. A resume already matching well moves by a handful of points; a weak one has more room. Do not default to 95-100.
+  - Rank the improvements first, then divide that budget between them by impact:
+    * adding a missing required keyword, skill, or experience signal takes the largest shares
+    * clarifying seniority, scope, or measurable results takes middling shares
+    * phrasing, ordering, and formatting polish takes the smallest shares, often 1 point
+  - Use integers only, and do not give every improvement the same number - the ranking is the point.
+  - A low-value polish item may be worth 0 when the budget is already spent on changes that matter more.
   UNIQUE TARGETS: Do not rewrite the same 'beforeText' multiple times. Target different sections and different bullet points.
   UNIQUE SUGGESTIONS: Inside the 'suggestions' array, offer 3 completely distinct ways to fix the problem (e.g., Option A: Keyword focus, Option B: Metric focus, Option C: Business impact focus).
   You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
@@ -238,7 +236,7 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
         "priority": string ("high", "medium", or "low"),
         "title": string (short action title, e.g., "Add Testing Experience"),
         "description": string (1 sentence why this gap affects ATS matching),
-        "matchScoreBoost": number (integer boost estimate, e.g., 8),
+        "matchScoreBoost": number (integer; see MATCH SCORE BOOST RULES - all boosts must sum to estimatedScoreWithAllImprovements - matchScore),
         "targetSection": string (must be "summary", "experience", "education", "projects", or "skills"),
         "targetId": string (must be the EXACT ID of the corresponding JSON block or bullet from the candidate's structured resume data input, e.g., "exp-1-bullet-2". Leave empty and do not include the field if targetSection is summary),
         "suggestions": [
@@ -302,7 +300,7 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
       "requiredTotal": number,
       "preferredMatched": number,
       "preferredTotal": number,
-      "estimatedScoreWithAllImprovements": number (0-100)
+      "estimatedScoreWithAllImprovements": number (0-100; realistic score after applying every improvement, and always greater than matchScore when improvements exist)
     },
     "coverLetterText": string (A highly personalized, 5-paragraph cover letter written from the candidate's perspective to the hiring manager. Focus on the value the candidate brings to the specific challenges mentioned in the job description. Do not use generic templates. Write the cover letter in targetLanguage.)
   }

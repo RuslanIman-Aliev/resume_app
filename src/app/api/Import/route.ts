@@ -8,6 +8,10 @@ const DOCUMENT_EDITOR_SERVICE_URL = serverEnv.DOCUMENT_EDITOR_SERVICE_URL;
 // Uploads are capped at 4MB, but the editor can also relay larger SFDT JSON.
 const MAX_IMPORT_SIZE_BYTES = 15 * 1024 * 1024;
 
+// Matches the budget in /api/docx-to-sfdt: the Import service cold start is
+// slower than the platform default timeout.
+export const maxDuration = 60;
+
 const normalizeServiceUrl = (value: string) =>
   value.endsWith("/") ? value : `${value}/`;
 

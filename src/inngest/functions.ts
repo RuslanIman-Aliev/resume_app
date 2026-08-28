@@ -1,6 +1,7 @@
 import { getJobMatchPrompt, getPrompt } from "@/lib/prompts";
 import { inngest } from "./client";
 import OpenAI from "openai";
+import { normalizeMatchScoreBoosts } from "@/lib/match-score";
 import { jobMatchAnalysisSchema, resumeAnalysisSchema } from "@/lib/schemas";
 import prisma from "@/lib/db";
 import Pusher from "pusher";
@@ -160,6 +161,21 @@ export const analyzeJobMatched = inngest.createFunction(
     const parsedData = JSON.parse(result || "{}");
     const validatedData = jobMatchAnalysisSchema.parse(parsedData);
 
+    // The prompt asks for a per-improvement boost and the model answers with a
+    // double-digit number on every card, so the totals are re-derived here
+    // before anything is stored or shown.
+    const { improvements, estimatedScoreWithAllImprovements } =
+      normalizeMatchScoreBoosts({
+        matchScore: validatedData.matchScore,
+        improvements: validatedData.improvements,
+        estimatedScoreWithAllImprovements:
+          validatedData.summary.estimatedScoreWithAllImprovements,
+      });
+    const summary = {
+      ...validatedData.summary,
+      estimatedScoreWithAllImprovements,
+    };
+
     // Save the analysis results to the database, linking it to the correct resume. We use upsert to create a new analysis if it doesn't exist or update the existing one if it does.
     await step.run("save-to-db", async () => {
       const existingApp = await prisma.jobApplication.findUnique({
@@ -183,12 +199,12 @@ export const analyzeJobMatched = inngest.createFunction(
             targetLanguage: validatedData.targetLanguage,
             matchScore: validatedData.matchScore,
             matchingSkills: validatedData.matchingSkills,
-            improvements: validatedData.improvements,
+            improvements,
             missingSkills: validatedData.missingSkills,
             requirementsMatch: validatedData.requirementsMatch,
             skillsGap: validatedData.skillsGap,
             keywordsGap: validatedData.keywordsGap,
-            summary: validatedData.summary,
+            summary,
             coverLetterText: validatedData.coverLetterText,
             status: "ANALYZED",
           },

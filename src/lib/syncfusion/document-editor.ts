@@ -259,8 +259,16 @@ const ensureLoaded = async (documentEditor: DocumentEditorLike) => {
 };
 
 /**
- * Attempts to open an SFDT payload across the matrix of shapes (object/raw
- * string), optimize flags, and open methods until a page renders.
+ * Attempts to open an SFDT payload as a parsed object, then as the raw string,
+ * using `open` and then `openAsync`, until a page renders.
+ *
+ * The payload is passed through untouched. SFDT produced by the Import service
+ * is the optimized dialect, where every key is abbreviated (`sec`, `b`, `i`,
+ * `cf`, `pf`, `tlp`) and the top-level `optimizeSfdt: true` flag is what tells
+ * the reader to use that key table - rewriting keys or dropping the flag makes
+ * the reader fall back to the long-name table and silently discard the whole
+ * document. `documentEditorSettings.optimizeSfdt` is deliberately left alone
+ * too: it only selects the dialect the editor *writes*, never the one it reads.
  */
 export const tryOpenVariants = async (
   documentEditor: DocumentEditorLike,
@@ -280,51 +288,36 @@ export const tryOpenVariants = async (
   }
   variants.push({ kind: "rawString", value: sfdtText });
 
-  const optimizeOptions = [true, false];
   const methods: Array<"open" | "openAsync"> = ["open", "openAsync"];
 
   for (const variant of variants) {
-    for (const optimize of optimizeOptions) {
-      for (const method of methods) {
-        try {
-          if (documentEditor.documentEditorSettings) {
-            try {
-              documentEditor.documentEditorSettings.optimizeSfdt = optimize;
-            } catch {
-              // ignore optimize flag issues
-            }
-          }
-
-          if (method === "open") {
-            documentEditor.open(variant.value);
-          } else if (typeof documentEditor.openAsync === "function") {
-            await documentEditor.openAsync(variant.value);
-          }
-
-          await delay(900);
-          await ensureLoaded(documentEditor);
-          forceEditorRender(documentEditor, container);
-          await delay(200);
-          const domPages = document.querySelectorAll(".e-de-page").length;
-          const pageCount = documentEditor.pageCount || 0;
-
-          if (
-            documentEditor.isDocumentLoaded ||
-            domPages > 0 ||
-            pageCount > 0
-          ) {
-            return true;
-          }
-
-          try {
-            documentEditor.openBlank?.();
-          } catch {
-            // ignore
-          }
-          await delay(200);
-        } catch {
-          // ignore variant errors
+    for (const method of methods) {
+      try {
+        if (method === "open") {
+          documentEditor.open(variant.value);
+        } else if (typeof documentEditor.openAsync === "function") {
+          await documentEditor.openAsync(variant.value);
         }
+
+        await delay(900);
+        await ensureLoaded(documentEditor);
+        forceEditorRender(documentEditor, container);
+        await delay(200);
+        const domPages = document.querySelectorAll(".e-de-page").length;
+        const pageCount = documentEditor.pageCount || 0;
+
+        if (documentEditor.isDocumentLoaded || domPages > 0 || pageCount > 0) {
+          return true;
+        }
+
+        try {
+          documentEditor.openBlank?.();
+        } catch {
+          // ignore
+        }
+        await delay(200);
+      } catch {
+        // ignore variant errors
       }
     }
   }

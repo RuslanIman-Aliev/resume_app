@@ -65,8 +65,8 @@ const AnalyzeResume = async ({ params }: PageProps) => {
 
   const queryClient = getQueryClient();
   // Prefetch so AnalyzeResumeClient hydrates without a client fetch. A match
-  // still being analyzed resolves to NOT_FOUND, which is not dehydrated, so
-  // the client falls back to its own fetch-and-poll path.
+  // still being analyzed also resolves successfully (with a null application),
+  // so the pending screen renders on first paint and the client only polls.
   void queryClient.prefetchQuery(
     trpc.resume.getJobMatchResult.queryOptions({ applicationId: analyzeId }),
   );

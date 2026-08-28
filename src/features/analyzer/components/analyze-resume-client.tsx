@@ -139,7 +139,7 @@ export const AnalyzeResumeClient = () => {
   const analyzeId = params?.analyzeId as string | undefined;
   const trpc = useTRPC();
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     ...trpc.resume.getJobMatchResult.queryOptions({
       applicationId: analyzeId ?? "",
     }),
@@ -150,25 +150,16 @@ export const AnalyzeResumeClient = () => {
       if (errorCode === "NOT_FOUND") return false;
       return failureCount < 2;
     },
-    refetchInterval: (query) => {
-      const errorCode = (
-        query.state.error as { data?: { code?: string } } | null
-      )?.data?.code;
-
-      if (errorCode === "NOT_FOUND") return 4000;
-
-      return false;
-    },
+    // Poll while the background job is still running. The pending state is a
+    // successful response, so each poll keeps `data` and the query stays in
+    // the success status instead of flipping back through the loading state.
+    refetchInterval: (query) =>
+      query.state.data && query.state.data.application === null ? 4000 : false,
   });
-  const errorCode = (error as { data?: { code?: string } } | null)?.data?.code;
-  const isPendingAnalysis = errorCode === "NOT_FOUND";
+  const isPendingAnalysis = Boolean(data) && data?.application === null;
 
   const handleAnalysisReady = useCallback(() => {}, []);
   useJobMatchPusher(analyzeId ?? "", handleAnalysisReady);
-
-  if (isPendingAnalysis) {
-    return <AnalyzeResumePending />;
-  }
 
   if (isLoading) {
     return <AnalyzeResumeLoading />;
@@ -176,6 +167,10 @@ export const AnalyzeResumeClient = () => {
 
   if (isError) {
     return <AnalyzeResumeError onRetry={refetch} isRetrying={isFetching} />;
+  }
+
+  if (isPendingAnalysis) {
+    return <AnalyzeResumePending />;
   }
 
   const appData = data?.application;

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedResume } from "./fixtures/test-data";
+import { budgetedRoutes } from "./fixtures/test-data";
 
 test.use({ storageState: "tests/e2e/.auth/user.json" });
 
@@ -16,8 +16,25 @@ test.describe("ai coach", () => {
     expect(duration).toBeLessThan(MAX_NAV_TIME_MS);
   };
 
+  /**
+   * The tabs render server-side, so a click can land before React hydrates and
+   * be dropped. Retry until the tab reports itself selected.
+   */
+  const openTab = async (
+    page: import("@playwright/test").Page,
+    name: string,
+  ) => {
+    const tab = page.getByRole("tab", { name });
+    await expect(async () => {
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true", {
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 15_000 });
+  };
+
   test("shows resume score and quick wins", async ({ page }) => {
-    await gotoWithBudget(page, `/ai-coach/${seedResume.id}`);
+    await gotoWithBudget(page, budgetedRoutes.aiCoach);
 
     await expect(
       page.getByRole("heading", { name: "AI Career Coach" }),
@@ -35,9 +52,9 @@ test.describe("ai coach", () => {
   });
 
   test("shows improvement suggestions", async ({ page }) => {
-    await gotoWithBudget(page, `/ai-coach/${seedResume.id}`);
+    await gotoWithBudget(page, budgetedRoutes.aiCoach);
 
-    await page.getByRole("tab", { name: "Improvements" }).click();
+    await openTab(page, "Improvements");
 
     await expect(
       page.getByRole("heading", { name: "Improvement Suggestions" }),
@@ -52,9 +69,9 @@ test.describe("ai coach", () => {
   });
 
   test("shows improvements filter controls", async ({ page }) => {
-    await gotoWithBudget(page, `/ai-coach/${seedResume.id}`);
+    await gotoWithBudget(page, budgetedRoutes.aiCoach);
 
-    await page.getByRole("tab", { name: "Improvements" }).click();
+    await openTab(page, "Improvements");
 
     await expect(page.getByRole("button", { name: "All" })).toBeVisible({
       timeout: 15_000,
