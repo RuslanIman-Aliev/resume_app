@@ -8,10 +8,44 @@ import { serverEnv } from "@/lib/env.server";
 
 const DOCUMENT_EDITOR_SERVICE_URL = serverEnv.DOCUMENT_EDITOR_SERVICE_URL;
 
+// The Import service sleeps when idle and its cold start runs well past the
+// platform default, which surfaced as a converted-to-plain-text resume rather
+// than an error.
+export const maxDuration = 60;
+
 const urlSchema = z.object({ url: z.string().url() });
 
 const normalizeServiceUrl = (value: string) =>
   value.endsWith("/") ? value : `${value}/`;
+
+/**
+ * Posts to the Import service, retrying once. A sleeping instance fails or
+ * 5xx-es the request that wakes it and answers the next one normally.
+ */
+const postToImportService = async (serviceUrl: string, body: FormData) => {
+  const endpoint = `${normalizeServiceUrl(serviceUrl)}Import`;
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(endpoint, { method: "POST", body });
+      if (response.ok || response.status < 500) {
+        return response;
+      }
+      lastError = new Error(`Import service responded ${response.status}`);
+      if (attempt === 1) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === 1) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError ?? new Error("Import service unreachable");
+};
 
 const isSfdtLike = (value: unknown) => {
   if (!value || typeof value !== "object") return false;
@@ -160,12 +194,9 @@ export async function POST(request: Request) {
     const formData = new FormData();
     formData.append("files", blob, "resume.docx");
 
-    const sfdtResponse = await fetch(
-      `${normalizeServiceUrl(DOCUMENT_EDITOR_SERVICE_URL)}Import`,
-      {
-        method: "POST",
-        body: formData,
-      },
+    const sfdtResponse = await postToImportService(
+      DOCUMENT_EDITOR_SERVICE_URL,
+      formData,
     );
 
     if (!sfdtResponse.ok) {

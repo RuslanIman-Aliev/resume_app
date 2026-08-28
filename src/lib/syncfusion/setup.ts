@@ -11,6 +11,13 @@ const syncfusionLicense = process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE?.trim();
 
 if (syncfusionLicense) {
   registerLicense(syncfusionLicense);
+} else {
+  // NEXT_PUBLIC_* values are inlined at build time, so a key added to the
+  // hosting provider after the last build stays missing until a redeploy.
+  // Without this warning the only symptom is Syncfusion's trial banner.
+  console.warn(
+    "[syncfusion] NEXT_PUBLIC_SYNCFUSION_LICENSE is not set in this build - the document editor will render the trial notice.",
+  );
 }
 
 DocumentEditorContainerComponent.Inject(Toolbar);

@@ -18,11 +18,13 @@ import {
   FileText,
   FileTextIcon,
   SparklesIcon,
+  UploadIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnalyzerError, AnalyzerLoading } from "./analyzer-states";
+import { EmptyDataCard } from "./empty-data-card";
 
 const AnalyzerTabs = () => {
   const trpc = useTRPC();
@@ -102,6 +104,17 @@ const AnalyzerTabs = () => {
             <AnalyzerLoading />
           ) : isError ? (
             <AnalyzerError onRetry={refetch} isRetrying={isFetching} />
+          ) : orderedResumes.length === 0 ? (
+            <EmptyDataCard
+              title="No resumes to compare"
+              description="Matching a job description needs a resume to match it against. Upload one and it will show up here."
+              icon={<FileText className="h-8 w-8 text-muted-foreground/60" />}
+              action={{
+                label: "Upload a resume",
+                href: "/resumes?upload=1",
+                icon: <UploadIcon className="size-4 mr-2" />,
+              }}
+            />
           ) : (
             <div className="flex flex-col gap-3">
               {orderedResumes.map((resume) => {

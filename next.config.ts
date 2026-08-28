@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Next 16 builds with Turbopack, which does not read this hook - it applies
+  // only to `next build --webpack`. Keep that in mind before tuning chunking or
+  // aliases here and expecting the production bundle to change.
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;

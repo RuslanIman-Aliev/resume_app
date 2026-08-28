@@ -38,6 +38,14 @@ export function useResumeUpload() {
         refetchType: "active",
       });
 
+      // The analyzer's resume picker and the sidebar read a different query, so
+      // without this a freshly uploaded resume is missing from the list you pick
+      // from until a full page reload.
+      queryClient.invalidateQueries({
+        queryKey: trpc.resume.getResumesAndAnalyses.queryKey(),
+        refetchType: "active",
+      });
+
       toast.success("Resume uploaded successfully!");
     },
     onError: (error) => {

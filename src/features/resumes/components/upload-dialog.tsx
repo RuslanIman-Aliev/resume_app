@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { useResumeUpload } from "@/features/resumes/hooks/use-resume-upload";
 import { TARGET_ROLE_SUGGESTIONS } from "@/lib/ui-config";
 import { Upload } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 
 /**
  * Self-contained "Upload Resume" dialog. Owns the upload orchestration via
@@ -35,6 +37,23 @@ export const UploadDialog = () => {
     isUploading,
     isCreating,
   } = useResumeUpload();
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const shouldAutoOpen = searchParams.get("upload") === "1";
+
+  // Lets other screens link straight into the upload flow - the analyzer sends
+  // people here when they have no resume to analyze. The parameter is dropped
+  // again so a refresh or a back-navigation does not reopen the dialog.
+  useEffect(() => {
+    if (!shouldAutoOpen) {
+      return;
+    }
+
+    setOpen(true);
+    router.replace(pathname, { scroll: false });
+  }, [shouldAutoOpen, pathname, router, setOpen]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { decodeBase64ToText } from "@/lib/sfdt/base64";
 import { extractSfdtFromZipBase64 } from "@/lib/sfdt/extract-zip";
 import { isSfdtLike } from "@/lib/sfdt/is-sfdt";
-import { normalizeSfdtText } from "@/lib/sfdt/normalize";
 import { saveEditorDocx } from "@/lib/sfdt/resume-docx-api";
-import { applyResponsiveZoom } from "@/lib/syncfusion/document-editor";
+import {
+  applyResponsiveZoom,
+  tryOpenVariants,
+} from "@/lib/syncfusion/document-editor";
 import "@/lib/syncfusion/setup";
 import { useTRPC } from "@/trpc/client";
 import { DocumentEditorContainerComponent } from "@syncfusion/ej2-react-documenteditor";
@@ -44,13 +46,6 @@ type DocumentEditorLike = {
   documentLoadFailed?: (args?: { status?: unknown }) => void;
 };
 
-type SfdtPayload = string | Record<string, unknown>;
-
-type SfdtVariantInput = {
-  kind: "object" | "normalizedString" | "rawString";
-  value: SfdtPayload;
-};
-
 export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -59,6 +54,10 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const [isDocumentLoading, setIsDocumentLoading] = useState(false);
   const [isDocumentReady, setIsDocumentReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // True when the editor holds the plain-text fallback instead of the converted
+  // DOCX. Saving from this state would upload a formatting-free document and
+  // delete the original file, so the save path refuses it.
+  const [isFallbackContent, setIsFallbackContent] = useState(false);
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [isSavingDocument, setIsSavingDocument] = useState(false);
 
@@ -119,6 +118,13 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
       return;
     }
 
+    if (isFallbackContent) {
+      toast.error(
+        "Документ показан как обычный текст - сохранение перезаписало бы исходный файл.",
+      );
+      return;
+    }
+
     const editor = editorRef.current?.documentEditor as
       | DocumentEditorLike
       | undefined;
@@ -149,7 +155,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     } finally {
       setIsSavingDocument(false);
     }
-  }, [isSavingDocument, queryClient, resumeId, trpc]);
+  }, [isFallbackContent, isSavingDocument, queryClient, resumeId, trpc]);
 
   /**
    * Cancel discards the in-memory editor state and forces the file to be
@@ -213,118 +219,35 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         }
       };
 
+      /**
+       * Opens SFDT exactly as the Import service produced it.
+       *
+       * The payload must not be rewritten on the way in. Import returns the
+       * optimized SFDT dialect - abbreviated keys (`sec`, `b`, `i`, `cf`, `pf`,
+       * `tlp`) plus a top-level `optimizeSfdt: true` that switches the reader to
+       * that key table. Renaming a key or dropping the flag makes the reader
+       * look up long names, find nothing, and load a document stripped of its
+       * formatting.
+       */
       const openSfdtText = async (sfdtText: string) => {
-        // If incoming SFDT declares optimization, tell the editor to parse optimized form
         try {
-          const parsedIncoming = JSON.parse(sfdtText) as Record<
-            string,
-            unknown
-          >;
+          editor.open(sfdtText);
+        } catch (openError) {
           try {
-            if (editor.documentEditorSettings) {
-              editor.documentEditorSettings.optimizeSfdt = !!(
-                parsedIncoming && parsedIncoming.optimizeSfdt === true
-              );
-              console.log(
-                "[SFDT] documentEditorSettings.optimizeSfdt set to",
-                editor.documentEditorSettings.optimizeSfdt,
-              );
-            }
-          } catch (setErr) {
-            console.warn(
-              "[SFDT] failed to set optimizeSfdt on editor settings:",
-              setErr,
-            );
+            await editor.openAsync?.(sfdtText);
+          } catch {
+            console.warn("[SFDT] open and openAsync both failed:", openError);
+            return false;
           }
-        } catch {
-          // non-JSON or already normalized
         }
 
-        // If the incoming SFDT is optimized, don't normalize its keys — keep shape consistent
-        let payloadForOpen = sfdtText;
-        try {
-          const parsedIncoming2 = JSON.parse(sfdtText) as Record<
-            string,
-            unknown
-          >;
-          if (!parsedIncoming2 || parsedIncoming2.optimizeSfdt !== true) {
-            payloadForOpen = normalizeSfdtText(sfdtText);
-          }
-        } catch {
-          // if not JSON, fall back to normalizing attempt
-          payloadForOpen = normalizeSfdtText(sfdtText);
-        }
-
-        // Debug: log payload shape before opening
-        try {
-          console.log(
-            "[SFDT] payloadForOpen length:",
-            payloadForOpen?.length ?? null,
-          );
-          const maybeParsed = JSON.parse(payloadForOpen as string);
-          console.log(
-            "[SFDT] payloadForOpen parsed.optimizeSfdt:",
-            maybeParsed?.optimizeSfdt,
-          );
-          console.log(
-            "[SFDT] payloadForOpen preview:",
-            JSON.stringify(maybeParsed).slice(0, 200),
-          );
-        } catch {
-          console.log(
-            "[SFDT] payloadForOpen is not JSON string; preview:",
-            (payloadForOpen as string)?.slice?.(0, 200),
-          );
-        }
-        // If payload is optimized JSON, pass object to openAsync to preserve structure
-        try {
-          const parsedPayload = JSON.parse(payloadForOpen) as unknown;
-          const parsedRecord =
-            parsedPayload && typeof parsedPayload === "object"
-              ? (parsedPayload as Record<string, unknown>)
-              : null;
-          if (parsedRecord && parsedRecord.optimizeSfdt === true) {
-            try {
-              editor.open(parsedRecord);
-            } catch (e) {
-              console.warn("[SFDT] editor.open(parsed) failed:", e);
-            }
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            const loaded = await ensureLoaded();
-            console.log("[SFDT] loaded:", loaded);
-            if (!hasDocumentText()) {
-              console.warn(
-                "[SFDT] no text detected after load; continuing to render",
-              );
-            }
-            return loaded;
-          }
-        } catch {
-          // not JSON — continue with string
-        }
-
-        try {
-          editor.open(payloadForOpen);
-        } catch (e) {
-          console.warn(
-            "[SFDT] editor.open(payload) failed, falling back to openAsync:",
-            e,
-          );
-          try {
-            // try async fallback
-            await editor.openAsync?.(payloadForOpen);
-          } catch (ee) {
-            console.warn("[SFDT] editor.openAsync fallback failed:", ee);
-          }
-        }
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const loaded = await ensureLoaded();
-        console.log("[SFDT] loaded:", loaded);
-        if (!hasDocumentText()) {
-          console.warn(
-            "[SFDT] no text detected after load; continuing to render",
-          );
+
+        if (loaded && !hasDocumentText()) {
+          console.warn("[SFDT] document loaded without any text runs");
         }
+
         return loaded;
       };
 
@@ -341,113 +264,6 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         const loaded = await ensureLoaded();
         console.log("[SFDT] loaded from DOCX:", loaded);
         return loaded;
-      };
-
-      const tryOpenVariants = async (sfdtText: string) => {
-        const results: Array<Record<string, unknown>> = [];
-        let parsed: unknown = null;
-        try {
-          parsed = JSON.parse(sfdtText);
-        } catch {
-          parsed = null;
-        }
-
-        const inputs: SfdtVariantInput[] = [];
-        if (parsed && typeof parsed === "object") {
-          inputs.push({
-            kind: "object",
-            value: parsed as Record<string, unknown>,
-          });
-        }
-        try {
-          inputs.push({
-            kind: "normalizedString",
-            value: normalizeSfdtText(sfdtText),
-          });
-        } catch {
-          inputs.push({ kind: "rawString", value: sfdtText });
-        }
-        inputs.push({ kind: "rawString", value: sfdtText });
-
-        const optimizeOptions = [true, false];
-        const methods: Array<"open" | "openAsync"> = ["open", "openAsync"];
-
-        for (const input of inputs) {
-          for (const optimize of optimizeOptions) {
-            for (const method of methods) {
-              try {
-                if (editor.documentEditorSettings) {
-                  try {
-                    editor.documentEditorSettings.optimizeSfdt = optimize;
-                  } catch (e) {
-                    console.warn("[SFDT] failed to set optimizeSfdt:", e);
-                  }
-                }
-
-                console.log(
-                  `[SFDT] trying variant method=${method} input=${input.kind} optimize=${optimize}`,
-                );
-                try {
-                  if (method === "open") {
-                    editor.open(input.value);
-                  } else {
-                    await editor.openAsync?.(input.value);
-                  }
-                } catch (openErr) {
-                  console.warn("[SFDT] open method threw:", openErr);
-                }
-
-                await new Promise((r) => setTimeout(r, 800));
-
-                const loadedNow = await ensureLoaded();
-                let serialized = null;
-                try {
-                  serialized = editor.serialize();
-                } catch (serErr) {
-                  console.warn("[SFDT] serialize failed:", serErr);
-                }
-
-                const hasText =
-                  typeof serialized === "string" &&
-                  /"(t|tlp|text)":"[^"]+"/.test(serialized);
-                const pagesCount =
-                  editor.pageCount ??
-                  editor.documentHelper?.viewer?.pages?.length ??
-                  0;
-                const domPages = document.querySelectorAll(".e-de-page").length;
-
-                const outcome = {
-                  method,
-                  input: input.kind,
-                  optimize,
-                  loadedNow,
-                  hasText,
-                  pageCountReported: pagesCount,
-                  domPages,
-                } as Record<string, unknown>;
-                results.push(outcome);
-                console.log("[SFDT] variant result:", outcome);
-
-                if (domPages > 0 || (hasText && pagesCount > 0)) {
-                  console.log("[SFDT] successful variant found", outcome);
-                  return true;
-                }
-
-                try {
-                  editor.openBlank?.();
-                } catch {
-                  // ignore
-                }
-                await new Promise((r) => setTimeout(r, 200));
-              } catch (e) {
-                console.warn("[SFDT] variant attempt error:", e);
-              }
-            }
-          }
-        }
-
-        console.log("[SFDT] all variants tried; results:", results);
-        return false;
       };
 
       const tryOpenFromApi = async () => {
@@ -559,13 +375,14 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             return false;
           }
 
-          let loaded = await tryOpenVariants(openPayload);
+          let loaded = await tryOpenVariants(
+            editor,
+            openPayload,
+            editorRef.current,
+          );
 
           if (!loaded) {
             try {
-              console.log(
-                "[SFDT] SFDT variants all failed, trying original openSfdtText as fallback",
-              );
               loaded = await openSfdtText(openPayload);
             } catch (e) {
               console.warn("[SFDT] openSfdtText fallback error:", e);
@@ -615,6 +432,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
       try {
         setIsDocumentLoading(true);
         setLoadError(null);
+        setIsFallbackContent(false);
 
         const opened = await tryOpenFromApi();
 
@@ -723,7 +541,10 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             console.warn("openBlank failed:", blankError);
           }
           editor.editor.insertText(cleanText);
-          setLoadError(null);
+          setIsFallbackContent(true);
+          setLoadError(
+            "Не удалось загрузить исходное форматирование - показан только извлечённый текст. Сохранение отключено, чтобы не перезаписать исходный файл.",
+          );
           lastLoadedResumeLinkRef.current = resumeLink;
           setIsDocumentReady(true);
         } else {

@@ -628,10 +628,24 @@ describe("resumeRouter", () => {
       where: {
         id: "application_3",
         userId: session.user.id,
-        status: "ANALYZED",
       },
     });
-    expect(result).toEqual({ application });
+    expect(result).toEqual({ application, status: "ANALYZED" });
+  });
+
+  it("returns a pending job match result while analysis is running", async () => {
+    prismaMock.jobApplication.findFirst.mockResolvedValue({
+      id: "application_5",
+      resumeId: "resume_1",
+      status: "TO_APPLY",
+    });
+
+    const caller = createCaller({});
+    const result = await caller.getJobMatchResult({
+      applicationId: "application_5",
+    });
+
+    expect(result).toEqual({ application: null, status: "TO_APPLY" });
   });
 
   it("uses structuredData payload when triggering job match analysis", async () => {

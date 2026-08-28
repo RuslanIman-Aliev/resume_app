@@ -50,6 +50,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -72,6 +73,16 @@ type ResumeListData = inferRouterOutputs<AppRouter>["resume"]["getAll"];
  */
 const isStoredAsPdf = (fileName: string | null) =>
   (fileName ?? "").toLowerCase().endsWith(".pdf");
+
+// The document editor pulls in Syncfusion, so it loads only when a card is
+// actually opened rather than with the resumes list.
+const AnalyzeOriginalResume = dynamic(
+  () =>
+    import("@/features/analyzer/components/analyze-original-resume").then(
+      (mod) => mod.AnalyzeOriginalResume,
+    ),
+  { ssr: false },
+);
 
 const ResumeCard = () => {
   const trpc = useTRPC();
@@ -128,6 +139,11 @@ const ResumeCard = () => {
         queryClient.invalidateQueries({
           queryKey: trpc.resume.getAll.queryKey(),
         });
+        // Keeps the analyzer picker and the sidebar from listing a resume that
+        // no longer exists, or listing it under its old name.
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getResumesAndAnalyses.queryKey(),
+        });
       },
     }),
   );
@@ -176,6 +192,11 @@ const ResumeCard = () => {
       onSettled: () => {
         queryClient.invalidateQueries({
           queryKey: trpc.resume.getAll.queryKey(),
+        });
+        // Keeps the analyzer picker and the sidebar from listing a resume that
+        // no longer exists, or listing it under its old name.
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getResumesAndAnalyses.queryKey(),
         });
       },
     }),
@@ -498,10 +519,14 @@ const ResumeCard = () => {
                         </div>
                       </div>
 
-                      <DialogContent className="sm:max-w-2xl! w-full h-[95dvh] p-0 overflow-hidden [&>[data-slot=dialog-close]]:size-11 sm:[&>[data-slot=dialog-close]]:size-7">
+                      <DialogContent className="sm:max-w-5xl! w-full h-[95dvh] overflow-y-auto p-4 sm:p-6 [&>[data-slot=dialog-close]]:size-11 sm:[&>[data-slot=dialog-close]]:size-7">
                         <DialogTitle className="sr-only">
-                          {resume.resumeName} Document Viewer
+                          {resume.resumeName} Resume Editor
                         </DialogTitle>
+                        {/* Opening a card used to show the first-page snapshot,
+                            which was read-only. It now opens the same editor as
+                            the analyzer's "Original resume" tab, so the document
+                            can be edited and saved back to the stored file.
                         <div className="relative w-full aspect-[1/1.4] bg-muted my-7">
                           {resume.resumePreviewLink ? (
                             <Image
@@ -517,6 +542,8 @@ const ResumeCard = () => {
                             </div>
                           )}
                         </div>
+                        */}
+                        <AnalyzeOriginalResume resumeId={resume.id} />
                       </DialogContent>
                     </Dialog>
                   </div>
