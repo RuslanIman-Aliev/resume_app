@@ -496,6 +496,15 @@ const AnalyzeResumeImprovements = ({
           .queryKey,
       });
 
+      if (fileWasUpdated) {
+        // Saving the file rewrites parsedContent and the preview image, so the
+        // resume list must not keep serving the pre-edit thumbnail.
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getAll.queryKey(),
+          refetchType: "active",
+        });
+      }
+
       if (applicationId) {
         queryClient.invalidateQueries({
           queryKey: trpc.resume.getJobMatchResult.queryOptions({

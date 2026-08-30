@@ -25,6 +25,7 @@ import {
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { SignInFormData, signInFormSchema } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -167,12 +168,20 @@ export function SignInForm({ oauthError }: { oauthError?: string }) {
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel
-                    htmlFor="form-signin-password"
-                    className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80"
-                  >
-                    Password
-                  </FieldLabel>
+                  <div className="flex items-center justify-between gap-2">
+                    <FieldLabel
+                      htmlFor="form-signin-password"
+                      className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80"
+                    >
+                      Password
+                    </FieldLabel>
+                    <Link
+                      href="/forgot-password"
+                      className="text-xs text-muted-foreground/80 underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
                   <Input
                     {...field}
                     id="form-signin-password"

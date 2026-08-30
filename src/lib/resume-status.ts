@@ -8,14 +8,14 @@
  */
 
 /**
- * The two states `resume.status` can hold, mirroring the `ResumeStatus` enum in
+ * The states `resume.status` can hold, mirroring the `ResumeStatus` enum in
  * `prisma/schema.prisma`.
  *
  * Declared here rather than imported from `@prisma/client` so client components
  * can read the list without pulling the Prisma runtime into the browser bundle -
  * keep the two in step when adding a state.
  */
-export const resumeStatusValues = ["DRAFT", "ANALYZED"] as const;
+export const resumeStatusValues = ["DRAFT", "ANALYZED", "FAILED"] as const;
 
 export type ResumeStatusValue = (typeof resumeStatusValues)[number];
 

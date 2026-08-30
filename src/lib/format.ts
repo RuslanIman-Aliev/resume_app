@@ -25,15 +25,77 @@ export function getRelativeTime(date: Date | string): string {
   return rtf.format(diffYears, "year");
 }
 
+export type ScoreBand = {
+  /** Lowest score that still belongs to this band. */
+  min: number;
+  /** One word for the score, shown on the badge. */
+  label: string;
+  /** Tailwind text color used wherever the number itself is printed. */
+  colorClass: string;
+  /** Badge styling that matches `colorClass`. */
+  badgeClass: string;
+  /** What the score means, and what to do about it. */
+  summary: string;
+};
+
+/**
+ * The single table every verdict about a score is read from - the colour of
+ * the number, the word on the badge and the sentence under it.
+ *
+ * It exists because those three used to disagree: the badge said "Good" and
+ * the paragraph said "performing well" for every resume, including one scoring
+ * 18%, while the number next to them was already red.
+ *
+ * Ordered high to low; `getScoreBand` takes the first band a score reaches.
+ */
+export const SCORE_BANDS: readonly ScoreBand[] = [
+  {
+    min: 85,
+    label: "Strong",
+    colorClass: "text-success",
+    badgeClass: "border-success/40 bg-success/10 text-success",
+    summary:
+      "This resume is landing well against the role. What follows is polish - small edits that keep it competitive rather than repairs.",
+  },
+  {
+    min: 70,
+    label: "Good",
+    colorClass: "text-chart-4",
+    badgeClass: "border-chart-4/40 bg-chart-4/10 text-chart-4",
+    summary:
+      "Your resume is performing well but there's room for improvement. Focus on the high-impact suggestions below to increase your score and stand out to recruiters.",
+  },
+  {
+    min: 0,
+    label: "Needs work",
+    colorClass: "text-chart-5",
+    badgeClass: "border-chart-5/40 bg-chart-5/10 text-chart-5",
+    summary:
+      "This resume is not yet saying what the role asks for. Start at the top of the suggestions below - they are ordered by how much each one moves the score.",
+  },
+] as const;
+
+/**
+ * Resolves a score to its band, clamping anything outside 0-100.
+ * @param score - Numeric score, normally 0-100
+ * @returns The matching entry from `SCORE_BANDS`
+ */
+export function getScoreBand(score: number): ScoreBand {
+  const clamped = Number.isFinite(score)
+    ? Math.min(100, Math.max(0, score))
+    : 0;
+
+  // The last band starts at 0, so there is always a match.
+  return SCORE_BANDS.find((band) => clamped >= band.min) ?? SCORE_BANDS[2];
+}
+
 /**
  * Maps a numeric score to a Tailwind color class for visual feedback.
  * @param score - Numeric score (0-100)
  * @returns Tailwind text color class ('text-success', 'text-chart-4', or 'text-chart-5')
  */
 export function getScoreColor(score: number) {
-  if (score >= 85) return "text-success";
-  if (score >= 70) return "text-chart-4";
-  return "text-chart-5";
+  return getScoreBand(score).colorClass;
 }
 
 /**

@@ -139,13 +139,13 @@ export const jobApplicationRouter = createTRPCRouter({
   /**
    * Deletes a single job application analysis owned by the current user.
    *
-   * Scope note: `TrackerPosition` has no foreign key to `JobApplication` — it
-   * stores `company`/`position` as plain strings — so there is no reliable link
-   * from an analysis back to a kanban card. Matching on company + title would
-   * be a guess (casing, "Acme" vs "Acme Inc.", several roles at one company),
-   * and a wrong guess silently destroys a position the user is actively
-   * tracking. This deletes the analysis row only; the tracker card is left
-   * untouched, and the confirmation dialog says so.
+   * Scope note: a kanban card created from an analysis now links back to it
+   * through `TrackerPosition.jobApplicationId`, but that link is declared
+   * `onDelete: SetNull` precisely so this stays true — deleting an analysis
+   * clears the link and leaves the card standing. The board is the user's, and
+   * by the time they remove an analysis the card may have moved through
+   * several stages. This deletes the analysis row only, and the confirmation
+   * dialog says so.
    */
   deleteJobApplication: protectedProcedure
     .input(z.object({ applicationId: z.string() }))

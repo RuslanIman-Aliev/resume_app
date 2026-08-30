@@ -1,4 +1,20 @@
 import { z } from "zod";
+import { sanitizeHttpUrl } from "./safe-url";
+
+/**
+ * The job post URL as the model returns it, narrowed to an absolute http(s)
+ * link.
+ *
+ * The model reads the job description, which is untrusted text, so this field
+ * is as attacker-influenced as the description itself. Anything that is not a
+ * plain web link - `javascript:` above all - is dropped to null here rather
+ * than stored and later rendered as an `href`.
+ */
+const modelJobUrlSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((value) => sanitizeHttpUrl(value));
 
 const requirementMatchItemSchema = z.object({
   requirement: z.string(),
@@ -222,7 +238,7 @@ export const jobMatchAnalysisSchema = z.object({
   experience: z.string().nullable().optional().default(null),
   salaryRange: z.string().nullable().optional().default(null),
   jobTitle: z.string().nullable().optional().default(null),
-  url: z.string().nullable().optional().default(null),
+  url: modelJobUrlSchema,
   targetLanguage: z.string().min(1).default("English"),
   matchScore: z.number().int().min(0).max(100),
   matchingSkills: z.array(

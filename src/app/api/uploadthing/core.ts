@@ -1,9 +1,10 @@
 import { auth } from "@/lib/auth";
-import { normalizeResumeParsedContent } from "@/lib/resume-content";
+import {
+  extractResumeContent,
+  isResumeImageFile,
+} from "@/lib/resume-extraction";
 import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError, UTApi } from "uploadthing/server";
-import { extractText } from "unpdf";
-import mammoth from "mammoth";
 import { logError } from "@/lib/logger";
 
 const f = createUploadthing();
@@ -40,13 +41,7 @@ export const ourFileRouter = {
     })
     .onUploadComplete(async ({ metadata, file }) => {
       try {
-        const normalizedFileName = file.name.toLowerCase();
-
-        if (
-          normalizedFileName.endsWith(".png") ||
-          normalizedFileName.endsWith(".jpg") ||
-          normalizedFileName.endsWith(".jpeg")
-        ) {
+        if (isResumeImageFile(file.name)) {
           return {
             uploadedBy: metadata.userId,
             type: "image",
@@ -55,48 +50,16 @@ export const ourFileRouter = {
 
         const fileResponse = await fetch(file.ufsUrl);
         const arrayBuffer = await fileResponse.arrayBuffer();
+        const { extractedText, type } = await extractResumeContent(
+          file.name,
+          arrayBuffer,
+        );
 
-        if (normalizedFileName.endsWith(".docx")) {
-          const buffer = Buffer.from(arrayBuffer);
-
-          const { value: extractedHtml } = await mammoth.convertToHtml({
-            buffer,
-          });
-
-          return {
-            uploadedBy: metadata.userId,
-            extractedText: normalizeResumeParsedContent(extractedHtml),
-            type: "docx",
-          };
-        }
-
-        if (normalizedFileName.endsWith(".doc")) {
-          const buffer = Buffer.from(arrayBuffer);
-
-          const { value: extractedText } = await mammoth.extractRawText({
-            buffer,
-          });
-
-          return {
-            uploadedBy: metadata.userId,
-            extractedText: normalizeResumeParsedContent(extractedText),
-            type: "docx",
-          };
-        }
-
-        if (normalizedFileName.endsWith(".pdf")) {
-          const { text } = await extractText(new Uint8Array(arrayBuffer), {
-            mergePages: true,
-          });
-
-          return {
-            uploadedBy: metadata.userId,
-            extractedText: normalizeResumeParsedContent(text),
-            type: "pdf",
-          };
-        }
-
-        throw new Error("Unsupported file format.");
+        return {
+          uploadedBy: metadata.userId,
+          extractedText,
+          type,
+        };
       } catch (error) {
         await utapi.deleteFiles(file.key);
         logError("Upload process error", error, {

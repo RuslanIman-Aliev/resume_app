@@ -1,18 +1,67 @@
 import { getJobMatchPrompt, getPrompt } from "@/lib/prompts";
 import { inngest } from "./client";
+import { NonRetriableError } from "inngest";
 import OpenAI from "openai";
 import { normalizeMatchScoreBoosts } from "@/lib/match-score";
 import { jobMatchAnalysisSchema, resumeAnalysisSchema } from "@/lib/schemas";
 import prisma from "@/lib/db";
-import Pusher from "pusher";
+import {
+  analyzedEventName,
+  failedEventName,
+  jobMatchChannel,
+  resumeAnalysisChannel,
+} from "@/lib/pusher-channels";
+import { createPusherServer } from "@/lib/pusher-server";
 import * as Sentry from "@sentry/nextjs";
 import { serverEnv } from "@/lib/env.server";
+import { logError } from "@/lib/logger";
 
 const openai = new OpenAI();
 const client = Sentry.instrumentOpenAiClient(openai, {
-  recordInputs: true,
-  recordOutputs: true,
+  // The prompt is the user's resume and the job description they pasted, and
+  // the response repeats large parts of both back. Recording either would ship
+  // names, phone numbers and full employment history to Sentry, which is what
+  // "never dump raw objects/uploads" in CLAUDE.md exists to prevent.
+  recordInputs: false,
+  recordOutputs: false,
 });
+
+/**
+ * Channels and event names live in `@/lib/pusher-channels`, imported above and
+ * also by the client hooks and by the endpoint that authorizes subscriptions.
+ * Each analysis publishes to its own private channel, and ends in one of two
+ * events, so a client that subscribed for a result is also told when there
+ * will not be one.
+ */
+
+/**
+ * Parses and validates a model response, refusing to retry on bad output.
+ *
+ * The raw response is memoized by the `handle-task` step, so a retry re-parses
+ * the identical string and fails identically - three more times, several
+ * seconds apart, before the run is finally marked failed. `NonRetriableError`
+ * ends it on the first attempt so the UI reaches its error state promptly.
+ *
+ * @param raw - The model's `message.content`, possibly null.
+ * @param schema - Zod schema the response has to satisfy.
+ * @returns The validated payload.
+ * @throws NonRetriableError when the response is not valid JSON or off-schema.
+ */
+const parseModelOutput = <T>(
+  raw: string | null | undefined,
+  schema: { parse: (value: unknown) => T },
+): T => {
+  try {
+    return schema.parse(JSON.parse(raw || "{}"));
+  } catch (error) {
+    // Logged rather than attached to the thrown error: the Zod issue list
+    // quotes the offending values, which here are pieces of the resume.
+    logError("Model returned an unusable analysis payload", error);
+    throw new NonRetriableError(
+      "The AI response did not match the expected analysis format.",
+    );
+  }
+};
 /**
  * Per-user ceiling on AI analysis runs, applied to every function below.
  *
@@ -51,6 +100,33 @@ export const analyzeResume = inngest.createFunction(
     id: "analyze-resume",
     triggers: { event: "app/resume.analyzed" },
     ...PER_USER_ANALYSIS_LIMITS,
+    /**
+     * Runs once the function has exhausted its retries, and is the only thing
+     * that gives a dead run a visible ending. Before it existed the resume
+     * stayed on DRAFT, no Pusher event was sent, and the page polled the same
+     * unchanged row every four seconds with no way out of "Analyzing...".
+     */
+    onFailure: async ({ event, step }) => {
+      const { resumeId } = event.data.event.data;
+
+      await step.run("mark-analysis-failed", async () => {
+        // Scoped to rows that are not already ANALYZED: a failed re-analysis
+        // must not retract results the user can still read from a previous
+        // successful run. The Pusher event below tells them either way.
+        await prisma.resume.updateMany({
+          where: { id: resumeId, status: { not: "ANALYZED" } },
+          data: { status: "FAILED" },
+        });
+      });
+
+      await step.run("notify-client-failed", async () => {
+        await createPusherServer().trigger(
+          resumeAnalysisChannel(resumeId),
+          failedEventName(resumeId),
+          { message: "Analysis failed" },
+        );
+      });
+    },
   },
   // The function receives the parsed resume content and the target role, then generates a prompt for the OpenAI API to analyze the resume against the target role. The result is returned after a brief pause.
   async ({ event, step }) => {
@@ -72,9 +148,12 @@ export const analyzeResume = inngest.createFunction(
       return response.choices[0].message.content;
     });
 
-    const parsedData = JSON.parse(result || "{}");
-
-    const validatedData = resumeAnalysisSchema.parse(parsedData);
+    // Inside a step: parsing used to happen in the function body, so an
+    // off-schema response threw before `save-to-db` and `notify-client` ran and
+    // left the row in the same state a run still in progress has.
+    const validatedData = await step.run("validate-model-output", () =>
+      parseModelOutput(result, resumeAnalysisSchema),
+    );
 
     // Save the analysis results to the database, linking it to the correct resume. We use upsert to create a new analysis if it doesn't exist or update the existing one if it does.
     await step.run("save-to-db", async () => {
@@ -103,16 +182,9 @@ export const analyzeResume = inngest.createFunction(
     });
     // After saving the results, we trigger a Pusher event to notify the client that the analysis is complete. The client can listen for this event and update the UI accordingly.
     await step.run("notify-client", async () => {
-      const pusher = new Pusher({
-        appId: serverEnv.PUSHER_APP_ID,
-        key: serverEnv.PUSHER_APP_KEY,
-        secret: serverEnv.PUSHER_APP_SECRET,
-        cluster: serverEnv.PUSHER_APP_CLUSTER,
-        useTLS: true,
-      });
-      await pusher.trigger(
-        "resume-updates",
-        `analyzed-${event.data.resumeId}`,
+      await createPusherServer().trigger(
+        resumeAnalysisChannel(event.data.resumeId),
+        analyzedEventName(event.data.resumeId),
         {
           message: "Analysis complete",
         },
@@ -137,6 +209,29 @@ export const analyzeJobMatched = inngest.createFunction(
     id: "analyze-job-matched",
     triggers: { event: "app/job-matched.analyzed" },
     ...PER_USER_ANALYSIS_LIMITS,
+    /**
+     * Terminal state for a dead job-match run. Without it the application row
+     * sat on TO_APPLY forever, which `getJobMatchResult` reports as "still
+     * analysing", so the analyzer page span its loading screen indefinitely.
+     */
+    onFailure: async ({ event, step }) => {
+      const { applicationId } = event.data.event.data;
+
+      await step.run("mark-analysis-failed", async () => {
+        await prisma.jobApplication.updateMany({
+          where: { id: applicationId, status: { not: "ANALYZED" } },
+          data: { status: "FAILED" },
+        });
+      });
+
+      await step.run("notify-client-failed", async () => {
+        await createPusherServer().trigger(
+          jobMatchChannel(applicationId),
+          failedEventName(applicationId),
+          { message: "Job match analysis failed" },
+        );
+      });
+    },
   },
   // The function receives the parsed resume content and the target role, then generates a prompt for the OpenAI API to analyze the resume against the target role. The result is returned after a brief pause.
   async ({ event, step }) => {
@@ -158,8 +253,9 @@ export const analyzeJobMatched = inngest.createFunction(
       return response.choices[0].message.content;
     });
 
-    const parsedData = JSON.parse(result || "{}");
-    const validatedData = jobMatchAnalysisSchema.parse(parsedData);
+    const validatedData = await step.run("validate-model-output", () =>
+      parseModelOutput(result, jobMatchAnalysisSchema),
+    );
 
     // The prompt asks for a per-improvement boost and the model answers with a
     // double-digit number on every card, so the totals are re-derived here
@@ -210,9 +306,15 @@ export const analyzeJobMatched = inngest.createFunction(
           },
         }),
 
-        prisma.trackerPosition.create({
-          data: {
+        // Keyed on the application, so a retried step or a re-run of the same
+        // analysis updates the card it already created. As a plain `create`
+        // this step was not idempotent: Inngest retries a step whose commit
+        // failed, and every retry added another identical card to the board.
+        prisma.trackerPosition.upsert({
+          where: { jobApplicationId: event.data.applicationId },
+          create: {
             userId: existingApp.userId,
+            jobApplicationId: event.data.applicationId,
             company: validatedData.companyName || "Unknown Company",
             position: validatedData.jobTitle || "Unknown Position",
             salary: validatedData.salaryRange,
@@ -221,21 +323,24 @@ export const analyzeJobMatched = inngest.createFunction(
             status: "saved",
             location: "Location not specified",
           },
+          // Only what the analysis is the source of truth for. `status`,
+          // `notes` and the contact fields are the user's - a re-analysis must
+          // not drag a card that reached "interview" back to "saved".
+          update: {
+            company: validatedData.companyName || "Unknown Company",
+            position: validatedData.jobTitle || "Unknown Position",
+            salary: validatedData.salaryRange,
+            url: validatedData.url,
+            matchScore: validatedData.matchScore,
+          },
         }),
       ]);
     });
     // After saving the results, we trigger a Pusher event to notify the client that the analysis is complete. The client can listen for this event and update the UI accordingly.
     await step.run("notify-client", async () => {
-      const pusher = new Pusher({
-        appId: serverEnv.PUSHER_APP_ID,
-        key: serverEnv.PUSHER_APP_KEY,
-        secret: serverEnv.PUSHER_APP_SECRET,
-        cluster: serverEnv.PUSHER_APP_CLUSTER,
-        useTLS: true,
-      });
-      await pusher.trigger(
-        "job-match",
-        `analyzed-${event.data.applicationId}`,
+      await createPusherServer().trigger(
+        jobMatchChannel(event.data.applicationId),
+        analyzedEventName(event.data.applicationId),
         {
           message: "Job Match Analysis complete",
         },

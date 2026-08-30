@@ -22,6 +22,33 @@ describe("jobMatchAnalysisSchema", () => {
     expect(parsed.targetLanguage).toBe("English");
   });
 
+  it("drops a job URL the model returned on an executable scheme", () => {
+    // The model reads the job description, which is untrusted text, so a
+    // posting can talk it into returning this. It used to be stored verbatim
+    // and rendered as the tracker card's "View Job Posting" href.
+    const parsed = jobMatchAnalysisSchema.parse({
+      url: "javascript:alert(1)",
+      matchScore: 50,
+      matchingSkills: [],
+      missingSkills: [],
+      coverLetterText: "Cover letter text",
+    });
+
+    expect(parsed.url).toBeNull();
+  });
+
+  it("keeps a job URL that is an ordinary web link", () => {
+    const parsed = jobMatchAnalysisSchema.parse({
+      url: " https://jobs.example.com/postings/42 ",
+      matchScore: 50,
+      matchingSkills: [],
+      missingSkills: [],
+      coverLetterText: "Cover letter text",
+    });
+
+    expect(parsed.url).toBe("https://jobs.example.com/postings/42");
+  });
+
   it("normalizes missing beforeText and afterText in improvements", () => {
     const parsed = jobMatchAnalysisSchema.parse({
       matchScore: 70,

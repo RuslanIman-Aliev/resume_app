@@ -4,65 +4,80 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Check } from "lucide-react";
 import Link from "next/link";
 
+/**
+ * What the product charges for today, and what it does not.
+ *
+ * There is no billing in the codebase: no payment provider, no subscription,
+ * no trial and no monthly quota - the only limits are per-minute rate limits.
+ * So the free plan lists the features that genuinely exist and ship today, and
+ * the two paid tiers are marked as planned with no call to action, instead of
+ * "Start Free Trial" and "Contact Sales" buttons that both led to /signup.
+ */
 const plans = [
   {
     name: "Free",
     price: "$0",
     period: "forever",
-    description: "Perfect for getting started",
+    description: "Everything the product does today",
     features: [
-      "5 job analyses per month",
-      "Basic resume scoring",
-      "ATS compatibility check",
-      "Email support",
+      "Resume scoring with ATS checks",
+      "Job match analysis against any posting",
+      "AI rewrite suggestions you can apply",
+      "Application tracker and cover letters",
     ],
     cta: "Get Started",
-    highlighted: false,
+    href: "/signup",
+    planned: false,
+    highlighted: true,
   },
   {
     name: "Pro",
     price: "$19",
     period: "per month",
-    description: "For serious job seekers",
+    description: "Planned, not yet available",
     features: [
-      "Unlimited job analyses",
-      "AI resume tailoring",
-      "Advanced ATS optimization",
-      "Application tracker",
-      "AI career coach",
+      "Higher analysis limits",
+      "Resume version history",
+      "Interview preparation",
       "Priority support",
     ],
-    cta: "Start Free Trial",
-    highlighted: true,
+    cta: "Coming soon",
+    href: null,
+    planned: true,
+    highlighted: false,
   },
   {
     name: "Enterprise",
     price: "Custom",
-    period: "contact us",
-    description: "For teams and recruiters",
+    period: "planned",
+    description: "Planned, not yet available",
     features: [
       "Everything in Pro",
       "Team collaboration",
-      "Custom integrations",
-      "Dedicated account manager",
       "SSO & advanced security",
       "API access",
     ],
-    cta: "Contact Sales",
+    cta: "Coming soon",
+    href: null,
+    planned: true,
     highlighted: false,
   },
 ];
 
 const PricingSection = () => {
   return (
-    <section className="w-full bg-background text-center py-12 md:py-20 border-y border-border/50 ">
+    <section
+      id="pricing"
+      className="w-full bg-background text-center py-12 md:py-20 border-y border-border/50 "
+    >
       <div className="px-4 sm:px-6 xl:px-0 max-w-7xl mx-auto container">
         <div>
           <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold  tracking-tight text-foreground ">
             Simple, transparent pricing
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-lg mx-auto text-pretty">
-            Start for free, upgrade when you&apos;re ready
+            Everything is free while the product is in beta. Paid tiers are on
+            the roadmap, not on the invoice.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6 mt-8 md:mt-14 max-w-5xl mx-auto">
@@ -79,7 +94,15 @@ const PricingSection = () => {
                 <h3 className="text-xl font-bold">{plan.name}</h3>
                 {plan.highlighted && (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
-                    Most Popular
+                    Available now
+                  </Badge>
+                )}
+                {plan.planned && (
+                  <Badge
+                    variant="outline"
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 bg-background"
+                  >
+                    Planned
                   </Badge>
                 )}
                 <p className="text-muted-foreground">{plan.description}</p>
@@ -102,14 +125,19 @@ const PricingSection = () => {
                   ))}
                 </ul>
                 <div className="mt-auto">
-                  <Link href="/signup" className="block">
+                  {plan.href ? (
+                    <Button className="w-full h-11 md:h-8" asChild>
+                      <Link href={plan.href}>{plan.cta}</Link>
+                    </Button>
+                  ) : (
                     <Button
                       className="w-full h-11 md:h-8"
-                      variant={plan.highlighted ? "default" : "outline"}
+                      variant="outline"
+                      disabled
                     >
                       {plan.cta}
                     </Button>
-                  </Link>
+                  )}
                 </div>
               </CardContent>
             </Card>

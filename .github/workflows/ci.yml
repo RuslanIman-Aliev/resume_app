@@ -46,6 +46,10 @@ jobs:
       # it Better Auth falls back to a built-in default, which it refuses to do
       # outside development.
       BETTER_AUTH_SECRET: ci-test-secret-not-used-outside-ci
+      # Required by `env.server` in a production build, which is what
+      # `npm run build` is. CI never receives an Inngest request, so the value
+      # only has to exist.
+      INNGEST_SIGNING_KEY: signkey-prod-ci-not-used-outside-ci
       OPENAI_API_KEY: sk-test
       GITHUB_CLIENT_ID: test
       GITHUB_CLIENT_SECRET: test
