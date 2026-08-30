@@ -100,11 +100,15 @@ const UpcomingInterviews = () => {
           />
         ) : (
           data.map(({ id, company, position, status, updatedAt }) => (
-            <div
+            // A link rather than a clickable `<div>`: the row only navigates to
+            // the tracker, and as a div it was invisible to the keyboard and
+            // announced as plain text. `prefetch` replaces the hover handler
+            // that used to warm the route.
+            <Link
               key={id}
-              className="cursor-pointer"
-              onMouseEnter={() => router.prefetch("/tracker")}
-              onClick={() => router.push("/tracker")}
+              href="/tracker"
+              prefetch
+              className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <div className="flex flex-col w-full rounded-lg py-2 px-4 transition-all hover:border-border hover:bg-secondary/50">
                 <div className="flex items-center justify-between gap-2">
@@ -123,7 +127,7 @@ const UpcomingInterviews = () => {
                   Updated {getRelativeTime(updatedAt)}
                 </div>
               </div>
-            </div>
+            </Link>
           ))
         )}
         <Button

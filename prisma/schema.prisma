@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
- // output   = "../generated/prisma"
+  // output   = "../generated/prisma"
 }
 
 datasource db {
@@ -19,21 +19,21 @@ datasource db {
 // ==========================================
 
 model User {
-  id            String    @id @default(cuid())
+  id            String  @id @default(cuid())
   name          String
-  email         String    @unique
+  email         String  @unique
   emailVerified Boolean
   image         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  credits       Int       @default(5) 
+  credits Int @default(5)
 
-  sessions      Session[]
-  accounts      Account[]
-  resumes       Resume[]
-  applications  JobApplication[]
+  sessions         Session[]
+  accounts         Account[]
+  resumes          Resume[]
+  applications     JobApplication[]
   trackerPositions TrackerPosition[]
 
   @@map("user")
@@ -47,9 +47,14 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String   @unique
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// Better Auth looks sessions up by user on every sign-out, every session
+  /// listing and every cascade delete. Without this the lookup is a sequential
+  /// scan of the whole table.
+  @@index([userId])
   @@map("session")
 }
 
@@ -68,8 +73,12 @@ model Account {
   scope                 String?
   password              String?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// `listAccounts` runs on every visit to /dashboard/settings, and account
+  /// linking reads the same column.
+  @@index([userId])
   @@map("account")
 }
 
@@ -81,6 +90,7 @@ model Verification {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   @@map("verification")
 }
 
@@ -90,79 +100,90 @@ model Verification {
 
 /// Lifecycle of an uploaded resume. `ANALYZED` is set only by the
 /// `analyze-resume` Inngest job once it has written a `ResumeAnalysis`.
+///
+/// `FAILED` is written by that job's `onFailure` handler after it has run out
+/// of retries. Without it a failed run left the row exactly as a run still in
+/// flight, so the client had no way to tell "working on it" from "this will
+/// never finish" and waited forever.
 enum ResumeStatus {
   DRAFT
   ANALYZED
+  FAILED
 }
 
 /// Lifecycle of a job-match analysis. `TO_APPLY` is the row created by
 /// `triggerJobMatchAnalysis`; the `analyze-job-matched` job promotes it to
-/// `ANALYZED` once the model output has been validated and stored.
+/// `ANALYZED` once the model output has been validated and stored, or to
+/// `FAILED` from its `onFailure` handler when every retry is spent.
 enum JobApplicationStatus {
   DRAFT
   TO_APPLY
   ANALYZED
+  FAILED
 }
 
 model Resume {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  fileName       String   
-  resumeName     String?   
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  postedRole     String   
-  status         ResumeStatus @default(DRAFT)
-  parsedContent  String?   @db.Text 
-  structuredData Json?    
-  resumeLink     String
-  resumePreviewLink     String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  fileName   String
+  resumeName String?
 
-  analysis          ResumeAnalysis[]
+  postedRole        String
+  status            ResumeStatus @default(DRAFT)
+  parsedContent     String?      @db.Text
+  structuredData    Json?
+  resumeLink        String
+  resumePreviewLink String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  applications      JobApplication[]
-  
+  analysis ResumeAnalysis[]
+
+  applications JobApplication[]
+
   @@index([userId, createdAt])
   @@map("resume")
 }
 
 model JobApplication {
-  id               String            @id @default(cuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  resumeId         String
-  resume           Resume            @relation(fields: [resumeId], references: [id], onDelete: Cascade)
-  
-  companyName      String?           
-  jobTitle         String?
-  jobDescription   String            @db.Text
-  url              String?          
-  experience       String?
-  salaryRange      String?
-  
-  matchScore       Int?             
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  improvements     Json?
-  missingSkills    Json?             
-  matchingSkills   Json?
+  resumeId String
+  resume   Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  companyName    String?
+  jobTitle       String?
+  jobDescription String  @db.Text
+  url            String?
+  experience     String?
+  salaryRange    String?
+
+  matchScore Int?
+
+  improvements      Json?
+  missingSkills     Json?
+  matchingSkills    Json?
   requirementsMatch Json?
-  skillsGap        Json?
-  keywordsGap      Json?
-  summary          Json?
-  
-  tailoringTips    Json?             
-  
-  coverLetterText  String?           @db.Text
-  targetLanguage   String            @default("English") 
-  
-  status           JobApplicationStatus @default(DRAFT)
-  
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  skillsGap         Json?
+  keywordsGap       Json?
+  summary           Json?
+
+  tailoringTips Json?
+
+  coverLetterText String? @db.Text
+  targetLanguage  String  @default("English")
+
+  status JobApplicationStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The kanban card this analysis produced, if it still exists.
+  trackerPosition TrackerPosition?
 
   @@index([userId, createdAt])
   @@index([userId, updatedAt])
@@ -170,10 +191,10 @@ model JobApplication {
 }
 
 model ResumeAnalysis {
-  id              String   @id @default(cuid())
-  
-  resumeId        String 
-  resume          Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+
+  resumeId String
+  resume   Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
 
   overallScore    Int
   contentQuality  Int
@@ -181,34 +202,45 @@ model ResumeAnalysis {
   experience      Int
   skillsMatch     Int
 
-  strengths       Json
-  quickWins       Json
-  improvements    Json
-  keywords        String[] 
-  createdAt       DateTime @default(now())
+  strengths    Json
+  quickWins    Json
+  improvements Json
+  keywords     String[]
+  createdAt    DateTime @default(now())
 
   @@index([resumeId, createdAt])
 }
 
 model TrackerPosition {
-  id           String   @id @default(cuid())
-  
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   company      String
   position     String
   location     String?
   salary       String?
-  status       String   @default("saved")
+  status       String  @default("saved")
   url          String?
-  notes        String?  @db.Text
+  notes        String? @db.Text
   contactName  String?
   contactEmail String?
   matchScore   Int?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  /// The analysis that created this card, when it came from one. Unique, so a
+  /// re-analysis of the same application updates the card it already made
+  /// instead of adding a second one to the board - the `save-to-db` step is
+  /// retried by Inngest and was not idempotent without it.
+  ///
+  /// `SetNull` rather than `Cascade` on purpose: deleting an analysis must
+  /// leave the tracked position alone. It is the user's board, and they may
+  /// have moved that card through several stages since.
+  jobApplicationId String?         @unique
+  jobApplication   JobApplication? @relation(fields: [jobApplicationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
   @@map("tracker_position")

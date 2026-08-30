@@ -120,7 +120,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
 
     if (isFallbackContent) {
       toast.error(
-        "Документ показан как обычный текст - сохранение перезаписало бы исходный файл.",
+        "This document is shown as plain text, so saving would overwrite the original file.",
       );
       return;
     }
@@ -145,6 +145,13 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
       await queryClient.invalidateQueries({
         queryKey: trpc.resume.getParsedContent.queryOptions({ resumeId })
           .queryKey,
+      });
+
+      // The save also rewrites parsedContent and the preview image, so the
+      // resume list is refreshed rather than left showing the old thumbnail.
+      queryClient.invalidateQueries({
+        queryKey: trpc.resume.getAll.queryKey(),
+        refetchType: "active",
       });
 
       toast.success("Resume saved and uploaded.");

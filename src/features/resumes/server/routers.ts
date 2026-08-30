@@ -34,6 +34,43 @@ const AI_TRIGGER_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
 const RESUME_NAME_MAX_LENGTH = 120;
 
 /**
+ * Removes just-uploaded files that no resume row points at.
+ *
+ * The reference check is what makes this safe to run on caller-supplied URLs:
+ * a file that belongs to a stored resume - anyone's - is never touched, so the
+ * worst a hand-crafted request can achieve is deleting a blob that is already
+ * unreachable. Failures are swallowed by `deleteUploadThingFilesByUrl`, since
+ * cleanup must not replace the error the caller actually needs to see.
+ */
+const discardUnreferencedUploads = async (
+  urls: Array<string | null | undefined>,
+) => {
+  const candidates = urls.filter((url): url is string => Boolean(url));
+  if (candidates.length === 0) {
+    return;
+  }
+
+  const referenced = await prisma.resume.findMany({
+    where: {
+      OR: [
+        { resumeLink: { in: candidates } },
+        { resumePreviewLink: { in: candidates } },
+      ],
+    },
+    select: { resumeLink: true, resumePreviewLink: true },
+  });
+
+  const inUse = new Set(
+    referenced.flatMap((row) => [row.resumeLink, row.resumePreviewLink]),
+  );
+
+  await deleteUploadThingFilesByUrl(
+    candidates.filter((url) => !inUse.has(url)),
+    "resume.create.cleanup",
+  );
+};
+
+/**
  * A stored resume-analysis improvement plus the applied flag that
  * `applyImprovement` writes back onto it. The flag is not part of the model
  * output contract, so it only ever exists on rows the user has acted on.
@@ -91,18 +128,28 @@ export const resumeRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const resume = await prisma.resume.create({
-        data: {
-          fileName: input.fileName,
-          resumeName: input.resumeName,
-          postedRole: input.postedRole,
-          resumeLink: input.fileUrl,
-          userId: ctx.auth.user.id,
-          resumePreviewLink: input.thumbnailUrl,
-          parsedContent: normalizeResumeParsedContent(input.parsedContent),
-        },
-      });
-      return { resume };
+      try {
+        const resume = await prisma.resume.create({
+          data: {
+            fileName: input.fileName,
+            resumeName: input.resumeName,
+            postedRole: input.postedRole,
+            resumeLink: input.fileUrl,
+            userId: ctx.auth.user.id,
+            resumePreviewLink: input.thumbnailUrl,
+            parsedContent: normalizeResumeParsedContent(input.parsedContent),
+          },
+        });
+        return { resume };
+      } catch (error) {
+        // The file is already in UploadThing by the time this runs - the client
+        // uploads first and only then creates the row. A failure here used to
+        // leave that blob behind with nothing pointing at it and no way to find
+        // it again. (An upload whose `create` call never arrives at all still
+        // orphans its file; that needs a sweeper, not a catch block.)
+        await discardUnreferencedUploads([input.fileUrl, input.thumbnailUrl]);
+        throw error;
+      }
     }),
   /**
    * Returns a paginated list of the authenticated user's resumes.
@@ -246,10 +293,25 @@ export const resumeRouter = createTRPCRouter({
 
       const resume = await prisma.resume.findFirst({
         where: { id: input.resumeId, userId: ctx.auth.user.id },
-        select: { parsedContent: true, resumeName: true, postedRole: true },
+        select: {
+          parsedContent: true,
+          resumeName: true,
+          postedRole: true,
+          status: true,
+        },
       });
       if (!resume) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Resume not found" });
+      }
+
+      // A retry after a failed run has to clear the FAILED marker, or the page
+      // it lands on reads the stale status and shows the error screen for a run
+      // that is under way.
+      if (resume.status === "FAILED") {
+        await prisma.resume.updateMany({
+          where: { id: input.resumeId, userId: ctx.auth.user.id },
+          data: { status: "DRAFT" },
+        });
       }
 
       await inngest.send({
@@ -270,7 +332,16 @@ export const resumeRouter = createTRPCRouter({
       return { success: true };
     }),
   /**
-   * Returns the latest completed analysis for a specific user-owned resume.
+   * Returns the latest completed analysis for a specific user-owned resume,
+   * along with the resume's lifecycle status.
+   *
+   * A resume with no analysis resolves successfully with a null `analysis`
+   * rather than throwing, mirroring `getJobMatchResult`. It used to throw
+   * NOT_FOUND, which the client read as "analysis in progress" - so a resume
+   * that had never been analysed, and one whose analysis had died, both
+   * rendered "AI Coach is analyzing your resume" with no way out. `status` is
+   * what separates the three cases; NOT_FOUND now means only that the resume
+   * does not exist or belongs to someone else.
    *
    * The analysis payload is normalized so the client receives typed arrays for
    * strengths, quick wins, and improvements.
@@ -278,6 +349,17 @@ export const resumeRouter = createTRPCRouter({
   getAnalysisResult: protectedProcedure
     .input(z.object({ resumeId: z.string() }))
     .query(async ({ ctx, input }) => {
+      const resume = await prisma.resume.findFirst({
+        where: { id: input.resumeId, userId: ctx.auth.user.id },
+        select: { status: true },
+      });
+      if (!resume) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Resume not found",
+        });
+      }
+
       const analysis = await prisma.resumeAnalysis.findFirst({
         where: {
           resumeId: input.resumeId,
@@ -294,10 +376,7 @@ export const resumeRouter = createTRPCRouter({
         },
       });
       if (!analysis) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Analysis not found",
-        });
+        return { analysis: null, status: resume.status };
       }
       return {
         analysis: {
@@ -306,6 +385,7 @@ export const resumeRouter = createTRPCRouter({
           quickWins: analysis.quickWins as QuickWin[],
           improvements: analysis.improvements as AnalysisImprovement[],
         },
+        status: resume.status,
       };
     }),
   /**
@@ -453,6 +533,32 @@ export const resumeRouter = createTRPCRouter({
           id: input.applicationId,
           userId: ctx.auth.user.id,
         },
+        // Everything the analyzer page reads, and nothing else. Without the
+        // select this returned every column, including the pasted
+        // `jobDescription` (up to 20 000 characters) that no view on this page
+        // renders - shipped over the wire on every poll of a running analysis.
+        select: {
+          id: true,
+          resumeId: true,
+          companyName: true,
+          jobTitle: true,
+          url: true,
+          experience: true,
+          salaryRange: true,
+          matchScore: true,
+          improvements: true,
+          missingSkills: true,
+          matchingSkills: true,
+          requirementsMatch: true,
+          skillsGap: true,
+          keywordsGap: true,
+          summary: true,
+          coverLetterText: true,
+          targetLanguage: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       });
       if (!application) {
         throw new TRPCError({
@@ -461,9 +567,93 @@ export const resumeRouter = createTRPCRouter({
         });
       }
       if (application.status !== "ANALYZED") {
-        return { application: null, status: application.status };
+        return {
+          application: null,
+          status: application.status,
+          // Lets the client cap how long it is willing to poll. A run that is
+          // wedged rather than failed never writes FAILED, so elapsed time is
+          // the only signal that waiting further is pointless. `updatedAt`
+          // rather than `createdAt`, so a retry restarts the clock instead of
+          // landing on a row that is already past the cap.
+          startedAt: application.updatedAt,
+        };
       }
-      return { application, status: application.status };
+      return {
+        application,
+        status: application.status,
+        startedAt: application.updatedAt,
+      };
+    }),
+
+  /**
+   * Re-runs a job-match analysis that failed, reusing the stored job
+   * description and the resume it was created against.
+   *
+   * Exists because the analyzer page is reached by application id: after a
+   * failed run the user is looking at a row whose job description is already
+   * saved, and sending them back to paste it again would lose it.
+   */
+  retryJobMatchAnalysis: protectedProcedure
+    .input(z.object({ applicationId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      enforceAiTriggerLimit(ctx.auth.user.id, "triggerJobMatch");
+
+      const application = await prisma.jobApplication.findFirst({
+        where: { id: input.applicationId, userId: ctx.auth.user.id },
+        select: {
+          jobDescription: true,
+          resumeId: true,
+          status: true,
+          resume: { select: { parsedContent: true, structuredData: true } },
+        },
+      });
+
+      if (!application) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Job application not found",
+        });
+      }
+
+      if (application.status === "ANALYZED") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "This analysis has already finished",
+        });
+      }
+
+      const parsedContent = application.resume?.parsedContent;
+      if (!parsedContent?.trim()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Resume parsed content is required before triggering job match analysis",
+        });
+      }
+
+      // Back to TO_APPLY before the event goes out, so the page the user is
+      // already looking at stops reporting the previous failure.
+      await prisma.jobApplication.updateMany({
+        where: { id: input.applicationId, userId: ctx.auth.user.id },
+        data: { status: "TO_APPLY" },
+      });
+
+      const structuredData = application.resume?.structuredData;
+
+      await inngest.send({
+        name: "app/job-matched.analyzed",
+        data: {
+          applicationId: input.applicationId,
+          userId: ctx.auth.user.id,
+          resumeId: application.resumeId,
+          jobDescription: application.jobDescription,
+          parsedContent: structuredData
+            ? JSON.stringify(structuredData, null, 2)
+            : resumeContentToPlainText(parsedContent) || parsedContent,
+        },
+      });
+
+      return { applicationId: input.applicationId };
     }),
 
   /**

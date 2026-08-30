@@ -1,5 +1,6 @@
-import { normalizeAppError } from "@/lib/app-error";
+import { toPublicAppError } from "@/lib/app-error";
 import { auth } from "@/lib/auth";
+import { logError } from "@/lib/logger";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { headers } from "next/headers";
 import { cache } from "react";
@@ -28,10 +29,19 @@ const t = initTRPC.create({
    */
   // transformer: superjson,
   errorFormatter({ shape, error }) {
-    const appError = normalizeAppError(error, shape.message);
+    // An unexpected throw is the server's problem to read, not the user's, so
+    // it is logged here and leaves only as the generic message. `shape.message`
+    // is overwritten too: it is the raw `cause` message by default, and it is
+    // what `TRPCClientError.message` ends up being on the client.
+    if (error.code === "INTERNAL_SERVER_ERROR") {
+      logError("trpc.procedure", error.cause ?? error);
+    }
+
+    const appError = toPublicAppError(error);
 
     return {
       ...shape,
+      message: appError.message,
       data: {
         ...shape.data,
         appError,

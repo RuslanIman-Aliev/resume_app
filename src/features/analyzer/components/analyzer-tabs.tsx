@@ -21,10 +21,13 @@ import {
   UploadIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnalyzerError, AnalyzerLoading } from "./analyzer-states";
 import { EmptyDataCard } from "./empty-data-card";
+
+/** Mirrors the `max(20_000)` on `resume.triggerJobMatchAnalysis`. */
+const JOB_DESCRIPTION_MAX_LENGTH = 20_000;
 
 const AnalyzerTabs = () => {
   const trpc = useTRPC();
@@ -52,12 +55,19 @@ const AnalyzerTabs = () => {
     return [selected, ...resumes.filter((_, index) => index !== selectedIndex)];
   }, [data?.resumes, selectedResumeId]);
 
-  const { mutate } = useMutation(
+  // Guards the window between the click and the re-render that disables the
+  // button. A ref rather than `isPending` because it is written and read within
+  // the same tick, which is exactly where a double click lands.
+  const hasTriggered = useRef(false);
+
+  const { mutate, isPending } = useMutation(
     trpc.resume.triggerJobMatchAnalysis.mutationOptions({
       onSuccess: (data) => {
         toast.info(
           "Analysis triggered successfully! It may take a few moments to complete.",
         );
+        // Stays locked: the page is navigating away, and a click landing in
+        // that gap would start a second analysis of the same job.
         router.push(`/analyzer/${data.applicationId}`);
       },
       onError: (error) => {
@@ -70,11 +80,32 @@ const AnalyzerTabs = () => {
     }),
   );
 
+  const canAnalyze =
+    Boolean(selectedResumeId) && inputJobDescription.trim().length > 0;
+  // The counter only earns attention once the limit is in sight.
+  const isNearDescriptionLimit =
+    inputJobDescription.length > JOB_DESCRIPTION_MAX_LENGTH * 0.9;
+
   const handleClick = () => {
-    mutate({
-      resumeId: selectedResumeId!,
-      jobDescription: inputJobDescription!,
-    });
+    // Every click that gets through is another `job_application` row, another
+    // OpenAI call and another card in the tracker - the per-user rate limit
+    // allows five a minute, so it will not stop the second one.
+    if (!canAnalyze || isPending || hasTriggered.current) return;
+
+    hasTriggered.current = true;
+    mutate(
+      {
+        resumeId: selectedResumeId!,
+        jobDescription: inputJobDescription,
+      },
+      {
+        // Released only on failure - a successful trigger navigates away, and
+        // a click landing in that gap would start the same analysis twice.
+        onError: () => {
+          hasTriggered.current = false;
+        },
+      },
+    );
   };
 
   return (
@@ -89,12 +120,31 @@ const AnalyzerTabs = () => {
         </div>
       </CardHeader>
 
+      {/* The cap matches `triggerJobMatchAnalysis`, which rejects anything
+          longer. Enforcing it here means a pasted 30 000-character posting is
+          trimmed as it lands rather than accepted and refused on submit. */}
       <Textarea
         placeholder="Paste the job description here..."
         className="min-h-40 max-h-100 sm:min-h-75 resize-none bg-secondary/30 border-border/50 focus:border-primary/50"
         value={inputJobDescription}
-        onChange={(e) => setInputJobDescription(e.target.value)}
+        maxLength={JOB_DESCRIPTION_MAX_LENGTH}
+        aria-describedby="job-description-counter"
+        onChange={(e) =>
+          setInputJobDescription(
+            e.target.value.slice(0, JOB_DESCRIPTION_MAX_LENGTH),
+          )
+        }
       />
+      <p
+        id="job-description-counter"
+        className={cn(
+          "mt-1 text-right text-xs text-muted-foreground",
+          isNearDescriptionLimit && "text-chart-5",
+        )}
+      >
+        {inputJobDescription.length.toLocaleString("en-US")} /{" "}
+        {JOB_DESCRIPTION_MAX_LENGTH.toLocaleString("en-US")} characters
+      </p>
 
       <div className="mt-6 space-y-3">
         <h3 className="font-medium">Select your resume to compare</h3>
@@ -116,17 +166,28 @@ const AnalyzerTabs = () => {
               }}
             />
           ) : (
-            <div className="flex flex-col gap-3">
+            <div
+              role="radiogroup"
+              aria-label="Select your resume to compare"
+              className="flex flex-col gap-3"
+            >
               {orderedResumes.map((resume) => {
                 const latestAnalysis = resume.analysis?.[0];
                 const isSelected = selectedResumeId === resume.id;
 
                 return (
-                  <div
+                  // A real button: picking a resume is the required first step
+                  // of this page, and as a bare `<div onClick>` it could not be
+                  // reached by keyboard or announced as selectable, which left
+                  // "Analyze" permanently disabled for anyone not using a mouse.
+                  <button
                     key={resume.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     onClick={() => setSelectedResumeId(resume.id)}
                     className={cn(
-                      "relative cursor-pointer rounded-lg border p-4 transition-all hover:bg-secondary/50",
+                      "relative w-full cursor-pointer rounded-lg border p-4 text-left transition-all hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       isSelected
                         ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-sm"
                         : "border-border/50 bg-secondary/30",
@@ -206,7 +267,7 @@ const AnalyzerTabs = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -216,11 +277,11 @@ const AnalyzerTabs = () => {
 
       <Button
         className="mt-4 p-5 w-full font-bold min-h-11 sm:min-h-0 "
-        disabled={!selectedResumeId || !inputJobDescription.trim()}
+        disabled={!canAnalyze || isPending}
         onClick={handleClick}
       >
-        <SparklesIcon className="size-4 mr-2" />
-        Analyze Job Description
+        <SparklesIcon className={cn("size-4 mr-2", isPending && "animate-spin")} />
+        {isPending ? "Starting analysis..." : "Analyze Job Description"}
       </Button>
     </Card>
   );

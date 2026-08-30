@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FeedbackState } from "@/components/ui/feedback-state";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { getCategoryConfig, getPriorityConfig } from "@/lib/ui-config";
 import { useTRPC } from "@/trpc/client";
@@ -72,6 +73,10 @@ const ImprovementsSection = () => {
     );
   }, [data?.improvements, filter]);
 
+  // Separates "the filter matched nothing" from "the analysis produced
+  // nothing" - the two need different copy and only the first has a way out.
+  const hasAnyImprovements = (data?.improvements ?? []).length > 0;
+
   if (isLoading) {
     return <ImprovementsSkeleton />;
   }
@@ -85,7 +90,9 @@ const ImprovementsSection = () => {
         <div className="flex flex-col">
           <h2 className="text-xl font-bold">Improvement Suggestions</h2>
           <p className="text-muted-foreground">
-            {filteredImprovements.length} suggestions to improve your resume
+            {filteredImprovements.length === 1
+              ? "1 suggestion to improve your resume"
+              : `${filteredImprovements.length} suggestions to improve your resume`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -104,6 +111,35 @@ const ImprovementsSection = () => {
         </div>
       </div>
       <div>
+        {filteredImprovements.length === 0 ? (
+          // Without this the section rendered "0 suggestions" over an empty
+          // accordion, which reads as a broken screen rather than a filter that
+          // matched nothing.
+          <FeedbackState
+            layout="inline"
+            className="mt-4 rounded-2xl border border-border/50 bg-card/50"
+            icon={<Lightbulb className="h-8 w-8 text-primary/50" />}
+            title={
+              hasAnyImprovements
+                ? `No ${filter} impact suggestions`
+                : "No suggestions in this analysis"
+            }
+            description={
+              hasAnyImprovements
+                ? "The analysis found suggestions, just none at this impact level."
+                : "The model returned no improvements for this resume. Re-run the analysis after editing it to get a fresh set."
+            }
+            primaryAction={
+              hasAnyImprovements
+                ? {
+                    label: "Show all suggestions",
+                    onClick: () => setFilter("all"),
+                    variant: "secondary",
+                  }
+                : undefined
+            }
+          />
+        ) : null}
         <Accordion type="multiple" className="mt-4 space-y-6">
           {filteredImprovements.map((improvement, index) => {
             const category = getCategoryConfig(improvement.category);

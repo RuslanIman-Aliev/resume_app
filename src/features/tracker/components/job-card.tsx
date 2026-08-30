@@ -12,6 +12,7 @@ import {
 import { useUpdateApplicationStatus } from "@/features/tracker/hooks/use-update-application-status";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { getScoreColor } from "@/lib/format";
+import { isSafeHttpUrl } from "@/lib/safe-url";
 import type {
   ApplicationStatusValue,
   JobApplicationCard,
@@ -255,13 +256,18 @@ export const JobCard = ({
   // drag are two front doors onto one behaviour.
   const { mutate: updateStatus } = useUpdateApplicationStatus();
 
+  // Rows written before the URL was validated - and any the model filled in -
+  // can still hold a non-http value, so the stored string is re-checked here
+  // rather than trusted because it came from our own database.
+  const jobPostingUrl = isSafeHttpUrl(application.url) ? application.url : null;
+
   const defaultValues: TrackerFormValues = {
     company: application.company || "",
     position: application.position || "",
     location: application.location || "",
     salary: application.salary || "",
     status: application.status as ApplicationStatusValue,
-    url: application.url || "",
+    url: jobPostingUrl ?? "",
     notes: application.notes || "",
     contactName: application.contactName || "",
     contactEmail: application.contactEmail || "",
@@ -339,10 +345,10 @@ export const JobCard = ({
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-              {application.url && (
+              {jobPostingUrl && (
                 <DropdownMenuItem asChild className="min-h-11 sm:min-h-0">
                   <a
-                    href={application.url}
+                    href={jobPostingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

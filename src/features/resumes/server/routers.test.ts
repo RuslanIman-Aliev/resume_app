@@ -23,6 +23,7 @@ const prismaMock = vi.hoisted(() => ({
     create: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   },
 }));
 
@@ -100,6 +101,60 @@ describe("resumeRouter", () => {
       },
     });
     expect(result).toEqual({ resume });
+    expect(deleteUploadThingFilesByUrlMock).not.toHaveBeenCalled();
+  });
+
+  it("deletes the just-uploaded files when the row cannot be written", async () => {
+    // The client uploads first and creates the row second, so a failure here
+    // used to leave the file in storage with nothing pointing at it.
+    prismaMock.resume.create.mockRejectedValue(new Error("db is down"));
+    prismaMock.resume.findMany.mockResolvedValue([]);
+
+    const caller = createCaller({});
+
+    await expect(
+      caller.create({
+        fileName: "resume.pdf",
+        fileUrl: "https://utfs.io/f/document-key",
+        resumeName: "Resume",
+        postedRole: "Frontend Engineer",
+        thumbnailUrl: "https://utfs.io/f/preview-key",
+      }),
+    ).rejects.toThrow();
+
+    expect(deleteUploadThingFilesByUrlMock).toHaveBeenCalledWith(
+      ["https://utfs.io/f/document-key", "https://utfs.io/f/preview-key"],
+      "resume.create.cleanup",
+    );
+  });
+
+  it("never deletes a file that a stored resume still points at", async () => {
+    prismaMock.resume.create.mockRejectedValue(new Error("db is down"));
+    // The reference check is what makes cleanup safe to run on URLs supplied
+    // by the caller: a file belonging to a saved resume is left alone.
+    prismaMock.resume.findMany.mockResolvedValue([
+      {
+        resumeLink: "https://utfs.io/f/document-key",
+        resumePreviewLink: null,
+      },
+    ]);
+
+    const caller = createCaller({});
+
+    await expect(
+      caller.create({
+        fileName: "resume.pdf",
+        fileUrl: "https://utfs.io/f/document-key",
+        resumeName: "Resume",
+        postedRole: "Frontend Engineer",
+        thumbnailUrl: "https://utfs.io/f/preview-key",
+      }),
+    ).rejects.toThrow();
+
+    expect(deleteUploadThingFilesByUrlMock).toHaveBeenCalledWith(
+      ["https://utfs.io/f/preview-key"],
+      "resume.create.cleanup",
+    );
   });
 
   it("sanitizes malicious parsed content before saving", async () => {
@@ -425,29 +480,72 @@ describe("resumeRouter", () => {
         postedRole: "Role",
       },
     };
+    prismaMock.resume.findFirst.mockResolvedValue({ status: "ANALYZED" });
     prismaMock.resumeAnalysis.findFirst.mockResolvedValue(analysis);
 
     const caller = createCaller({});
     const result = await caller.getAnalysisResult({ resumeId: "resume_1" });
 
-    expect(Array.isArray(result.analysis.strengths)).toBe(true);
-    expect(Array.isArray(result.analysis.quickWins)).toBe(true);
-    expect(Array.isArray(result.analysis.improvements)).toBe(true);
+    expect(Array.isArray(result.analysis?.strengths)).toBe(true);
+    expect(Array.isArray(result.analysis?.quickWins)).toBe(true);
+    expect(Array.isArray(result.analysis?.improvements)).toBe(true);
     expect(result.analysis).toMatchObject({
       id: analysis.id,
       resumeId: analysis.resumeId,
       resume: analysis.resume,
     });
+    expect(result.status).toBe("ANALYZED");
   });
 
-  it("throws when analysis is missing", async () => {
+  it("reports a failed analysis instead of an endless pending state", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({ status: "FAILED" });
     prismaMock.resumeAnalysis.findFirst.mockResolvedValue(null);
+
+    const caller = createCaller({});
+    const result = await caller.getAnalysisResult({ resumeId: "resume_1" });
+
+    // A missing analysis used to throw NOT_FOUND, which the client read as
+    // "still analysing"; the status is what tells the two apart now.
+    expect(result).toEqual({ analysis: null, status: "FAILED" });
+  });
+
+  it("returns a null analysis for a resume that was never analysed", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({ status: "DRAFT" });
+    prismaMock.resumeAnalysis.findFirst.mockResolvedValue(null);
+
+    const caller = createCaller({});
+    const result = await caller.getAnalysisResult({ resumeId: "resume_1" });
+
+    expect(result).toEqual({ analysis: null, status: "DRAFT" });
+  });
+
+  it("throws when the resume itself is missing", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue(null);
 
     const caller = createCaller({});
 
     await expect(
       caller.getAnalysisResult({ resumeId: "resume_404" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(prismaMock.resumeAnalysis.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("clears a FAILED status when the analysis is triggered again", async () => {
+    prismaMock.resume.findFirst.mockResolvedValue({
+      parsedContent: "Parsed resume",
+      resumeName: "Resume",
+      postedRole: "Role",
+      status: "FAILED",
+    });
+
+    const caller = createCaller({});
+    await caller.triggerAnalysis({ resumeId: "resume_1" });
+
+    expect(prismaMock.resume.updateMany).toHaveBeenCalledWith({
+      where: { id: "resume_1", userId: session.user.id },
+      data: { status: "DRAFT" },
+    });
+    expect(inngestMock.send).toHaveBeenCalledTimes(1);
   });
 
   it("fetches latest analyses for dashboard", async () => {
@@ -612,10 +710,12 @@ describe("resumeRouter", () => {
   });
 
   it("returns job match result when available", async () => {
+    const updatedAt = new Date("2026-04-05T00:00:00Z");
     const application = {
       id: "application_3",
       resumeId: "resume_1",
       status: "ANALYZED",
+      updatedAt,
     };
     prismaMock.jobApplication.findFirst.mockResolvedValue(application);
 
@@ -624,20 +724,37 @@ describe("resumeRouter", () => {
       applicationId: "application_3",
     });
 
-    expect(prismaMock.jobApplication.findFirst).toHaveBeenCalledWith({
-      where: {
-        id: "application_3",
-        userId: session.user.id,
-      },
+    expect(prismaMock.jobApplication.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "application_3",
+          userId: session.user.id,
+        },
+      }),
+    );
+
+    // The query projects columns instead of returning the row whole; the
+    // pasted job description is the one field the analyzer page never reads
+    // and the one most likely to be 20 000 characters long.
+    const [{ select }] = prismaMock.jobApplication.findFirst.mock.calls.at(
+      -1,
+    ) as [{ select: Record<string, boolean> }];
+    expect(select.jobDescription).toBeUndefined();
+    expect(select.matchScore).toBe(true);
+    expect(result).toEqual({
+      application,
+      status: "ANALYZED",
+      startedAt: updatedAt,
     });
-    expect(result).toEqual({ application, status: "ANALYZED" });
   });
 
   it("returns a pending job match result while analysis is running", async () => {
+    const updatedAt = new Date("2026-04-05T00:00:00Z");
     prismaMock.jobApplication.findFirst.mockResolvedValue({
       id: "application_5",
       resumeId: "resume_1",
       status: "TO_APPLY",
+      updatedAt,
     });
 
     const caller = createCaller({});
@@ -645,7 +762,86 @@ describe("resumeRouter", () => {
       applicationId: "application_5",
     });
 
-    expect(result).toEqual({ application: null, status: "TO_APPLY" });
+    expect(result).toEqual({
+      application: null,
+      status: "TO_APPLY",
+      startedAt: updatedAt,
+    });
+  });
+
+  it("reports a failed job match instead of a pending one", async () => {
+    prismaMock.jobApplication.findFirst.mockResolvedValue({
+      id: "application_6",
+      resumeId: "resume_1",
+      status: "FAILED",
+      updatedAt: new Date("2026-04-05T00:00:00Z"),
+    });
+
+    const caller = createCaller({});
+    const result = await caller.getJobMatchResult({
+      applicationId: "application_6",
+    });
+
+    expect(result.application).toBeNull();
+    expect(result.status).toBe("FAILED");
+  });
+
+  it("re-queues a failed job match with the stored job description", async () => {
+    prismaMock.jobApplication.findFirst.mockResolvedValue({
+      jobDescription: "Stored job description",
+      resumeId: "resume_1",
+      status: "FAILED",
+      resume: { parsedContent: "Parsed resume", structuredData: null },
+    });
+
+    const caller = createCaller({});
+    const result = await caller.retryJobMatchAnalysis({
+      applicationId: "application_7",
+    });
+
+    expect(prismaMock.jobApplication.updateMany).toHaveBeenCalledWith({
+      where: { id: "application_7", userId: session.user.id },
+      data: { status: "TO_APPLY" },
+    });
+    expect(inngestMock.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "app/job-matched.analyzed",
+        data: expect.objectContaining({
+          applicationId: "application_7",
+          userId: session.user.id,
+          jobDescription: "Stored job description",
+        }),
+      }),
+    );
+    expect(result).toEqual({ applicationId: "application_7" });
+  });
+
+  it("refuses to re-run a job match that already finished", async () => {
+    prismaMock.jobApplication.findFirst.mockResolvedValue({
+      jobDescription: "Stored job description",
+      resumeId: "resume_1",
+      status: "ANALYZED",
+      resume: { parsedContent: "Parsed resume", structuredData: null },
+    });
+
+    const caller = createCaller({});
+
+    await expect(
+      caller.retryJobMatchAnalysis({ applicationId: "application_8" }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(inngestMock.send).not.toHaveBeenCalled();
+  });
+
+  it("does not re-run a job match owned by someone else", async () => {
+    prismaMock.jobApplication.findFirst.mockResolvedValue(null);
+
+    const caller = createCaller({});
+
+    await expect(
+      caller.retryJobMatchAnalysis({ applicationId: "application_foreign" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(prismaMock.jobApplication.updateMany).not.toHaveBeenCalled();
+    expect(inngestMock.send).not.toHaveBeenCalled();
   });
 
   it("uses structuredData payload when triggering job match analysis", async () => {

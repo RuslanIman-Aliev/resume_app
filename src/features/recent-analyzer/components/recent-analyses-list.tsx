@@ -51,44 +51,17 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  getScoreFilterFromParams,
+  getSortByFromParams,
+  scoreParamKey,
+  sortParamKey,
+  type ScoreFilter,
+  type SortBy,
+} from "@/features/recent-analyzer/lib/list-params";
 
-type ScoreFilter = "all" | "high" | "medium" | "low";
-type SortBy = "date" | "score";
-
-const scoreParamKey = "score";
-const sortParamKey = "sort";
-
-type SearchParamsReader = {
-  get: (name: string) => string | null;
-};
-
-const parseScoreFilter = (value: string | null): ScoreFilter => {
-  switch (value) {
-    case "all":
-    case "high":
-    case "medium":
-    case "low":
-      return value;
-    default:
-      return "all";
-  }
-};
-
-const parseSortBy = (value: string | null): SortBy => {
-  switch (value) {
-    case "date":
-    case "score":
-      return value;
-    default:
-      return "date";
-  }
-};
-
-const getScoreFilterFromParams = (params: SearchParamsReader): ScoreFilter =>
-  parseScoreFilter(params.get(scoreParamKey));
-
-const getSortByFromParams = (params: SearchParamsReader): SortBy =>
-  parseSortBy(params.get(sortParamKey));
+// Shared with the server page, which prefetches this list's first query and
+// therefore has to read the same parameters the same way.
 
 const SCORE_FILTER_LABELS = {
   all: "All Scores",

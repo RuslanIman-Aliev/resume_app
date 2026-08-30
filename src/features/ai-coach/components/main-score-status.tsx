@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { FeedbackState } from "@/components/ui/feedback-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCcw, Sparkles } from "lucide-react";
 
 export const MainScoreSkeleton = () => {
   return (
@@ -154,8 +154,87 @@ export const MainScorePending = () => {
   );
 };
 
+type AnalysisRetryProps = {
+  onRetry: () => void;
+  isRetrying?: boolean;
+};
+
 /**
- * Error state component shown when resume analysis fails to load.
+ * Shown when the background analysis itself failed or stopped responding.
+ *
+ * Distinct from `MainScoreError`, which means the page could not read the
+ * analysis: here the read succeeded and the answer is that there will not be a
+ * result. The retry button starts a new run rather than refetching, because
+ * refetching a FAILED row returns the same failure forever.
+ *
+ * @param onRetry - Starts a fresh analysis for this resume.
+ * @param isRetrying - Disables the button while the run is being queued.
+ * @param timedOut - Switches the copy to the "still not finished" case, where
+ *   nothing reported a failure but the wait has gone past the cap.
+ */
+export const MainScoreAnalysisFailed = ({
+  onRetry,
+  isRetrying,
+  timedOut,
+}: AnalysisRetryProps & { timedOut?: boolean }) => {
+  return (
+    <FeedbackState
+      status="error"
+      layout="card"
+      icon={<AlertTriangle className="h-7 w-7 text-destructive" />}
+      title={
+        timedOut
+          ? "This analysis is taking longer than expected."
+          : "We could not finish this analysis."
+      }
+      description={
+        timedOut
+          ? "It has not finished in the time it normally takes. You can start it again - your resume file is unchanged."
+          : "The AI response could not be processed. Starting the analysis again usually fixes it, and your resume file is unchanged."
+      }
+      primaryAction={{
+        label: isRetrying ? "Starting..." : "Run analysis again",
+        onClick: onRetry,
+        disabled: isRetrying,
+        icon: <RefreshCcw className="h-4 w-4" />,
+        variant: "secondary",
+      }}
+    />
+  );
+};
+
+/**
+ * Shown for a resume that has simply never been analysed.
+ *
+ * This case used to render the "AI Coach is analyzing your resume" screen,
+ * because a missing analysis reached the client as NOT_FOUND and NOT_FOUND was
+ * read as "in progress" - a claim that was not true and never resolved.
+ *
+ * @param onRetry - Starts the first analysis for this resume.
+ * @param isRetrying - Disables the button while the run is being queued.
+ */
+export const MainScoreNotAnalyzed = ({
+  onRetry,
+  isRetrying,
+}: AnalysisRetryProps) => {
+  return (
+    <FeedbackState
+      layout="card"
+      icon={<Sparkles className="h-7 w-7 text-primary" />}
+      title="This resume has not been analyzed yet."
+      description="Run the AI analysis to get a score, keywords and rewrite suggestions. It usually takes about 20 seconds."
+      primaryAction={{
+        label: isRetrying ? "Starting..." : "Analyze resume",
+        onClick: onRetry,
+        disabled: isRetrying,
+        icon: <Sparkles className="h-4 w-4" />,
+      }}
+    />
+  );
+};
+
+/**
+ * Error state component shown when the analysis could not be loaded at all.
  * Provides retry button to refetch the analysis data.
  * @param onRetry - Callback function to refetch the failed analysis
  */

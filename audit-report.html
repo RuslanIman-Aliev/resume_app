@@ -1,0 +1,1105 @@
+<title>Аудит AI-Tailor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+  /* ============================================================
+     Палитра. :root — полный светлый набор. Тёмный переопределяет
+     только токены, дважды: под prefers-color-scheme и под
+     [data-theme="dark"], чтобы явный выбор побеждал в обе стороны.
+     ============================================================ */
+  :root {
+    --paper:        #F2F4F5;
+    --surface:      #FFFFFF;
+    --surface-sunk: #E8ECEE;
+    --ink:          #12181C;
+    --ink-soft:     #3D4A52;
+    --slate:        #63747E;
+    --rule:         #D3DBDF;
+    --rule-strong:  #B6C3C9;
+
+    --accent:       #0B6B73;
+    --accent-soft:  #E0F0F0;
+    --accent-ink:   #084F55;
+
+    --p0:           #A5281C;
+    --p0-soft:      #FAE6E3;
+    --p1:           #94660A;
+    --p1-soft:      #FAF0DC;
+    --p2:           #5A6C77;
+    --p2-soft:      #E7ECEF;
+    --good:         #2A6349;
+    --good-soft:    #E1EFE8;
+
+    --shadow:       0 1px 2px rgba(18, 24, 28, .06), 0 8px 24px -16px rgba(18, 24, 28, .28);
+
+    --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --font-body:    "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --measure: 68ch;
+    --gutter: clamp(1.25rem, 4vw, 3rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:        #0E1417;
+      --surface:      #161E22;
+      --surface-sunk: #101719;
+      --ink:          #EAF0F2;
+      --ink-soft:     #B9C7CD;
+      --slate:        #8A9BA3;
+      --rule:         #27343A;
+      --rule-strong:  #3A4B53;
+
+      --accent:       #5FC7CC;
+      --accent-soft:  #133034;
+      --accent-ink:   #8EDCDF;
+
+      --p0:           #F08477;
+      --p0-soft:      #351916;
+      --p1:           #E0AE52;
+      --p1-soft:      #302512;
+      --p2:           #93A6B0;
+      --p2-soft:      #1D262B;
+      --good:         #71C79E;
+      --good-soft:    #14271F;
+
+      --shadow:       0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -16px rgba(0, 0, 0, .9);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:        #0E1417;
+    --surface:      #161E22;
+    --surface-sunk: #101719;
+    --ink:          #EAF0F2;
+    --ink-soft:     #B9C7CD;
+    --slate:        #8A9BA3;
+    --rule:         #27343A;
+    --rule-strong:  #3A4B53;
+
+    --accent:       #5FC7CC;
+    --accent-soft:  #133034;
+    --accent-ink:   #8EDCDF;
+
+    --p0:           #F08477;
+    --p0-soft:      #351916;
+    --p1:           #E0AE52;
+    --p1-soft:      #302512;
+    --p2:           #93A6B0;
+    --p2-soft:      #1D262B;
+    --good:         #71C79E;
+    --good-soft:    #14271F;
+
+    --shadow:       0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -16px rgba(0, 0, 0, .9);
+  }
+
+  /* ============================================================ */
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 0 var(--gutter) 6rem;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  p, li { max-width: var(--measure); }
+  .wide p, .wide li { max-width: none; }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+    line-height: 1.15;
+    margin: 0;
+    letter-spacing: -0.015em;
+  }
+
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  code, .mono { font-family: var(--font-mono); font-size: .86em; }
+
+  code {
+    background: var(--surface-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: .06em .34em;
+    word-break: break-word;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--slate);
+  }
+
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Шапка ---------- */
+
+  .masthead {
+    padding: clamp(3rem, 8vw, 5.5rem) 0 2rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .masthead h1 {
+    font-size: clamp(2.6rem, 7vw, 4.4rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    margin: .5rem 0 0;
+  }
+
+  .masthead .sub {
+    font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+    color: var(--ink-soft);
+    margin: 1rem 0 0;
+    max-width: 56ch;
+  }
+
+  .meta-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.5rem;
+    margin-top: 1.75rem;
+    font-family: var(--font-mono);
+    font-size: .78rem;
+    color: var(--slate);
+  }
+
+  /* ---------- Счётчики серьёзности ---------- */
+
+  .tally {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 2.5rem 0 0;
+  }
+
+  .tally > div {
+    background: var(--surface);
+    padding: 1.15rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+  }
+
+  .tally .n {
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .tally .lbl { font-size: .82rem; color: var(--slate); }
+  .tally .t0 .n { color: var(--p0); }
+  .tally .t1 .n { color: var(--p1); }
+  .tally .t2 .n { color: var(--p2); }
+  .tally .done .n { color: var(--good); }
+
+  /* ---------- Секции ---------- */
+
+  section { padding-top: clamp(3.5rem, 8vw, 5rem); }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    border-bottom: 1px solid var(--rule-strong);
+    padding-bottom: .75rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .sec-head h2 {
+    font-size: clamp(1.55rem, 3.4vw, 2.1rem);
+    font-weight: 700;
+  }
+
+  .sec-head .eyebrow { margin-left: auto; }
+
+  .lede { font-size: 1.05rem; color: var(--ink-soft); }
+
+  /* ---------- Три риска ---------- */
+
+  .risks {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    margin-top: 1.75rem;
+  }
+
+  .risk {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 4px solid var(--p1);
+    padding: 1.4rem 1.35rem 1.5rem;
+    box-shadow: var(--shadow);
+  }
+
+  .risk h3 {
+    font-size: 1.08rem;
+    font-weight: 700;
+    margin: .55rem 0 .5rem;
+  }
+
+  .risk p { font-size: .93rem; color: var(--ink-soft); margin: 0; max-width: none; }
+  .risk .rank { font-family: var(--font-mono); font-size: .74rem; color: var(--p1); letter-spacing: .1em; }
+
+  /* ---------- Фильтр находок ---------- */
+
+  .filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .filterbar button {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    background: var(--surface);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    padding: .42rem .95rem;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease, border-color .12s ease;
+  }
+
+  .filterbar button:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+  .filterbar button[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .filterbar .count {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    color: var(--slate);
+    margin-left: auto;
+  }
+
+  /* ---------- Карточка находки ---------- */
+
+  .findings { display: flex; flex-direction: column; gap: .85rem; }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 5px solid var(--p2);
+    padding: 1.1rem 1.25rem 1.2rem;
+  }
+
+  .finding[data-sev="P0"] { border-left-color: var(--p0); }
+  .finding[data-sev="P1"] { border-left-color: var(--p1); }
+  .finding[data-sev="P2"] { border-left-color: var(--p2); }
+  .finding[hidden] { display: none; }
+
+  .f-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .55rem .8rem;
+    margin-bottom: .6rem;
+  }
+
+  .f-id {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: .82rem;
+    letter-spacing: .04em;
+  }
+
+  .pill {
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    padding: .18rem .5rem;
+    border-radius: 3px;
+  }
+
+  .pill.P0 { background: var(--p0-soft); color: var(--p0); }
+  .pill.P1 { background: var(--p1-soft); color: var(--p1); }
+  .pill.P2 { background: var(--p2-soft); color: var(--p2); }
+
+  .tag {
+    font-size: .74rem;
+    color: var(--slate);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: .14rem .45rem;
+  }
+
+  .f-loc {
+    font-family: var(--font-mono);
+    font-size: .78rem;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    padding: .35rem .55rem;
+    border-radius: 3px;
+    margin-bottom: .8rem;
+    word-break: break-word;
+    line-height: 1.5;
+  }
+
+  .f-body {
+    display: grid;
+    gap: .9rem 1.75rem;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 720px) {
+    .f-body { grid-template-columns: 1.15fr 1fr; }
+  }
+
+  .f-body h4 {
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: .3rem;
+  }
+
+  .f-body p { margin: 0; font-size: .93rem; max-width: none; }
+  .f-body .conseq p { color: var(--ink-soft); }
+
+  /* ---------- Список «что хорошо» ---------- */
+
+  .goods { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+  .good-item {
+    background: var(--good-soft);
+    border: 1px solid var(--rule);
+    border-left: 5px solid var(--good);
+    padding: 1.05rem 1.15rem 1.15rem;
+  }
+
+  .good-item h3 { font-size: 1rem; font-weight: 700; margin-bottom: .4rem; }
+  .good-item p { font-size: .9rem; color: var(--ink-soft); margin: 0; max-width: none; }
+  .good-item .mono { color: var(--ink-soft); }
+
+  /* ---------- Таблицы ---------- */
+
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+  }
+
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .9rem; }
+
+  th, td {
+    text-align: left;
+    padding: .7rem .85rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    font-weight: 500;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--slate);
+    background: var(--surface-sunk);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  td.hours, td.prio { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Покрытие тестами ---------- */
+
+  .cover-split { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+  .cover-box { border: 1px solid var(--rule); background: var(--surface); padding: 1.2rem 1.25rem 1.35rem; }
+  .cover-box.yes { border-top: 4px solid var(--good); }
+  .cover-box.no  { border-top: 4px solid var(--p0); }
+  .cover-box h3 { font-size: 1rem; margin-bottom: .75rem; }
+  .cover-box ul { margin: 0; padding-left: 1.1rem; }
+  .cover-box li { font-size: .9rem; margin-bottom: .4rem; color: var(--ink-soft); max-width: none; }
+
+  /* ---------- План ---------- */
+
+  .phase { margin-bottom: 2.25rem; }
+
+  .phase-head {
+    display: flex;
+    align-items: baseline;
+    gap: .8rem;
+    margin-bottom: .9rem;
+    flex-wrap: wrap;
+  }
+
+  .phase-head h3 { font-size: 1.2rem; font-weight: 700; }
+  .phase-head .budget { font-family: var(--font-mono); font-size: .78rem; color: var(--slate); }
+
+  /* ---------- Топ-3 ---------- */
+
+  .top3 { display: grid; gap: 1.15rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+  .top-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 1.3rem 1.3rem 1.4rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .top-card .cost {
+    font-family: var(--font-display);
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--accent-ink);
+    line-height: 1;
+  }
+
+  .top-card h3 { font-size: 1.05rem; margin: .5rem 0 .55rem; }
+  .top-card p { font-size: .9rem; color: var(--ink-soft); margin: 0; max-width: none; }
+
+  /* ---------- Оценки ---------- */
+
+  .scores { display: flex; flex-direction: column; gap: .1rem; }
+
+  .score-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) auto;
+    gap: .3rem 1rem;
+    align-items: baseline;
+    padding: 1rem 0 1.1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .score-row .name { font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; }
+  .score-row .val { font-family: var(--font-display); font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .score-row .val small { font-weight: 500; font-size: .78rem; color: var(--slate); }
+
+  .meter {
+    grid-column: 1 / -1;
+    height: 6px;
+    background: var(--surface-sunk);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: .25rem 0 .5rem;
+  }
+
+  .meter span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+  .score-row .why { grid-column: 1 / -1; font-size: .9rem; color: var(--ink-soft); margin: 0; max-width: var(--measure); }
+
+  /* ---------- Подвал ---------- */
+
+  footer {
+    margin-top: 4.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--ink);
+    font-family: var(--font-mono);
+    font-size: .76rem;
+    color: var(--slate);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.5rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Технический и продуктовый аудит · 29 августа 2026 · второй пересмотр 30 августа</p>
+    <h1>AI-Tailor</h1>
+    <p class="sub">
+      Двадцать пять находок закрыты за два прохода — все четыре P0 и двенадцать P1,
+      от экрана без выхода и PII в Sentry до публичных Pusher-каналов и мёртвых
+      ссылок лендинга. Осталось двенадцать, и они собрались в два узла: вес бандла
+      с дублем редактора и зависимости, за которыми никто не следит.
+    </p>
+    <div class="meta-line">
+      <span>main @ bfb4237 · правки в рабочем дереве</span>
+      <span>Next.js 16.1.6 · React 19.2.3</span>
+      <span>Prisma 6.19 · Zod 4.4.3</span>
+      <span>typecheck ✓ · lint ✓ · build ✓ · 203 теста ✓</span>
+    </div>
+  </header>
+
+  <div class="tally">
+    <div class="t0"><span class="n num">0</span><span class="lbl">P0 — ломает продукт</span></div>
+    <div class="t1"><span class="n num">4</span><span class="lbl">P1 — портит опыт</span></div>
+    <div class="t2"><span class="n num">8</span><span class="lbl">P2 — технический долг</span></div>
+    <div><span class="n num">12</span><span class="lbl">Открыто сейчас</span></div>
+    <div class="done"><span class="n num">25</span><span class="lbl">Закрыто после аудита</span></div>
+  </div>
+
+  <!-- ================= РИСКИ ================= -->
+  <section id="risks">
+    <div class="sec-head">
+      <h2>Три главных риска сейчас</h2>
+      <span class="eyebrow">01</span>
+    </div>
+
+    <div class="risks">
+      <article class="risk">
+        <span class="rank">РИСК 01 · F-14 + F-20</span>
+        <h3>Сторонний код над байтами резюме</h3>
+        <p>
+          Воркер pdf.js грузится с <code>cdnjs.cloudflare.com</code> без SRI и без локального
+          фолбэка, а установленная версия 3.11.174 имеет HIGH-адвайзори «arbitrary JavaScript
+          execution upon opening a malicious PDF». Проверить это в пайплайне нечем:
+          <code>npm audit</code> в CI нет, а он даёт 2 critical и 26 high.
+        </p>
+      </article>
+
+      <article class="risk">
+        <span class="rank">РИСК 02 · F-15</span>
+        <h3>Редактор весит вдвое больше, чем должен</h3>
+        <p>
+          Два побайтово одинаковых чанка по 6,5 МБ — Syncfusion, продублированный на каждый
+          вызов <code>next/dynamic</code>. Статика весит 16,73 МБ при бюджете CI в 17 МБ:
+          запаса осталось 270 КБ, то есть следующая заметная зависимость упрётся в потолок,
+          и поднимать придётся уже не бюджет, а причину.
+        </p>
+      </article>
+
+      <article class="risk">
+        <span class="rank">РИСК 03 · F-19</span>
+        <h3>Применённая правка засчитывается дважды</h3>
+        <p>
+          В ветке <code>JobApplication</code> у <code>applyImprovement</code> нет ни
+          <code>!imp.isApplied</code>, ни флага <code>matched</code>, которые есть в ветке
+          резюме. Две карточки с одинаковым текстом схлопываются в одну — предложение
+          теряется, — а <code>matchScore</code> может вырасти дважды за одну правку.
+          Это тихая порча тех самых цифр, ради которых продукт и существует.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ================= НАХОДКИ ================= -->
+  <section id="findings" class="wide">
+    <div class="sec-head">
+      <h2>Находки</h2>
+      <span class="eyebrow">02</span>
+    </div>
+
+    <div class="filterbar">
+      <button type="button" data-filter="all" aria-pressed="true">Все</button>
+      <button type="button" data-filter="P1" aria-pressed="false">P1</button>
+      <button type="button" data-filter="P2" aria-pressed="false">P2</button>
+      <span class="count" id="filter-count">12 из 12</span>
+    </div>
+
+    <div class="findings" id="findings-list">
+
+      <!-- P1 -->
+      <article class="finding" data-sev="P1">
+        <div class="f-top"><span class="f-id">F-14</span><span class="pill P1">P1</span><span class="tag">Безопасность</span></div>
+        <div class="f-loc">src/lib/thumbnails.ts:6 · package.json (pdfjs-dist@^3.11.174)</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p>Воркер pdf.js грузится с <code>cdnjs.cloudflare.com</code> без SRI и без локального фолбэка. Версия 3.11.174 имеет HIGH-адвайзори «arbitrary JavaScript execution upon opening a malicious PDF».</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Сторонний скрипт исполняется над байтами резюме. Специально собранный PDF даёт исполнение JS в origin приложения.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P1">
+        <div class="f-top"><span class="f-id">F-15</span><span class="pill P1">P1</span><span class="tag">Производительность</span></div>
+        <div class="f-loc">.next/static/chunks/0825a9b9b20a238a.js и f38e721fd45886d4.js — проверено сборкой</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p>Два <strong>побайтово одинаковых</strong> чанка по 6 495 899 байт — Syncfusion, продублированный на каждый вызов <code>next/dynamic</code>. Общий вес статики 16 355 001 байт.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Открыв редактор и на <code>/resumes</code>, и на <code>/analyzer/[id]</code>, пользователь скачивает ~13 МБ вместо 6,5. Комментарий в CI это признаёт и поднимает бюджет вместо починки.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P1">
+        <div class="f-top"><span class="f-id">F-19</span><span class="pill P1">P1</span><span class="tag">Надёжность</span></div>
+        <div class="f-loc">src/features/resumes/server/routers.ts:756-772 против 815-822</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p>В ветке <code>JobApplication</code> нет ни <code>!imp.isApplied</code>, ни флага <code>matched</code>, которые есть в ветке <code>ResumeAnalysis</code>.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Две карточки с одинаковым <code>targetId</code>/<code>beforeText</code>/<code>afterText</code> схлопываются в одну — пользователь теряет предложение; <code>matchScore</code> может вырасти дважды за одну правку.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P1">
+        <div class="f-top"><span class="f-id">F-20</span><span class="pill P1">P1</span><span class="tag">CI</span></div>
+        <div class="f-loc">.github/workflows/ci.yml:96-99</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p>Есть <code>gitleaks</code>, но нет ни <code>npm audit</code>, ни Dependabot, ни любого другого гейта по уязвимостям зависимостей.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p><code>npm audit --omit=dev</code>: 60 адвайзори, 2 critical, 26 high — <code>tar</code>, <code>pdfjs-dist</code>, <code>next</code>, <code>better-auth</code>, <code>undici</code>, <code>sharp</code>. Ни одна не видна в пайплайне.</p></div>
+        </div>
+      </article>
+
+      <!-- P2 -->
+      <article class="finding" data-sev="P2">
+        <div class="f-top"><span class="f-id">F-21</span><span class="pill P2">P2</span><span class="tag">Данные</span></div>
+        <div class="f-loc">prisma/schema.prisma:31</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p><code>credits Int @default(5)</code> — поле пишется дефолтом БД и не читается нигде в <code>src/</code>.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Мёртвая колонка, которая выглядит как задел под биллинг и вводит в заблуждение любого, кто откроет схему.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P2">
+        <div class="f-top"><span class="f-id">F-22</span><span class="pill P2">P2</span><span class="tag">Гигиена</span></div>
+        <div class="f-loc">src/lib/logger.ts:13-24 · save-docx/route.ts:143,149 · analyze-original-resume.tsx:110</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p><code>CLAUDE.md</code> называет <code>logError</code> «scrubbed logger», но он делает <code>{...details}</code> без очистки; вызовы передают <code>resumeName</code>, <code>targetRole</code>, <code>fileName</code>. Три места логируют мимо него через <code>console.*</code>.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Заявленная гарантия отсутствует. При <code>enableLogs: true</code> в Sentry это ещё один канал утечки.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P2">
+        <div class="f-top"><span class="f-id">F-23</span><span class="pill P2">P2</span><span class="tag">Безопасность</span></div>
+        <div class="f-loc">src/lib/rate-limit.ts:33,44-57</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p>Состояние в памяти одного процесса (честно описано в комментарии); ключи из <code>hits</code> никогда не удаляются.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>На Vercel эффективный лимит = <code>limit × число инстансов</code> и сбрасывается холодным стартом. Мапа растёт линейно по числу пользователей.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P2">
+        <div class="f-top"><span class="f-id">F-24</span><span class="pill P2">P2</span><span class="tag">Данные</span></div>
+        <div class="f-loc">prisma/schema.prisma:186</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p><code>TrackerPosition.status</code> — свободный <code>String</code>, тогда как <code>Resume.status</code> и <code>JobApplication.status</code> уже переведены в enum миграцией <code>20260826140000_status_enums</code>.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Нормализация доведена до двух моделей из трёх; <code>"saved"</code> в <code>functions.ts:221</code> — magic string, который БД не проверяет.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P2">
+        <div class="f-top"><span class="f-id">F-26</span><span class="pill P2">P2</span><span class="tag">UI</span></div>
+        <div class="f-loc">app/globals.css:6-7,50 · theme-provider.tsx · theme-toggle-button.tsx · ui/sonner.tsx:8</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p>В <code>:root</code> лежит тёмная палитра, <code>.dark</code> её дословно повторяет, светлой нет. <code>ModeToggle</code> не импортируется ниоткуда. <code>useTheme()</code> отдаёт неразрешённое <code>"system"</code> в <code>&lt;Sonner&gt;</code>.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Вся машинерия <code>next-themes</code> + <code>.dark</code> + переключатель — мёртвый вес: тема ровно одна и сменить её нельзя.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P2">
+        <div class="f-top"><span class="f-id">F-27</span><span class="pill P2">P2</span><span class="tag">Мёртвый код</span></div>
+        <div class="f-loc">analyzer-skills.tsx · analyzer-suggestions.tsx · lib/editor-utils.ts · theme-toggle-button.tsx · schema.prisma:160 · schemas.ts:241-268 · auth.ts:12-17</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p>Ноль импортёров у четырёх модулей. Колонка <code>tailoringTips</code> и закомментированный блок схемы на 28 строк. GitHub OAuth настроен в <code>auth.ts</code> и в CI, но в UI ведёт только Google.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>~270 строк мёртвого кода, мёртвая колонка и настроенный, но недостижимый провайдер входа.</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P2">
+        <div class="f-top"><span class="f-id">F-29</span><span class="pill P2">P2</span><span class="tag">Гигиена</span></div>
+        <div class="f-loc">корень репозитория</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p><code>.env.example</code> отсутствует. Список переменных восстанавливается только чтением <code>env.server.ts</code> и <code>ci.yml</code>. Сам <code>.env</code> закрыт <code>.gitignore</code> корректно.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Новый разработчик не может поднять проект, не читая исходники. Для портфолио — прямой минус к «можно ли это запустить».</p></div>
+        </div>
+      </article>
+
+      <article class="finding" data-sev="P2">
+        <div class="f-top"><span class="f-id">F-35</span><span class="pill P2">P2</span><span class="tag">Гигиена</span></div>
+        <div class="f-loc">next.config.ts:16-22 · вывод npm run build</div>
+        <div class="f-body">
+          <div><h4>Что не так</h4><p>Хук <code>webpack</code> не читается Turbopack'ом, то есть <code>config.resolve.alias.canvas = false</code> не действует. <code>turbopack.root</code> не задан — каждая сборка печатает предупреждение о двух лок-файлах.</p></div>
+          <div class="conseq"><h4>Последствие</h4><p>Мёртвая конфигурация и постоянный шум в логе сборки.</p></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ================= ЧТО ХОРОШО ================= -->
+  <section id="good" class="wide">
+    <div class="sec-head">
+      <h2>Что уже хорошо</h2>
+      <span class="eyebrow">03</span>
+    </div>
+    <p class="lede">Решения, на которые можно опираться дальше. Каждое закрывает конкретную
+      проблему, которую в проектах такого класса обычно не решают вовсе.</p>
+
+    <div class="goods" style="margin-top:1.75rem">
+      <div class="good-item">
+        <h3>Изоляция по userId сделана правильным приёмом</h3>
+        <p><span class="mono">resumes/server/routers.ts:851-877, 885-914</span> — <code>updateMany</code>/<code>deleteMany</code> со скоупом по неуникальному <code>userId</code> и проверкой <code>count</code>. Это закрывает не только IDOR, но и оракул существования: чужой id и несуществующий дают неотличимый ответ.</p>
+      </div>
+      <div class="good-item">
+        <h3>Контракт ошибок подключён на уровне транспорта</h3>
+        <p><span class="mono">trpc/init.ts:30-40</span> + <span class="mono">lib/app-error.ts:13-27</span>. Клиент нигде не разбирает ошибки руками. Из-за этого новый код <code>PRECONDITION_FAILED</code> стоил одной строки, а не правки десяти компонентов.</p>
+      </div>
+      <div class="good-item">
+        <h3>Миграции написаны как инженерный документ</h3>
+        <p><span class="mono">20260826140000_status_enums</span> объясняет, почему колонки разъехались, и нормализует строки case-insensitive <em>до</em> смены типа. Соседняя миграция фиксирует, что проверка через <code>pg_attribute</code> сделана заранее.</p>
+      </div>
+      <div class="good-item">
+        <h3>Санитизация резюме по белому списку схем</h3>
+        <p><span class="mono">lib/resume-content.ts:21-68</span> — <code>allowedSchemes: ["http","https","mailto","tel"]</code> и принудительный <code>rel="noopener noreferrer"</code> на недоверенном HTML из <code>mammoth</code>.</p>
+      </div>
+      <div class="good-item">
+        <h3>Kanban доступен с клавиатуры и с тача</h3>
+        <p><span class="mono">tracker/components/main-view.tsx:47-52,109-155</span> — <code>KeyboardSensor</code>, полный набор <code>Announcements</code>, порог активации 8px и дублирующее меню «Move to». E2E проверяет все три способа, включая тач.</p>
+      </div>
+      <div class="good-item">
+        <h3>Агрегаты считаются в Postgres одним запросом</h3>
+        <p><span class="mono">tracker/server/routers.ts:133-156</span> — один <code>groupBy</code> кормит и полосу пайплайна, и четыре счётчика, поэтому два блока на экране физически не могут разойтись в цифрах.</p>
+      </div>
+      <div class="good-item">
+        <h3>Бюджет бандла проверяется по маршрутам, а не только суммарно</h3>
+        <p><span class="mono">scripts/check-bundle-size.mjs:85-156</span> разбирает манифесты Next 16, чтобы посчитать вес именно тех чанков, которые тянет конкретная страница.</p>
+      </div>
+      <div class="good-item">
+        <h3>resume-status.ts существует, чтобы не тащить zod в клиент</h3>
+        <p>Модуль без единого импорта, с объяснением: тот же хелпер из <code>@/lib/types</code> добавлял ~285 КБ в бандл. Вес клиента здесь реально измеряли.</p>
+      </div>
+      <div class="good-item">
+        <h3>Оптимистичные апдейты с честным откатом</h3>
+        <p><span class="mono">use-update-application-status.ts:25-64</span> — <code>cancelQueries</code>, снапшот, восстановление, инвалидация. Один хук на драг и на меню, чтобы два входа не разошлись в поведении.</p>
+      </div>
+      <div class="good-item">
+        <h3>Нормализация matchScoreBoost — недоверие к модели</h3>
+        <p><span class="mono">inngest/functions.ts:164-177</span> пересчитывает бюджет баллов после ответа модели, хотя в промпте уже стоит арифметическое ограничение. Именно так и надо обращаться с LLM-выводом.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ТЕСТЫ ================= -->
+  <section id="tests" class="wide">
+    <div class="sec-head">
+      <h2>Тесты</h2>
+      <span class="eyebrow">04</span>
+    </div>
+
+    <div class="cover-split">
+      <div class="cover-box yes">
+        <h3>Покрыто содержательно</h3>
+        <ul>
+          <li><code>resumeRouter</code> — 46 кейсов: скоуп по <code>userId</code>, клампинг страниц, рейт-лимит, PRECONDITION_FAILED, NOT_FOUND без утечки существования</li>
+          <li><code>trackerRouter</code> — 11 кейсов, включая отказ анонимному и zero-fill статусов</li>
+          <li><code>deleteJobApplication</code> — отдельный тест на то, что карточка трекера <em>не</em> удаляется</li>
+          <li><code>normalizeMatchScoreBoosts</code>, <code>updateResumeParsedContent</code>, <code>rateLimit</code>, хелперы <code>sfdt/</code></li>
+          <li><code>convertDocxToPdf</code> — включая проверку, что секрет не попадает в текст ошибки</li>
+          <li>E2E трекера — мышь, клавиатура, тач, меню, прокрутка колонки</li>
+        </ul>
+      </div>
+      <div class="cover-box no">
+        <h3>Не покрыто ничем</h3>
+        <ul>
+          <li><code>src/inngest/functions.ts</code> — обе фоновые функции</li>
+          <li><code>src/lib/safe-fetch.ts</code> — единственная защита от SSRF</li>
+          <li><code>src/lib/prompts.ts</code>, <code>src/lib/logger.ts</code></li>
+          <li><code>/api/pusher/auth</code> — проверка владения каналом</li>
+          <li>Все девять route handler'ов</li>
+          <li><code>requireAuth</code>/<code>requireUnauth</code>, все хуки</li>
+          <li>Ветка <code>JobApplication</code> в <code>applyImprovement</code> с начислением боста</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin:2.5rem 0 .9rem;font-size:1.15rem">Ложное чувство защищённости</h3>
+    <p><code>primitives-smoke.test.tsx</code> проверяет, что Radix-диалог открывается по клику — это
+      тестирование библиотеки, а не приложения, и оно поднимает процент покрытия по
+      <code>src/components/ui</code>, не трогая бизнес-логику. <code>sfdt/delay.test.ts</code> проверяет
+      обёртку над <code>setTimeout</code>. Тесты роутеров честны, но Prisma замокан полностью: проверяется
+      форма <code>where</code>-клаузы, а не то, что БД её исполнит — из этого зазора и выросла ошибка,
+      из-за которой сообщение Prisma доходило до тоста (закрыта). При этом в
+      CI поднят настоящий Postgres, в который не ходит ни один тест. А на PR гоняются две самые
+      поверхностные e2e-спеки из восьми.</p>
+
+    <h3 style="margin:2.5rem 0 .9rem;font-size:1.15rem">Каких тестов не хватает</h3>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Что проверяем</th><th>Файл</th><th>Тип</th><th>Приоритет</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Невалидный ответ модели пишет терминальный статус и шлёт событие <em>(код исправлен, теста нет)</em></td><td><code>src/inngest/functions.test.ts</code></td><td>unit</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td>Повтор <code>save-to-db</code> не создаёт вторую <code>TrackerPosition</code> <em>(код исправлен, теста нет)</em></td><td><code>src/inngest/functions.test.ts</code></td><td>unit</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td><code>/api/pusher/auth</code> отказывает в подписке на чужой канал</td><td><code>api/pusher/auth/route.test.ts</code></td><td>integration</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td><code>assertAllowedFileUrl</code> отвергает <code>file:</code>, <code>169.254.169.254</code>, <code>utfs.io.evil.com</code></td><td><code>src/lib/safe-fetch.test.ts</code></td><td>unit</td><td class="prio"><span class="pill P0">P0</span></td></tr>
+          <tr><td><code>javascript:</code>-URL не рендерится как ссылка <em>(хелпер покрыт, рендер — нет)</em></td><td><code>tracker/components/job-card.test.tsx</code></td><td>unit</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td><code>targetRole</code> с инструкцией не попадает в тело промпта <em>(код исправлен, теста нет)</em></td><td><code>src/lib/prompts.test.ts</code></td><td>unit</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td>После <code>save-docx</code> <code>parsedContent</code> пересчитан <em>(код исправлен, теста нет)</em></td><td><code>api/resume/save-docx/route.test.ts</code></td><td>integration</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td><code>export-pdf</code>: 401 без сессии, 404 для чужого id, 429 после лимита</td><td><code>api/resume/export-pdf/route.test.ts</code></td><td>integration</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td>Повторное применение не начисляет бост дважды</td><td><code>resumes/server/routers.test.ts</code></td><td>unit</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td>Регистрация → вход → дашборд → выход → редирект</td><td><code>tests/e2e/auth.spec.ts</code></td><td>e2e</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td>Полный путь анализа от выбора резюме до результата</td><td><code>tests/e2e/analysis-flow.spec.ts</code></td><td>e2e</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td>Упавший анализ показывает ошибку и повтор, а не спиннер</td><td><code>tests/e2e/analysis-flow.spec.ts</code></td><td>e2e</td><td class="prio"><span class="pill P1">P1</span></td></tr>
+          <tr><td><code>requireAuth</code>/<code>requireUnauth</code> редиректят корректно</td><td><code>src/lib/auth-utils.test.ts</code></td><td>unit</td><td class="prio"><span class="pill P2">P2</span></td></tr>
+          <tr><td>Pusher-хуки отписываются при размонтировании</td><td><code>src/hooks/usePusher.test.ts</code></td><td>unit</td><td class="prio"><span class="pill P2">P2</span></td></tr>
+          <tr><td><code>logError</code> не пишет содержимое резюме</td><td><code>src/lib/logger.test.ts</code></td><td>unit</td><td class="prio"><span class="pill P2">P2</span></td></tr>
+          <tr><td>Загрузка PDF → парсинг → карточка в списке</td><td><code>tests/e2e/resumes.spec.ts</code></td><td>e2e</td><td class="prio"><span class="pill P2">P2</span></td></tr>
+          <tr><td>Удаление и переименование резюме из UI</td><td><code>tests/e2e/resumes.spec.ts</code></td><td>e2e</td><td class="prio"><span class="pill P2">P2</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="margin:2.5rem 0 .9rem;font-size:1.15rem">Где нужен e2e, а где хватит unit</h3>
+    <p><strong>Только e2e</strong> — реальный цикл аутентификации (cookie, редиректы, серверные guard'ы),
+      полный путь анализа через Pusher и инвалидацию кеша, взаимодействия с браузерными API.
+      <strong>Достаточно unit</strong> — все схемы Zod, <code>normalizeAppError</code>,
+      <code>assertAllowedFileUrl</code>, построение промптов, процедуры tRPC с замоканной Prisma.
+      <strong>Отдельно не хватает интеграционного слоя:</strong> в CI поднимается настоящий Postgres
+      и применяются миграции, но ни один тест в него не ходит.</p>
+  </section>
+
+  <!-- ================= ПЛАН ================= -->
+  <section id="plan" class="wide">
+    <div class="sec-head">
+      <h2>План работ</h2>
+      <span class="eyebrow">05</span>
+    </div>
+    <p class="lede">Что осталось после двух проходов правок. Часы — оценка на одного
+      разработчика, знакомого с кодовой базой.</p>
+
+    <div class="phase" style="margin-top:1.75rem">
+      <div class="phase-head">
+        <h3>За день</h3>
+        <span class="budget">≈ 2 часа · 3 задачи</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Задача</th><th>Часы</th><th>Зависит</th><th>Критерий готовности</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td>Добавить <code>.env.example</code> — включая <code>RESEND_API_KEY</code> и <code>EMAIL_FROM</code> <em>(F-29)</em></td><td class="hours">0,5</td><td>—</td><td>Чистый клон поднимается без чтения исходников</td></tr>
+            <tr><td class="num">2</td><td>Очистка в <code>logError</code> и вызовы мимо него через <code>console.*</code> <em>(F-22)</em></td><td class="hours">1</td><td>—</td><td>Логгер вычищает поля резюме; заявленная в <code>CLAUDE.md</code> гарантия становится правдой</td></tr>
+            <tr><td class="num">3</td><td>Убрать мёртвый код, колонку <code>tailoringTips</code> и неподключённый переключатель тем <em>(F-27, F-26)</em></td><td class="hours">0,5</td><td>—</td><td>Модулей без импортёров не остаётся; в схеме нет колонок, которых никто не читает</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <h3>За неделю</h3>
+        <span class="budget">≈ 22 часа · 5 задач</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Задача</th><th>Часы</th><th>Зависит</th><th>Критерий готовности</th></tr></thead>
+          <tbody>
+            <tr><td class="num">4</td><td><strong>Гейт по зависимостям в CI</strong> + <code>pdfjs-dist</code> 4.x + воркер со своего домена <em>(F-14, F-20)</em></td><td class="hours">3</td><td>—</td><td><code>npm audit --audit-level=high</code> в CI зелёный; воркер не с чужого CDN</td></tr>
+            <tr><td class="num">5</td><td><strong>Убрать дубликат Syncfusion</strong> — один общий компонент-обёртка редактора <em>(F-15)</em></td><td class="hours">6</td><td>—</td><td>Один чанк редактора; общий вес ≤10 МБ; бюджет в CI можно опустить</td></tr>
+            <tr><td class="num">6</td><td><strong>Выровнять ветку <code>JobApplication</code> в <code>applyImprovement</code></strong> — <code>isApplied</code> и флаг <code>matched</code> <em>(F-19)</em></td><td class="hours">3</td><td>—</td><td>Повторное применение не начисляет бост дважды и не съедает предложение</td></tr>
+            <tr><td class="num">7</td><td><strong>Тестовые дыры:</strong> обе функции Inngest, <code>safe-fetch</code>, <code>prompts</code>, <code>save-docx</code>, <code>/api/pusher/auth</code> — плюс регрессии на уже исправленное</td><td class="hours">8</td><td>6</td><td>В таблице тестов не остаётся P0; закрытые находки закреплены тестом</td></tr>
+            <tr><td class="num">8</td><td><code>tracker_position.status</code> → enum миграцией <em>(F-24)</em></td><td class="hours">2</td><td>—</td><td>Тип статуса проверяется базой, а не только Zod-схемой формы</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <h3>Крупное</h3>
+        <span class="budget">≈ 75 часов · 7 задач</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Задача</th><th>Часы</th><th>Зависит</th><th>Критерий готовности</th></tr></thead>
+          <tbody>
+            <tr><td class="num">9</td><td><strong>Настройки аккаунта:</strong> смена пароля, профиль, выгрузка данных, удаление аккаунта</td><td class="hours">16</td><td>—</td><td>Удаление каскадно убирает резюме, анализы и файлы из UploadThing</td></tr>
+            <tr><td class="num">10</td><td><strong>Цифры лендинга:</strong> статистика «3x faster» и «89% interview success», три вымышленных отзыва, мёртвая колонка <code>credits</code> <em>(F-21)</em></td><td class="hours">12</td><td>—</td><td>Ни одно утверждение на главной не опровергается пятиминутным использованием</td></tr>
+            <tr><td class="num">11</td><td><strong>Интеграционные тесты против реального Postgres</strong> (он уже поднят в CI)</td><td class="hours">12</td><td>7</td><td>≥10 тестов ходят в настоящую БД и падают при регрессе изоляции</td></tr>
+            <tr><td class="num">12</td><td><strong>Показать посчитанное:</strong> график динамики score, экран собранного резюме, счётчики требований</td><td class="hours">16</td><td>—</td><td>Три невидимых набора данных доступны без новых запросов к модели</td></tr>
+            <tr><td class="num">13</td><td><strong>Распределённый рейт-лимит</strong> за существующей сигнатурой <code>rateLimit()</code> <em>(F-23)</em></td><td class="hours">6</td><td>—</td><td>Лимит держится при нескольких инстансах; перезапуск не сбрасывает окно</td></tr>
+            <tr><td class="num">14</td><td><strong>Онбординг</strong> — пошаговый первый сценарий для пустого дашборда</td><td class="hours">10</td><td>—</td><td>Новый пользователь доходит до первого анализа без блужданий</td></tr>
+            <tr><td class="num">15</td><td>Письмо «анализ готов» поверх уже готовой отправки почты; настройка Turbopack вместо мёртвого хука webpack <em>(F-35)</em></td><td class="hours">3</td><td>—</td><td>Вкладку можно закрыть и вернуться по письму; сборка не печатает предупреждений</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ТОП-3 ================= -->
+  <section id="top3" class="wide">
+    <div class="sec-head">
+      <h2>Топ-3 по отдаче</h2>
+      <span class="eyebrow">06</span>
+    </div>
+    <p class="lede">Максимум пользы за минимум времени.</p>
+
+    <div class="top3" style="margin-top:1.75rem">
+      <article class="top-card">
+        <span class="cost">3 часа</span>
+        <h3>Гейт по зависимостям и pdf.js</h3>
+        <p>Единственная оставшаяся находка, где чужой код исполняется над файлами
+          пользователя: воркер pdf.js тянется с чужого CDN, а его версия имеет HIGH-адвайзори
+          на исполнение JS из PDF. Обновление и <code>npm audit</code> в CI закрывают и её,
+          и остальные 26 high, которые сегодня не видны в пайплайне.</p>
+      </article>
+
+      <article class="top-card">
+        <span class="cost">3 часа</span>
+        <h3>Одна правка — один бост</h3>
+        <p>Ветка <code>JobApplication</code> в <code>applyImprovement</code> защищена слабее,
+          чем соседняя: предложение может исчезнуть, а <code>matchScore</code> — вырасти
+          дважды за одну текстовую правку. Дешёвая правка, которая защищает ровно то число,
+          вокруг которого построен весь продукт.</p>
+      </article>
+
+      <article class="top-card">
+        <span class="cost">6 часов</span>
+        <h3>Один Syncfusion вместо двух</h3>
+        <p>Два побайтово одинаковых чанка по 6,5 МБ — редактор, продублированный на каждый
+          вызов <code>next/dynamic</code>. Общий вес статики 16,73 МБ при бюджете CI в 17 МБ:
+          запас 270 КБ, то есть следующая заметная зависимость упрётся в потолок. Общая
+          обёртка редактора убирает половину веса и снимает ограничение.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ================= ОЦЕНКИ ================= -->
+  <section id="scores" class="wide">
+    <div class="sec-head">
+      <h2>Оценки</h2>
+      <span class="eyebrow">07</span>
+    </div>
+
+    <div class="scores">
+      <div class="score-row">
+        <span class="name">Корректность</span>
+        <span class="val num">8 <small>/ 10</small></span>
+        <div class="meter"><span style="width:80%"></span></div>
+        <p class="why">Две из четырёх асинхронных границ закрыты: у анализа появился статус
+          <code>FAILED</code> с таймаутом и повтором на клиенте, а сохранение DOCX пересчитывает
+          <code>parsedContent</code> и сбрасывает устаревший <code>structuredData</code>. Ошибки
+          больше не приходят к пользователю сырым текстом Prisma. Осталось ровно то, что связано
+          с повторным запуском: шаг создания карточки стал идемпотентным — карточка трекера
+          привязана к анализу уникальным ключом, и повтор обновляет её вместо второй копии.
+          Осталась одна асимметрия: две ветки <code>applyImprovement</code> по-прежнему
+          защищены по-разному (F-19), и это единственное место, где цифра на экране может
+          разойтись с тем, что сделал пользователь.</p>
+      </div>
+
+      <div class="score-row">
+        <span class="name">Безопасность</span>
+        <span class="val num">8,5 <small>/ 10</small></span>
+        <div class="meter"><span style="width:85%"></span></div>
+        <p class="why">Базис был сильным и раньше: авторизация на всех 17 процедурах и всех route
+          handler'ах, изоляция через <code>updateMany</code> с проверкой <code>count</code>, SSRF-фильтр
+          с allow-list, санитизация HTML, gitleaks в CI. Теперь доведены до конца и слабые места:
+          тексты резюме не уходят в Sentry, <code>javascript:</code>-URL отсекается схемой модели,
+          формой и рендером, <code>targetRole</code> лежит в блоке недоверенных данных, три критичных
+          секрета валидируются при старте, а внутренние сообщения об ошибках не покидают сервер.
+          Каналы Pusher стали приватными: подписку подписывает эндпоинт, который проверяет сессию
+          и владение конкретным резюме или анализом, так что ключ из бандла больше ничего не открывает.
+          Остались две вещи, обе про чужой код, а не про свой: воркер pdf.js с чужого CDN на версии
+          с HIGH-адвайзори и отсутствие гейта по уязвимостям зависимостей в CI.</p>
+      </div>
+
+      <div class="score-row">
+        <span class="name">Данные</span>
+        <span class="val num">8 <small>/ 10</small></span>
+        <div class="meter"><span style="width:80%"></span></div>
+        <p class="why">Каскады расставлены везде, где нужны; составные индексы добавлены под конкретные
+          <code>orderBy</code>; миграции статусов написаны с нормализацией строк и объяснением причины;
+          отсутствие связи между трекером и анализом задокументировано там, где влияет на поведение.
+          N+1 нет, агрегаты в Postgres, поля трекера ограничены по длине, у сессий и аккаунтов
+          появились индексы по <code>userId</code>, карточка трекера связана с анализом, из которого
+          она создана, а тяжёлый <code>jobDescription</code> больше не уезжает на клиент при каждом
+          опросе. Осталось: третий статус — всё ещё свободная строка, мёртвые колонки и шесть
+          <code>Json?</code> без валидации на чтении.</p>
+      </div>
+
+      <div class="score-row">
+        <span class="name">UX</span>
+        <span class="val num">8 <small>/ 10</small></span>
+        <div class="meter"><span style="width:80%"></span></div>
+        <p class="why">Разброс сократился. Loading/error/empty были написаны системно и раньше;
+          теперь к ним добавились выход из упавшего анализа, доступный с клавиатуры выбор резюме,
+          вердикт, который считается от оценки, и восстановление пароля — сценарий, которого не было
+          вовсе. К этому добавились честный лендинг без битых ссылок и мёртвых кнопок, счётчик символов
+          и проверка файла до отправки, пустое состояние у фильтра подсказок, англоязычные сообщения
+          об ошибках и один тост на загрузку вместо двух противоречащих. Осталась мелочь, которую видно
+          только вблизи: единственная тема без переключателя и цифры на главной, взятые из воздуха.</p>
+      </div>
+
+      <div class="score-row">
+        <span class="name">Покрытие тестами</span>
+        <span class="val num">7,5 <small>/ 10</small></span>
+        <div class="meter"><span style="width:75%"></span></div>
+        <p class="why">203 теста, и карта стала ровнее: контракт ошибок, схемы трекера, пороги
+          оценки, безопасность ссылок, имена приватных каналов, очистка осиротевших загрузок,
+          опрос статуса анализа и поведение кнопки «Analyze» закрыты тестами, написанными вместе
+          с правками. Перекос остался там же, где был: обе фоновые функции
+          Inngest, SSRF-фильтр, промпты и route handler'ы не покрыты ничем. Prisma замокан полностью,
+          хотя в CI поднят настоящий Postgres, в который не ходит ни один тест, а на PR гоняются две
+          самые поверхностные e2e-спеки.</p>
+      </div>
+
+      <div class="score-row">
+        <span class="name">Готовность к показу работодателю</span>
+        <span class="val num">8,5 <small>/ 10</small></span>
+        <div class="meter"><span style="width:85%"></span></div>
+        <p class="why">В пользу всё, что было: осмысленный стек, CI из семи гейтов с собственным
+          скриптом бюджета бандла, миграции как документ, a11y трекера на редком уровне, комментарии,
+          объясняющие <em>почему</em>. К этому добавились честные терминальные состояния, восстановление
+          доступа и вердикт, который не противоречит цифре рядом. Первая минута знакомства тоже
+          починена: в футере не осталось ни одной несуществующей страницы, «Watch Demo» ведёт в раздел,
+          который действительно объясняет продукт, а тарифы честно помечены как планируемые. Против
+          остаются цифры на главной, взятые из воздуха, и отсутствие <code>.env.example</code> —
+          то есть «нельзя проверить утверждение» и «нельзя быстро запустить».</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Полная версия первого прохода с цитатами — AUDIT.md в корне репозитория</span>
+    <span>Открыто: 12 · 4 P1 · 8 P2 · закрыто после аудита: 25</span>
+    <span>Проверено запуском: typecheck, lint, 203 теста, build, bundle-size</span>
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll(".filterbar button");
+    var items = Array.prototype.slice.call(document.querySelectorAll(".finding"));
+    var counter = document.getElementById("filter-count");
+    var total = items.length;
+
+    function apply(sev) {
+      var shown = 0;
+      items.forEach(function (el) {
+        var match = sev === "all" || el.dataset.sev === sev;
+        el.hidden = !match;
+        if (match) shown++;
+      });
+      counter.textContent = shown + " из " + total;
+      buttons.forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b.dataset.filter === sev));
+      });
+    }
+
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () { apply(b.dataset.filter); });
+    });
+  })();
+</script>

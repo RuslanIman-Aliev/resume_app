@@ -4,8 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { useResumePusher } from "@/hooks/usePusher";
+import {
+  ANALYSIS_POLL_INTERVAL_MS,
+  hasAnalysisTimedOut,
+} from "@/lib/analysis-polling";
+import { getErrorFeedback } from "@/lib/error-feedback";
+import { getScoreBand } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Briefcase,
   CheckCircle2,
@@ -32,9 +39,12 @@ import {
   RadialBar,
   RadialBarChart,
 } from "recharts";
+import { toast } from "sonner";
 import { CoachScoreCard } from "./coach-score-card";
 import {
+  MainScoreAnalysisFailed,
   MainScoreError,
+  MainScoreNotAnalyzed,
   MainScorePending,
   MainScoreSkeleton,
 } from "./main-score-status";
@@ -60,30 +70,44 @@ const MainScoreCard = () => {
   const analysisParam = searchParams.get("analysis");
   const analysisStartedAt = Number(searchParams.get("ts")) || 0;
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     ...trpc.resume.getAnalysisResult.queryOptions({ resumeId }),
     retry: (failureCount, queryError) => {
       const errorCode = (queryError as { data?: { code?: string } } | null)
         ?.data?.code;
 
+      // NOT_FOUND now means the resume does not exist or is not ours, which no
+      // number of retries will change.
       if (errorCode === "NOT_FOUND") return false;
       return failureCount < 2;
     },
+    // Polls only while a run this page is waiting on could still land. A
+    // resume that already has results, one whose run was marked FAILED, and one
+    // that was never analysed all stop the poll on the spot; the timeout covers
+    // a run that died without recording anything.
     refetchInterval: (query) => {
-      const errorCode = (
-        query.state.error as { data?: { code?: string } } | null
-      )?.data?.code;
+      const result = query.state.data;
+      if (!result || result.analysis || result.status === "FAILED") {
+        return false;
+      }
+      if (analysisParam !== "1") return false;
+      if (hasAnalysisTimedOut(analysisStartedAt || null)) return false;
 
-      if (errorCode === "NOT_FOUND") return 4000;
-
-      return analysisParam === "1" ? 4000 : false;
+      return ANALYSIS_POLL_INTERVAL_MS;
     },
   });
 
-  const errorCode = (error as { data?: { code?: string } } | null)?.data?.code;
-  const isPendingAnalysis = errorCode === "NOT_FOUND";
+  const analysis = data?.analysis ?? null;
+  const analysisStatus = data?.status;
+  const analysisTimedOut = hasAnalysisTimedOut(analysisStartedAt || null);
 
-  const isAwaitingAnalysis = isPendingAnalysis || analysisParam === "1";
+  // "Analysing" is now a claim the page only makes about a run it actually
+  // started and that has neither failed nor outrun the timeout.
+  const isAwaitingAnalysis =
+    !analysis &&
+    analysisParam === "1" &&
+    analysisStatus !== "FAILED" &&
+    !analysisTimedOut;
 
   const clearAnalysisParams = useCallback(() => {
     if (analysisParam !== "1") return;
@@ -115,7 +139,52 @@ const MainScoreCard = () => {
     data?.analysis?.createdAt,
   ]);
 
-  useResumePusher(isAwaitingAnalysis ? resumeId : null, handleAnalysisReady);
+  const { mutate: startAnalysis, isPending: isStartingAnalysis } = useMutation(
+    trpc.resume.triggerAnalysis.mutationOptions({
+      onSuccess: () => {
+        queryClient.removeQueries({
+          queryKey: trpc.resume.getAnalysisResult.queryOptions({ resumeId })
+            .queryKey,
+        });
+        queryClient.removeQueries({
+          queryKey: trpc.resume.getImprovements.queryOptions({ resumeId })
+            .queryKey,
+        });
+
+        // Re-arms the wait on this same page: `analysis=1` turns polling back
+        // on and `ts` restarts the timeout clock.
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set("analysis", "1");
+        nextParams.set("ts", new Date().getTime().toString());
+        router.replace(`${pathname}?${nextParams.toString()}`, {
+          scroll: false,
+        });
+
+        toast.success("Analysis started! This will take about 20 seconds.");
+      },
+      onError: (error) => {
+        toast.error(
+          getErrorFeedback(error, {
+            fallbackMessage: "Failed to start analysis",
+          }).message,
+        );
+      },
+    }),
+  );
+
+  const handleStartAnalysis = useCallback(() => {
+    startAnalysis({ resumeId });
+  }, [resumeId, startAnalysis]);
+
+  const handleAnalysisFailed = useCallback(() => {
+    toast.error("The analysis could not be completed.");
+  }, []);
+
+  useResumePusher(
+    isAwaitingAnalysis ? resumeId : null,
+    handleAnalysisReady,
+    handleAnalysisFailed,
+  );
 
   const analysisId = data?.analysis?.id;
   useEffect(() => {
@@ -134,21 +203,48 @@ const MainScoreCard = () => {
     return <MainScoreSkeleton />;
   }
 
-  if (isAwaitingAnalysis) {
-    return <MainScorePending />;
-  }
-
   if (isError) {
     return <MainScoreError onRetry={() => refetch()} />;
   }
 
-  const overallScore = Math.min(
-    100,
-    Math.max(0, data?.analysis.overallScore ?? 0),
-  );
-  const displayScore = Math.round(overallScore);
+  if (!analysis) {
+    if (analysisStatus === "FAILED") {
+      return (
+        <MainScoreAnalysisFailed
+          onRetry={handleStartAnalysis}
+          isRetrying={isStartingAnalysis}
+        />
+      );
+    }
 
-  const strengths = (data?.analysis?.strengths as string[]) || [];
+    if (isAwaitingAnalysis) {
+      return <MainScorePending />;
+    }
+
+    // Waited past the cap on a run that never reported anything either way.
+    if (analysisParam === "1") {
+      return (
+        <MainScoreAnalysisFailed
+          onRetry={handleStartAnalysis}
+          isRetrying={isStartingAnalysis}
+          timedOut
+        />
+      );
+    }
+
+    return (
+      <MainScoreNotAnalyzed
+        onRetry={handleStartAnalysis}
+        isRetrying={isStartingAnalysis}
+      />
+    );
+  }
+
+  const overallScore = Math.min(100, Math.max(0, analysis.overallScore ?? 0));
+  const displayScore = Math.round(overallScore);
+  const scoreBand = getScoreBand(displayScore);
+
+  const strengths = (analysis.strengths as string[]) || [];
 
   return (
     <>
@@ -158,7 +254,7 @@ const MainScoreCard = () => {
             <h3 className="text-xl font-semibold">Resume Score</h3>
             <p className="text-sm text-muted-foreground">
               Based on your latest resume:{" "}
-              {data?.analysis?.resume?.resumeName || "Untitled Resume"}
+              {analysis.resume?.resumeName || "Untitled Resume"}
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 items-center justify-center md:flex-row">
@@ -233,19 +329,23 @@ const MainScoreCard = () => {
             </div>
 
             <div className="flex flex-col gap-2">
-              {/* Add later a border and color depend on a value */}
-              <Badge className="border">Good</Badge>
+              {/* Verdict and copy both come from the score itself; see
+                  SCORE_BANDS for the thresholds they share with the number. */}
+              <Badge
+                variant="outline"
+                className={cn("w-fit border", scoreBand.badgeClass)}
+              >
+                {scoreBand.label}
+              </Badge>
               <p className="text-[18px] text-muted-foreground">
-                Your resume is performing well but there&apos;s room for
-                improvement. Focus on the high-impact suggestions below to
-                increase your score and stand out to recruiters.
+                {scoreBand.summary}
               </p>
               <div className="flex w-full flex-col gap-2 mt-4 sm:flex-row">
                 <div className="p-3 rounded-lg bg-primary/10 flex gap-3 flex-1 ">
                   <CheckCircle2 className="h-6 w-6 text-primary" />
                   <div className="flex flex-col">
                     <p className="text-base">
-                      {data?.analysis?.strengths.length || 0} Strengths
+                      {analysis.strengths.length || 0} Strengths
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Areas performing well
@@ -256,7 +356,7 @@ const MainScoreCard = () => {
                   <LucideMessageCircleWarning className="h-6 w-6 text-yellow-400" />
                   <div className="flex flex-col">
                     <p className="text-base">
-                      {data?.analysis?.improvements.length || 0} Improvements
+                      {analysis.improvements.length || 0} Improvements
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Suggested changes
@@ -275,9 +375,9 @@ const MainScoreCard = () => {
             </CardHeader>
 
             <CardContent className="flex flex-col gap-2">
-              {data?.analysis.quickWins &&
-              data?.analysis.quickWins.length > 0 ? (
-                data?.analysis.quickWins.map((win, index) => (
+              {analysis.quickWins &&
+              analysis.quickWins.length > 0 ? (
+                analysis.quickWins.map((win, index) => (
                   <div
                     key={`${win.title}-${index}`}
                     className="flex flex-col gap-1 justify-between items-start sm:flex-row sm:gap-3 sm:items-center"
@@ -340,25 +440,25 @@ const MainScoreCard = () => {
         <CoachScoreCard
           icon={FileText}
           title="Content Quality"
-          score={data?.analysis.contentQuality || 0}
+          score={analysis.contentQuality || 0}
           description="Clear and relevant content"
         />
         <CoachScoreCard
           icon={Code}
           title="ATS Optimization"
-          score={data?.analysis.atsOptimization || 0}
+          score={analysis.atsOptimization || 0}
           description="Keyword matching"
         />
         <CoachScoreCard
           icon={Briefcase}
           title="Experience"
-          score={data?.analysis.experience || 0}
+          score={analysis.experience || 0}
           description="Impact and achievements"
         />
         <CoachScoreCard
           icon={GraduationCap}
           title="Skills Match"
-          score={data?.analysis.skillsMatch || 0}
+          score={analysis.skillsMatch || 0}
           description="Industry relevance"
         />
       </div>

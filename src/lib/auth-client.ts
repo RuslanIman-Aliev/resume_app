@@ -39,7 +39,7 @@ export const signInWithGoogle = async ({
 export const linkGoogleAccount = async ({
   callbackURL = "/dashboard/settings",
   errorCallbackURL = "/dashboard/settings",
-}: SocialSignInOptions = {}) =>
+}: SocialSignInOptions = {}) => 
   authClient.linkSocial({
     provider: "google",
     callbackURL,

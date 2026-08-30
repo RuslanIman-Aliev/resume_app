@@ -1,9 +1,13 @@
 import z from "zod";
 import { jobMatchAnalysisSchema, resumeAnalysisSchema } from "./schemas";
+import { isSafeHttpUrl } from "./safe-url";
 
 export const signUpFormSchema = z
   .object({
-    name: z.string().min(1, "Name must be at least 3 characters."),
+    // The message says what the rule actually checks. It used to promise three
+    // characters while accepting one, and the rule is the part worth keeping:
+    // single-character names are real, so the field only needs to be non-empty.
+    name: z.string().trim().min(1, "Please enter your name."),
     email: z.string().email("Please enter a valid email address."),
     password: z
       .string()
@@ -30,6 +34,32 @@ export const signInFormSchema = z.object({
 });
 
 export type SignInFormData = z.infer<typeof signInFormSchema>;
+
+export const forgotPasswordFormSchema = z.object({
+  email: z.string().email("Please enter a valid email address."),
+});
+
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordFormSchema>;
+
+export const resetPasswordFormSchema = z
+  .object({
+    // Matches the bounds Better Auth enforces server-side, so a password it
+    // would reject is caught before the request.
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters.")
+      .max(100, "Password must be at most 100 characters."),
+    confirmPassword: z
+      .string()
+      .min(8, "Confirm Password must be at least 8 characters.")
+      .max(100, "Confirm Password must be at most 100 characters."),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
+export type ResetPasswordFormData = z.infer<typeof resetPasswordFormSchema>;
 
 /**
  * Represents a single piece of actionable advice to improve a resume.
@@ -202,7 +232,14 @@ export type JobApplicationCard = {
   
   /** URL to the job posting. */
   url: string | null;
-  
+
+  /**
+   * The analysis this card was created from, or null for one added by hand or
+   * created before the link existed. Carried here because the optimistic
+   * tracker updates write whole rows back into the `tracker.getAll` cache.
+   */
+  jobApplicationId: string | null;
+
   userId: string;
   
   /** Timestamp when the record was created. */
@@ -336,19 +373,92 @@ export const applicationStatusValues = [
 
 export type ApplicationStatusValue = (typeof applicationStatusValues)[number];
 
+/**
+ * Every text field carries an upper bound. The columns behind them are
+ * unbounded Postgres `text`, so without one a single tracked job can be
+ * megabytes of notes - the resume router already draws the same lines
+ * (`max(255)` on names, `max(20_000)` on job descriptions).
+ *
+ * The numbers are set where a real value stops and abuse starts: a company
+ * name is not 200 characters, and notes on one application are not a novel.
+ */
+export const TRACKER_FIELD_LIMITS = {
+  company: 200,
+  position: 200,
+  location: 200,
+  salary: 100,
+  url: 2000,
+  notes: 5000,
+  contactName: 200,
+  contactEmail: 320,
+} as const;
+
 export const trackerFormSchema = z.object({
-  company: z.string().min(1, "Company name is required."),
-  position: z.string().min(1, "Position is required."),
-  location: z.string().optional(),
-  salary: z.string().optional(),
+  company: z
+    .string()
+    .min(1, "Company name is required.")
+    .max(
+      TRACKER_FIELD_LIMITS.company,
+      `Company name must be at most ${TRACKER_FIELD_LIMITS.company} characters.`,
+    ),
+  position: z
+    .string()
+    .min(1, "Position is required.")
+    .max(
+      TRACKER_FIELD_LIMITS.position,
+      `Position must be at most ${TRACKER_FIELD_LIMITS.position} characters.`,
+    ),
+  location: z
+    .string()
+    .max(
+      TRACKER_FIELD_LIMITS.location,
+      `Location must be at most ${TRACKER_FIELD_LIMITS.location} characters.`,
+    )
+    .optional(),
+  salary: z
+    .string()
+    .max(
+      TRACKER_FIELD_LIMITS.salary,
+      `Salary must be at most ${TRACKER_FIELD_LIMITS.salary} characters.`,
+    )
+    .optional(),
   status: z.enum(applicationStatusValues),
-  // Use a union to allow either a completely empty string OR a valid URL/Email
-  url: z.union([z.literal(""), z.string().url("Please enter a valid URL.")]),
-  notes: z.string().optional(),
-  contactName: z.string().optional(),
+  // Empty string or a real web link. `z.string().url()` alone is not that
+  // check: it accepts `javascript:alert(1)`, which would be stored and then
+  // rendered as the card's "View Job Posting" href.
+  url: z.union([
+    z.literal(""),
+    z
+      .string()
+      .max(
+        TRACKER_FIELD_LIMITS.url,
+        `Link must be at most ${TRACKER_FIELD_LIMITS.url} characters.`,
+      )
+      .refine(isSafeHttpUrl, "Please enter a valid http(s) URL."),
+  ]),
+  notes: z
+    .string()
+    .max(
+      TRACKER_FIELD_LIMITS.notes,
+      `Notes must be at most ${TRACKER_FIELD_LIMITS.notes} characters.`,
+    )
+    .optional(),
+  contactName: z
+    .string()
+    .max(
+      TRACKER_FIELD_LIMITS.contactName,
+      `Contact name must be at most ${TRACKER_FIELD_LIMITS.contactName} characters.`,
+    )
+    .optional(),
   contactEmail: z.union([
     z.literal(""),
-    z.string().email("Please enter a valid email address."),
+    z
+      .string()
+      .max(
+        TRACKER_FIELD_LIMITS.contactEmail,
+        `Contact email must be at most ${TRACKER_FIELD_LIMITS.contactEmail} characters.`,
+      )
+      .email("Please enter a valid email address."),
   ]),
 });
 

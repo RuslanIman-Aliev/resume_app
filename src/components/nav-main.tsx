@@ -99,8 +99,11 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 xl:px-0">
+        {/* The header renders on the landing page too, where "/dashboard"
+            bounces an anonymous visitor to /signup through a redirect. The
+            logo should return them to the page they are on, not sign them up. */}
         <Link
-          href="/dashboard"
+          href={session ? "/dashboard" : "/"}
           prefetch
           className="flex min-h-11 items-center gap-2.5 md:min-h-0"
         >

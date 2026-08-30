@@ -249,7 +249,10 @@ const ResumeCard = () => {
 
         const analysisParams = new URLSearchParams({
           analysis: "1",
-          ts: new Date().toString(),
+          // Epoch milliseconds: the coach page reads this with `Number(...)` to
+          // decide when a run has been waiting too long, and a formatted date
+          // string parsed that way is NaN, which disabled the timeout entirely.
+          ts: new Date().getTime().toString(),
         });
         router.push(`/ai-coach/${variables.resumeId}?${analysisParams}`);
       },

@@ -136,6 +136,7 @@ export const TARGET_ROLE_SUGGESTIONS = [
 export const RESUME_STATUS_LABELS: Record<ResumeStatusValue, string> = {
   DRAFT: "Draft",
   ANALYZED: "Analyzed",
+  FAILED: "Analysis failed",
 };
 
 /**
@@ -146,6 +147,7 @@ export const RESUME_STATUS_LABELS: Record<ResumeStatusValue, string> = {
 export const RESUME_STATUS_FILTER_ORDER = [
   "ANALYZED",
   "DRAFT",
+  "FAILED",
 ] as const satisfies readonly ResumeStatusValue[];
 
 /**
@@ -168,25 +170,25 @@ export const getImportanceStyles = (importance: string) => {
   return "border-muted text-muted-foreground bg-transparent";
 };
 
+const RESUME_STATUS_BADGE_STYLES: Record<ResumeStatusValue, string> = {
+  ANALYZED: "bg-primary/10 text-primary border-0",
+  DRAFT: "bg-muted text-muted-foreground border-0",
+  FAILED: "bg-destructive/10 text-destructive border-0",
+};
+
 /**
  * Renders the badge for a resume's status.
  *
- * The column is a `ResumeStatus` enum, so both states are known here and every
+ * The column is a `ResumeStatus` enum, so every state is known here and every
  * resume gets a label - draft rows used to render no badge at all whenever the
- * lookup missed.
+ * lookup missed. FAILED reads as a failure rather than as another quiet
+ * not-yet-analysed row.
  * @param status - The stored `resume.status` value
  * @returns JSX Badge showing the human-readable label
  */
 export function getStatusBadge(status: ResumeStatusValue) {
-  const isAnalyzed = status === "ANALYZED";
   return (
-    <Badge
-      className={
-        isAnalyzed
-          ? "bg-primary/10 text-primary border-0"
-          : "bg-muted text-muted-foreground border-0"
-      }
-    >
+    <Badge className={RESUME_STATUS_BADGE_STYLES[status]}>
       {getResumeStatusLabel(status)}
     </Badge>
   );

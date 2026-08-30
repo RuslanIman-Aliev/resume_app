@@ -196,6 +196,53 @@ export const AnalyzeResumePending = () => {
   );
 };
 
+/**
+ * Shown when the job-match run failed or stopped responding.
+ *
+ * Separate from `AnalyzeResumeError`, which covers a failed read: this one says
+ * the run is over and produced nothing. Retrying re-queues the same
+ * application, so the job description the user pasted is not lost.
+ *
+ * @param onRetry - Re-runs the analysis for this application.
+ * @param isRetrying - Disables the button while the run is being queued.
+ * @param timedOut - Copy for the case where nothing reported a failure but the
+ *   wait has passed the cap.
+ */
+export const AnalyzeResumeFailed = ({
+  onRetry,
+  isRetrying,
+  timedOut,
+}: AnalyzeResumeErrorProps & { timedOut?: boolean }) => {
+  return (
+    <FeedbackState
+      status="error"
+      layout="card"
+      icon={<AlertTriangle className="h-7 w-7 text-destructive" />}
+      title={
+        timedOut
+          ? "This match analysis is taking longer than expected."
+          : "We could not finish this match analysis."
+      }
+      description={
+        timedOut
+          ? "It has not finished in the time it normally takes. You can run it again - the job description you pasted is saved."
+          : "The AI response could not be processed. Running it again usually fixes it, and the job description you pasted is saved."
+      }
+      primaryAction={
+        onRetry
+          ? {
+              label: isRetrying ? "Starting..." : "Run analysis again",
+              onClick: onRetry,
+              disabled: isRetrying,
+              icon: <RefreshCcw className="h-4 w-4" />,
+              variant: "secondary",
+            }
+          : undefined
+      }
+    />
+  );
+};
+
 export const AnalyzeResumeError = ({
   onRetry,
   isRetrying,

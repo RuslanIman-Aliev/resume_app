@@ -2,13 +2,48 @@
 
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { logError } from "@/lib/logger";
-import { generateDocxThumbnail, generatePdfThumbnail } from "@/lib/thumbnails";
+import { generateDocxThumbnail } from "@/lib/thumbnails-docx";
+import { generatePdfThumbnail } from "@/lib/thumbnails";
 import { useUploadThing } from "@/lib/utils/uploadthing";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ChangeEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
+
+/** The `maxFileSize` UploadThing enforces for every accepted resume type. */
+export const MAX_RESUME_FILE_MB = 4;
+const MAX_RESUME_FILE_BYTES = MAX_RESUME_FILE_MB * 1024 * 1024;
+
+const SUPPORTED_RESUME_EXTENSIONS = [".pdf", ".doc", ".docx"];
+
+/**
+ * One toast id for the whole upload, so the flow shows a single notification
+ * that moves from "uploading" to "saving" to its outcome.
+ *
+ * The success used to fire the moment the file reached UploadThing, before
+ * `resume.create` had written anything: a failed save produced "uploaded
+ * successfully" followed by an error, and a successful one produced two
+ * success toasts. Only the mutation resolves this toast now.
+ */
+const UPLOAD_TOAST_ID = "resume-upload";
+
+/**
+ * Accepts the file types the uploader is configured for.
+ *
+ * Extension first, MIME type second: browsers disagree about what they report
+ * for .doc and .docx, and a file picked through "All files" can arrive with an
+ * empty type.
+ */
+const isSupportedResumeFile = (file: File) => {
+  const name = file.name.toLowerCase();
+  return (
+    SUPPORTED_RESUME_EXTENSIONS.some((ext) => name.endsWith(ext)) ||
+    file.type === "application/pdf" ||
+    file.type === "application/msword" ||
+    file.type.includes("wordprocessingml")
+  );
+};
 
 /**
  * Orchestrates the resume upload flow: local form state, client-side thumbnail
@@ -46,13 +81,14 @@ export function useResumeUpload() {
         refetchType: "active",
       });
 
-      toast.success("Resume uploaded successfully!");
+      toast.success("Resume uploaded successfully!", { id: UPLOAD_TOAST_ID });
     },
     onError: (error) => {
       toast.error(
         getErrorFeedback(error, {
           fallbackMessage: "Failed to save resume.",
         }).message,
+        { id: UPLOAD_TOAST_ID },
       );
     },
   });
@@ -78,20 +114,40 @@ export function useResumeUpload() {
       }
     },
     onUploadError: () => {
-      toast.error("Error occurred while uploading. Please try again.");
+      toast.error("Error occurred while uploading. Please try again.", {
+        id: UPLOAD_TOAST_ID,
+      });
     },
   });
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+
+    // Both limits are the ones UploadThing enforces server-side. Checking here
+    // means an oversized or wrong-typed file is refused on selection, instead
+    // of after the thumbnail render and the upload round-trip.
+    if (!isSupportedResumeFile(selected)) {
+      toast.error("Choose a PDF, DOC or DOCX file.");
+      e.target.value = "";
+      return;
     }
+
+    if (selected.size > MAX_RESUME_FILE_BYTES) {
+      toast.error(
+        `That file is ${(selected.size / 1024 / 1024).toFixed(1)} MB. The limit is ${MAX_RESUME_FILE_MB} MB.`,
+      );
+      e.target.value = "";
+      return;
+    }
+
+    setFile(selected);
   };
 
   const handleUpload = async () => {
     if (!file) return;
 
-    const uploadToastId = toast.loading("Uploading resume...");
+    toast.loading("Uploading resume...", { id: UPLOAD_TOAST_ID });
 
     try {
       let imageFile: File;
@@ -111,7 +167,9 @@ export function useResumeUpload() {
 
       await startUpload([file, imageFile]);
 
-      toast.success("Resume uploaded successfully", { id: uploadToastId });
+      // Still in flight: `onClientUploadComplete` fires `resume.create`, and
+      // that mutation owns the final state of this toast.
+      toast.loading("Saving resume...", { id: UPLOAD_TOAST_ID });
     } catch (error) {
       logError("Thumbnail generation error", error, { resumeName, targetRole });
       toast.error(
@@ -120,15 +178,13 @@ export function useResumeUpload() {
 
       try {
         await startUpload([file]);
-        toast.success("Resume uploaded (without preview)", {
-          id: uploadToastId,
-        });
+        toast.loading("Saving resume...", { id: UPLOAD_TOAST_ID });
       } catch (uploadError) {
         logError("Resume upload failed", uploadError, {
           resumeName,
           targetRole,
         });
-        toast.error("Failed to upload resume", { id: uploadToastId });
+        toast.error("Failed to upload resume", { id: UPLOAD_TOAST_ID });
       }
     }
   };

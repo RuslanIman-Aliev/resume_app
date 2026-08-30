@@ -11,8 +11,13 @@ import {
   SkillImportance,
   SkillsGapData,
 } from "@/lib/types";
+import {
+  ANALYSIS_POLL_INTERVAL_MS,
+  hasAnalysisTimedOut,
+} from "@/lib/analysis-polling";
+import { getErrorFeedback } from "@/lib/error-feedback";
 import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FileText,
   Mail,
@@ -32,8 +37,10 @@ import { useCallback } from "react";
 import AnalyzeCoverLetter from "./analyze-cover-letter";
 import AnalyzeKeywords from "./analyze-keywords";
 import AnalyzeRequirementsMatch from "./analyze-requirements-match";
+import { toast } from "sonner";
 import {
   AnalyzeResumeError,
+  AnalyzeResumeFailed,
   AnalyzeResumeLoading,
   AnalyzeResumePending,
 } from "./analyze-resume-states";
@@ -138,6 +145,7 @@ export const AnalyzeResumeClient = () => {
   const currentTab = searchParams.get("tab") || "overview";
   const analyzeId = params?.analyzeId as string | undefined;
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     ...trpc.resume.getJobMatchResult.queryOptions({
@@ -153,13 +161,65 @@ export const AnalyzeResumeClient = () => {
     // Poll while the background job is still running. The pending state is a
     // successful response, so each poll keeps `data` and the query stays in
     // the success status instead of flipping back through the loading state.
-    refetchInterval: (query) =>
-      query.state.data && query.state.data.application === null ? 4000 : false,
+    //
+    // Polling stops once the run has an ending: FAILED, or a wait that has run
+    // past the cap. Without either check this interval had nothing to stop it,
+    // and a dead run left the page on its loading screen indefinitely.
+    refetchInterval: (query) => {
+      const result = query.state.data;
+      if (!result || result.application !== null) return false;
+      if (result.status === "FAILED") return false;
+      if (hasAnalysisTimedOut(result.startedAt)) return false;
+
+      return ANALYSIS_POLL_INTERVAL_MS;
+    },
   });
-  const isPendingAnalysis = Boolean(data) && data?.application === null;
+
+  const analysisFailed = data?.status === "FAILED";
+  const analysisTimedOut =
+    data?.application === null && hasAnalysisTimedOut(data?.startedAt);
+  const isPendingAnalysis =
+    Boolean(data) &&
+    data?.application === null &&
+    !analysisFailed &&
+    !analysisTimedOut;
+
+  const { mutate: retryAnalysis, isPending: isRetryingAnalysis } = useMutation(
+    trpc.resume.retryJobMatchAnalysis.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: trpc.resume.getJobMatchResult.queryOptions({
+            applicationId: analyzeId ?? "",
+          }).queryKey,
+          refetchType: "active",
+        });
+
+        toast.success("Analysis restarted. This takes about 30-45 seconds.");
+      },
+      onError: (error) => {
+        toast.error(
+          getErrorFeedback(error, {
+            fallbackMessage: "Failed to restart analysis",
+          }).message,
+        );
+      },
+    }),
+  );
+
+  const handleRetryAnalysis = useCallback(() => {
+    if (!analyzeId) return;
+    retryAnalysis({ applicationId: analyzeId });
+  }, [analyzeId, retryAnalysis]);
 
   const handleAnalysisReady = useCallback(() => {}, []);
-  useJobMatchPusher(analyzeId ?? "", handleAnalysisReady);
+  const handleAnalysisFailed = useCallback(() => {
+    toast.error("The match analysis could not be completed.");
+  }, []);
+  useJobMatchPusher(
+    analyzeId ?? "",
+    handleAnalysisReady,
+    handleAnalysisFailed,
+  );
 
   if (isLoading) {
     return <AnalyzeResumeLoading />;
@@ -167,6 +227,16 @@ export const AnalyzeResumeClient = () => {
 
   if (isError) {
     return <AnalyzeResumeError onRetry={refetch} isRetrying={isFetching} />;
+  }
+
+  if (analysisFailed || analysisTimedOut) {
+    return (
+      <AnalyzeResumeFailed
+        onRetry={handleRetryAnalysis}
+        isRetrying={isRetryingAnalysis}
+        timedOut={analysisTimedOut && !analysisFailed}
+      />
+    );
   }
 
   if (isPendingAnalysis) {

@@ -1,4 +1,5 @@
 import prisma from "@/lib/db";
+import { withRecordScope } from "@/lib/prisma-errors";
 import { applicationStatusValues, trackerFormSchema } from "@/lib/types";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import z from "zod";
@@ -38,18 +39,26 @@ export const trackerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const updatedApplication = await prisma.trackerPosition.update({
-        where: { id: input.id, userId: ctx.auth.user.id },
-        data: { status: input.status },
-      });
+      const updatedApplication = await withRecordScope(
+        () =>
+          prisma.trackerPosition.update({
+            where: { id: input.id, userId: ctx.auth.user.id },
+            data: { status: input.status },
+          }),
+        "This job is no longer in your tracker.",
+      );
       return updatedApplication;
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await prisma.trackerPosition.delete({
-        where: { id: input.id, userId: ctx.auth.user.id },
-      });
+      await withRecordScope(
+        () =>
+          prisma.trackerPosition.delete({
+            where: { id: input.id, userId: ctx.auth.user.id },
+          }),
+        "This job is no longer in your tracker.",
+      );
       return { success: true };
     }),
 
@@ -60,23 +69,27 @@ export const trackerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const updatedJob = await prisma.trackerPosition.update({
-        where: {
-          id: input.id,
-          userId: ctx.auth.user.id,
-        },
-        data: {
-          company: input.company,
-          position: input.position,
-          location: input.location,
-          salary: input.salary,
-          status: input.status,
-          url: input.url,
-          notes: input.notes,
-          contactName: input.contactName,
-          contactEmail: input.contactEmail,
-        },
-      });
+      const updatedJob = await withRecordScope(
+        () =>
+          prisma.trackerPosition.update({
+            where: {
+              id: input.id,
+              userId: ctx.auth.user.id,
+            },
+            data: {
+              company: input.company,
+              position: input.position,
+              location: input.location,
+              salary: input.salary,
+              status: input.status,
+              url: input.url,
+              notes: input.notes,
+              contactName: input.contactName,
+              contactEmail: input.contactEmail,
+            },
+          }),
+        "This job is no longer in your tracker.",
+      );
 
       return updatedJob;
     }),
