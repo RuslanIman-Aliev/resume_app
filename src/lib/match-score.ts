@@ -83,3 +83,48 @@ export const normalizeMatchScoreBoosts = (
     estimatedScoreWithAllImprovements: matchScore + budget,
   };
 };
+
+type MatchingSkill = {
+  skill: string;
+  importance: "High" | "Medium" | "Low";
+  evidence?: string | null;
+};
+
+/**
+ * Drops matching skills the model could not quote the resume for.
+ *
+ * Asked which skills a candidate has, the model pads the list with personal
+ * attributes nobody claimed - Teamfaehigkeit, Leistungsbereitschaft,
+ * Verantwortungsbewusstsein - and does it most on the weakest matches, where
+ * there is least real overlap to report. Measured against a warehouse posting,
+ * all four "matching skills" returned for a frontend resume were of that kind.
+ * Presented to the user as skills they have, they teach the candidate to claim
+ * things the resume does not support, and they prop up the floor of the score.
+ *
+ * The same model quotes flawlessly when a field demands it: across twelve runs
+ * `requirementsMatch.evidence` never once cited text absent from the resume.
+ * So the fix is to require the quote here too and discard what arrives without
+ * one, rather than to ask more politely.
+ *
+ * @param skills - `matchingSkills` as validated from the model response.
+ * @returns Only the entries carrying a non-empty evidence quote.
+ */
+export const keepEvidencedMatchingSkills = <T extends MatchingSkill>(
+  skills: T[],
+): T[] => skills.filter((item) => Boolean(item.evidence?.trim()));
+
+/**
+ * Half-width of the band the match score is displayed with.
+ *
+ * Five identical runs of the same resume against the same posting returned 56,
+ * 58, 58, 58 and 62. The model is sampled, not consulted, so the figure it
+ * returns is one draw from a distribution roughly this wide. Three points is
+ * the observed spread rounded to the nearest whole point either side of the
+ * mean, and it is a floor rather than a guarantee: `seed` narrows the
+ * variation but OpenAI does not promise to reproduce a completion.
+ *
+ * Printing a bare integer implies the tool can tell 58 from 62. It cannot, and
+ * a user who re-runs an analysis should be able to see that before concluding
+ * their edit helped.
+ */
+export const MATCH_SCORE_UNCERTAINTY = 3;

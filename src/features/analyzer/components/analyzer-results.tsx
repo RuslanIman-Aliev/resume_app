@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { getScoreColor } from "@/lib/format";
+import { MATCH_SCORE_UNCERTAINTY } from "@/lib/match-score";
 import {
   Briefcase,
   Building2,
@@ -126,18 +127,25 @@ const AnalyzerResults = ({
                   >
                     {matchScore}%
                   </span>
-                  <span
-                    className={`text-sm font-medium ${getScoreColor(matchScore)}`}
-                  >
-                    Match Score
+                  {/* The score is one sample from a model, not a measurement.
+                      Repeat runs of identical input moved by up to six points,
+                      so the band is shown rather than implying the tool can
+                      tell 58 from 62. */}
+                  <span className="text-sm font-medium text-muted-foreground">
+                    &plusmn; {MATCH_SCORE_UNCERTAINTY}
                   </span>
                 </div>
               </div>
             </div>
             <div className="flex-1">
               <Progress value={matchScore} className="h-3" />
+              {/* Was "Based on keyword matching and requirement alignment",
+                  which describes a calculation the product does not perform:
+                  the score is a number the model returns, not a formula over
+                  extracted keywords. */}
               <p className="mt-2 text-sm text-muted-foreground">
-                Based on keyword matching and requirement alignment
+                An AI estimate of how well this resume fits the posting. Re-runs
+                can move it a few points either way.
               </p>
             </div>
           </div>

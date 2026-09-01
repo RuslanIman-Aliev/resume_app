@@ -125,6 +125,42 @@ describe("resumeAnalysisSchema", () => {
     expect(parsed.improvements[0]?.targetSection).toBe("summary");
   });
 
+  it("accepts a Projects-category improvement targeting a project bullet", () => {
+    // The regression this guards: the prompt offers "projects" as a
+    // targetSection, so the model answers with category "Projects" whenever it
+    // rewrites a project bullet. The category enum did not list it, the parse
+    // threw a NonRetriableError, and the whole analysis failed - on six of
+    // eight measured runs against a resume with a projects section. Every
+    // developer's resume has one, and they are this product's users.
+    const parsed = resumeAnalysisSchema.parse({
+      overallScore: 71,
+      categoryScores: {
+        contentQuality: 70,
+        atsOptimization: 68,
+        experience: 66,
+        skillsMatch: 80,
+      },
+      keywords: ["react"],
+      strengths: ["Ships tested side projects"],
+      quickWins: [],
+      improvements: [
+        {
+          category: "Projects",
+          impact: "Medium Impact",
+          title: "Give the project a measurable outcome",
+          description: "States the stack but not what it achieved",
+          currentText: "CRUD app built with Next.js and Prisma",
+          suggestedText: "Recipe manager built with Next.js and Prisma",
+          tips: ["Name the use case"],
+          targetSection: "projects",
+          targetId: "proj-1-bullet-1",
+        },
+      ],
+    });
+
+    expect(parsed.improvements[0]?.category).toBe("Projects");
+  });
+
   it("rejects invalid quick win impact values", () => {
     const result = resumeAnalysisSchema.safeParse({
       overallScore: 86,

@@ -11,12 +11,14 @@ import { Button } from "@/components/ui/button";
 import { FeedbackState } from "@/components/ui/feedback-state";
 import { getErrorFeedback } from "@/lib/error-feedback";
 import { getCategoryConfig, getPriorityConfig } from "@/lib/ui-config";
+import { findUnverifiedNumbers } from "@/lib/unverified-numbers";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
+  HelpCircle,
   Lightbulb,
   Loader2,
   Sparkles,
@@ -203,8 +205,56 @@ const ImprovementsSection = () => {
                           </div>
                         </div>
                         <p className="text-sm">{improvement.suggestedText}</p>
+
+                        {/* The model is told never to invent a figure, but it
+                            can still volunteer one. Applying a suggestion
+                            writes it into the resume the user downloads, so
+                            any new digits are named here, beside the text,
+                            while there is still a decision to make. */}
+                        {(() => {
+                          const unverified = findUnverifiedNumbers(
+                            improvement.currentText,
+                            improvement.suggestedText,
+                          );
+
+                          if (unverified.length === 0) {
+                            return null;
+                          }
+
+                          return (
+                            <p className="mt-3 flex items-start gap-2 border-t border-primary/20 pt-3 text-xs text-muted-foreground">
+                              <AlertCircle
+                                aria-hidden="true"
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500"
+                              />
+                              <span>
+                                This suggestion adds{" "}
+                                {unverified.length === 1
+                                  ? "a number that is"
+                                  : "numbers that are"}{" "}
+                                not in your resume. Check it against what you
+                                actually did before applying.
+                              </span>
+                            </p>
+                          );
+                        })()}
                       </div>
                     </div>
+
+                    {improvement.metricPrompt?.trim() ? (
+                      <div className="rounded-lg border border-border/50 bg-muted/40 p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-medium">
+                          <HelpCircle
+                            aria-hidden="true"
+                            className="h-4 w-4 text-primary"
+                          />
+                          Worth adding, if you know it
+                        </h4>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {improvement.metricPrompt}
+                        </p>
+                      </div>
+                    ) : null}
 
                     <div>
                       <h4 className="flex items-center gap-2 text-sm font-medium">

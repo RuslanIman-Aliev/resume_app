@@ -39,7 +39,7 @@ The project focuses on the end-to-end resume workflow:
 
 The UI is organized by route groups:
 
-- Public marketing page at / (hero, pricing, testimonials).
+- Public marketing page at / (hero, product facts, pricing, project status).
 - Auth pages for sign-in and sign-up.
 - Authenticated pages for dashboard, resumes, analyzer, tracker, and ai-coach.
 

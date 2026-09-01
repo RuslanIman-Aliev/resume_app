@@ -4,8 +4,8 @@ import FeatureSection from "@/features/main-page/components/feature-section";
 import { Footer } from "@/features/main-page/components/footer";
 import HeroSection from "@/features/main-page/components/hero-section";
 import PricingSection from "@/features/main-page/components/pricing-section";
-import StatsSection from "@/features/main-page/components/stats-section";
-import TestimonialsSection from "@/features/main-page/components/testimonials-section";
+import ProductFactsSection from "@/features/main-page/components/product-facts-section";
+import ProjectStatusSection from "@/features/main-page/components/project-status-section";
 import HowItWorksSection from "@/features/main-page/components/works-section";
 import type { Metadata } from "next";
 
@@ -59,10 +59,10 @@ const Page = () => {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <HeroSection />
-        <StatsSection />
+        <ProductFactsSection />
         <FeatureSection />
         <HowItWorksSection />
-        <TestimonialsSection />
+        <ProjectStatusSection />
         <PricingSection />
         <CTASection />
       </main>

@@ -2,7 +2,11 @@ import { getJobMatchPrompt, getPrompt } from "@/lib/prompts";
 import { inngest } from "./client";
 import { NonRetriableError } from "inngest";
 import OpenAI from "openai";
-import { normalizeMatchScoreBoosts } from "@/lib/match-score";
+import {
+  keepEvidencedMatchingSkills,
+  normalizeMatchScoreBoosts,
+} from "@/lib/match-score";
+import { composeCoverLetter } from "@/lib/cover-letter";
 import { jobMatchAnalysisSchema, resumeAnalysisSchema } from "@/lib/schemas";
 import prisma from "@/lib/db";
 import {
@@ -62,6 +66,22 @@ const parseModelOutput = <T>(
     );
   }
 };
+
+/**
+ * Fixed sampling seed for every analysis call.
+ *
+ * Five identical job-match runs returned 56, 58, 58, 58 and 62 - a six-point
+ * spread on unchanged input. A user who re-runs an analysis and reads a
+ * different number has no way to tell that from a real change to their resume.
+ *
+ * OpenAI treats `seed` as best-effort, not a guarantee: it narrows the
+ * variation between identical requests, and back-end changes can shift results
+ * regardless. So this reduces the noise, it does not remove it, and nothing in
+ * the product should promise a reproducible score - which is why the UI shows
+ * the match score as a band rather than an exact figure.
+ */
+const ANALYSIS_SEED = 20260901;
+
 /**
  * Per-user ceiling on AI analysis runs, applied to every function below.
  *
@@ -144,6 +164,7 @@ export const analyzeResume = inngest.createFunction(
           },
         ],
         response_format: { type: "json_object" },
+        seed: ANALYSIS_SEED,
       });
       return response.choices[0].message.content;
     });
@@ -249,6 +270,7 @@ export const analyzeJobMatched = inngest.createFunction(
           },
         ],
         response_format: { type: "json_object" },
+        seed: ANALYSIS_SEED,
       });
       return response.choices[0].message.content;
     });
@@ -272,6 +294,12 @@ export const analyzeJobMatched = inngest.createFunction(
       estimatedScoreWithAllImprovements,
     };
 
+    // Anything the model could not quote the resume for is dropped rather than
+    // shown to the user as a skill they have.
+    const matchingSkills = keepEvidencedMatchingSkills(
+      validatedData.matchingSkills,
+    );
+
     // Save the analysis results to the database, linking it to the correct resume. We use upsert to create a new analysis if it doesn't exist or update the existing one if it does.
     await step.run("save-to-db", async () => {
       const existingApp = await prisma.jobApplication.findUnique({
@@ -294,14 +322,17 @@ export const analyzeJobMatched = inngest.createFunction(
             experience: validatedData.experience,
             targetLanguage: validatedData.targetLanguage,
             matchScore: validatedData.matchScore,
-            matchingSkills: validatedData.matchingSkills,
+            matchingSkills,
             improvements,
             missingSkills: validatedData.missingSkills,
             requirementsMatch: validatedData.requirementsMatch,
             skillsGap: validatedData.skillsGap,
             keywordsGap: validatedData.keywordsGap,
             summary,
-            coverLetterText: validatedData.coverLetterText,
+            coverLetterText: composeCoverLetter(
+              validatedData.coverLetterSubject,
+              validatedData.coverLetterText,
+            ),
             status: "ANALYZED",
           },
         }),

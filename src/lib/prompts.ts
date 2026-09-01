@@ -46,7 +46,9 @@ export function getPrompt(resumeText: string, targetRole: string) {
 
   LANGUAGE REQUIREMENT: You must detect the language of the provided resume. All your generated content, including suggestions, descriptions, titles, tips, and rewritten text, MUST be exclusively in that same language. For example, if the resume is in English, write all your suggestions and analysis in English. If the resume is in Russian, write everything in Russian.
 
-  You must eliminate weak verbs (e.g., "helped", "worked on") and replace them with strong action verbs (e.g., "architected", "scaled", "drove"). You must inject specific metrics, percentages, and business impact into your suggestions.
+  You must eliminate weak verbs (e.g., "helped", "worked on") and replace them with strong action verbs (e.g., "architected", "scaled", "drove"). Surface the business impact that the resume already supports.
+
+  ABSOLUTE RULE ON NUMBERS: every figure you write must already appear in the candidate's resume text. Never invent, estimate or illustrate with a made-up number, and never tell the candidate to add a figure you have made up for them. Where a number would help and the resume has none, ask for it in that improvement's "metricPrompt" field. The candidate has to defend this resume in an interview, and in regulated professions an invented figure is a claim they may be held to.
 
   You MUST respond ONLY with a valid, raw JSON object. Do not include markdown formatting, explanations, or any text outside the JSON. The JSON must exactly match the following structure:
 
@@ -127,7 +129,7 @@ export function getPrompt(resumeText: string, targetRole: string) {
     "improvements": [
       // Array of EXACTLY 5 to 8 detailed suggestions.
       {
-        "category": string ("Content", "Skills", "Keywords", "Format", or "Experience"),
+        "category": string ("Content", "Skills", "Keywords", "Format", "Experience", or "Projects"),
         "impact": string ("High Impact", "Medium Impact", or "Low Impact"),
         "title": string (e.g., "Transform duties into quantifiable achievements"),
         "description": string (Explain exactly why this change will increase the candidate's ATS score and impress a human recruiter),
@@ -137,7 +139,10 @@ export function getPrompt(resumeText: string, targetRole: string) {
 
         // YOU MUST ALWAYS PROVIDE THESE TWO FIELDS. NEVER LEAVE THEM NULL.
         "currentText": string (You MUST extract a direct, weak quote from the candidate's provided resume text. Do not make this up.),
-        "suggestedText": string (You MUST rewrite the currentText using the Google XYZ formula. Add realistic placeholder metrics like "by 25%" or "saving $10k" if the candidate didn't provide any.),
+        "suggestedText": string (You MUST rewrite the currentText using the Google XYZ formula, using ONLY facts that appear in the candidate's resume text. NEVER invent a number, percentage, duration, team size, budget, user count or any other figure that is not already in the resume. If the resume gives you no figure, write the strongest possible version without one - a rewrite with a strong action verb and a clear outcome is acceptable and expected. It is always better to return a suggestion with no number than a suggestion with a number the candidate cannot defend in an interview.),
+
+        // Ask for the number instead of inventing it.
+        "metricPrompt": string or null (If, and only if, this bullet would be materially stronger with a figure the resume does not contain, ask the candidate for it here as one short question in the resume's language, e.g. "Wie viele Komponenten waren es ungefähr?" or "How many customer sites did you work on?". Ask for exactly one figure. Use null when the suggestion needs no number.),
 
         "tips": [
           // Array of 2 to 3 actionable, McKinsey-level tips (e.g., "Lead with the business impact, not the technology used")
@@ -193,6 +198,8 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
   Data quality rules for the additional structured fields:
   - Use only evidence from the provided resume and job description.
   - Never invent companies, projects, tools, or achievements that do not appear in the input.
+  - Never invent a number. Percentages, durations, team sizes, user counts and budgets may only appear in your output if they already appear in the input. A rewrite with no figure is always preferable to a rewrite with an invented one.
+  - Only list a skill in matchingSkills if the resume evidences it. Personal attributes the resume does not claim - teamwork, reliability, quality-consciousness, willingness to learn - are NOT matching skills. Do not pad the list to make a weak match look better.
     - experience and salaryRange are required when evidence exists in the job description. NEVER return null if relevant text is present.
     - Experience evidence examples include: "5+ years", "3-5 years", "at least 4 years", "Senior", "Lead", "Principal", "3+ years of experience", "3+ лет опыта".
     - Salary evidence examples include: "$120,000 - $150,000", "120k-150k", "up to $180k", "from 90,000 to 120,000", "salary: ...", "compensation: ...".
@@ -227,10 +234,12 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
     "targetLanguage": string (e.g., "English", "Russian"; must match the job description language),
     "matchScore": number (0-100),
     "matchingSkills": [
-      // Array of 4 to 8 objects highlighting skills the candidate has that the job requires
+      // Up to 8 objects for skills the candidate demonstrably has AND the job requires.
+      // Return FEWER, or an empty array, rather than including one you cannot quote the resume for.
       {
         "skill": string (e.g., "React.js"),
-        "importance": string ("High", "Medium", or "Low" - based on how often it appears in the job description)
+        "importance": string ("High", "Medium", or "Low" - based on how often it appears in the job description),
+        "evidence": string (a direct quote from the resume text showing the candidate has this skill. If you cannot quote the resume, omit the whole skill.)
       }
     ],
     "improvements": [
@@ -306,7 +315,18 @@ export function getJobMatchPrompt(resumeText: string, jobDescription: string) {
       "preferredTotal": number,
       "estimatedScoreWithAllImprovements": number (0-100; realistic score after applying every improvement, and always greater than matchScore when improvements exist)
     },
-    "coverLetterText": string (A highly personalized, 5-paragraph cover letter written from the candidate's perspective to the hiring manager. Focus on the value the candidate brings to the specific challenges mentioned in the job description. Do not use generic templates. Write the cover letter in targetLanguage.)
+    "coverLetterSubject": string (The subject line for the letter, without the word "Betreff". Name the exact role from the job description, and the reference number or job ID if the posting gives one, e.g. "Bewerbung als Senior Frontend Developer (m/w/d)". Write it in targetLanguage.),
+    "coverLetterAvailability": string or null (One short sentence stating when the candidate can start, in targetLanguage, e.g. "Verfügbar ab sofort." Derive it from the resume - a role listed as ongoing means a notice period is unknown, so say the candidate is available by arrangement rather than inventing a date. Use null only if the resume gives nothing to go on.),
+    "coverLetterText": string (A highly personalized cover letter body written from the candidate's perspective to the hiring manager, in targetLanguage. Rules:
+      - Do NOT include the subject line, the sender or recipient address, the place or the date. Those are laid out separately from the fields above. Start at the salutation.
+      - Open on the EMPLOYER, not the applicant: the first sentence must say something specific about this company or this role, taken from the job description. Never open with a bare "Ich bewerbe mich..." or "I am applying for...".
+      - The middle must establish fit with concrete evidence drawn ONLY from the resume: name real employers, real projects and real technologies that appear in it.
+      - State any requirement the candidate does not meet honestly or leave it out. Never claim experience, employers, durations, qualifications or language levels beyond what the resume states, and never round a stated language level upwards.
+      - Before the closing, state availability in one short sentence, matching coverLetterAvailability.
+      - Close by asking for an interview.
+      - Avoid empty self-praise: no "fundierte Kenntnisse", "nachgewiesene Fähigkeit", "dynamisches Umfeld", "agiles Team" or their equivalents in other languages, unless the phrase names something the resume evidences.
+      - Keep it under 350 words so it fits on one page. Use as many paragraphs as the content needs.
+      - Spell targetLanguage correctly, using its own alphabet and diacritics. For German that means writing "ä", "ö", "ü" and "ß" - never the "ae"/"oe"/"ue"/"ss" substitutes, and never mixed with correct spellings in the same letter. Do this even if the resume or the job description you were given has lost its diacritics; if their text is transliterated, that is a defect in the extraction, not the spelling you should copy.)
   }
 
   Here is the Job Description:

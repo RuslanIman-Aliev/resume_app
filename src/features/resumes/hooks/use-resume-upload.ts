@@ -1,6 +1,7 @@
 "use client";
 
 import { getErrorFeedback } from "@/lib/error-feedback";
+import { hasStrippedGermanDiacritics } from "@/lib/extraction-quality";
 import { logError } from "@/lib/logger";
 import { generateDocxThumbnail } from "@/lib/thumbnails-docx";
 import { generatePdfThumbnail } from "@/lib/thumbnails";
@@ -102,6 +103,21 @@ export function useResumeUpload() {
         const imageFile = res.find((f) => f.serverData?.type === "image");
 
         if (documentFile) {
+          // Everything downstream - analysis, match score, cover letter - is
+          // generated from this text, and the model copies its orthography. A
+          // German resume that arrives without umlauts silently produces a
+          // German cover letter without umlauts, which the user would have no
+          // way to explain. Warn at the point the damage is detectable.
+          if (
+            hasStrippedGermanDiacritics(documentFile.serverData?.extractedText)
+          ) {
+            toast.warning("Umlauts may be missing from this resume", {
+              description:
+                "The text we extracted reads as German but contains no ä, ö, ü or ß. Anything generated from it will have the same problem. Try re-saving the file as a PDF or DOCX and uploading again.",
+              duration: 12_000,
+            });
+          }
+
           createResumeMutation.mutate({
             fileName: documentFile.name,
             fileUrl: documentFile.url,

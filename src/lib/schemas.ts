@@ -119,7 +119,20 @@ const quickWinSchema = z.object({
 });
 
 const analysisImprovementSchema = z.object({
-  category: z.enum(["Content", "Skills", "Keywords", "Format", "Experience"]),
+  // "Projects" is here because the model puts it here. The prompt lists five
+  // categories and, separately, five `targetSection` values that include
+  // "projects" - so an improvement aimed at a project bullet comes back as
+  // category "Projects", which this enum used to reject. That rejection is a
+  // NonRetriableError, so the whole analysis died: six of eight measured runs
+  // on a resume with a projects section, which is nearly every developer's.
+  category: z.enum([
+    "Content",
+    "Skills",
+    "Keywords",
+    "Format",
+    "Experience",
+    "Projects",
+  ]),
   impact: z.enum(["High Impact", "Medium Impact", "Low Impact"]),
   title: z.string(),
   description: z.string(),
@@ -134,6 +147,10 @@ const analysisImprovementSchema = z.object({
     "skills",
   ]),
   targetId: z.string().optional(),
+  // The question the model asks instead of inventing a figure. Null whenever
+  // the suggestion needs no number. See the "ABSOLUTE RULE ON NUMBERS" block
+  // in `getPrompt`.
+  metricPrompt: z.string().nullable().optional().default(null),
 });
 
 /**
@@ -241,10 +258,17 @@ export const jobMatchAnalysisSchema = z.object({
   url: modelJobUrlSchema,
   targetLanguage: z.string().min(1).default("English"),
   matchScore: z.number().int().min(0).max(100),
+  // `evidence` is optional here on purpose, even though the prompt demands it.
+  // A required field is a failure mode: the analysis prompt's `category` enum
+  // taught us that one value the model omits or renames kills the entire run
+  // via NonRetriableError. So the schema stays permissive and
+  // `keepEvidencedMatchingSkills` drops the unevidenced entries instead - a
+  // shorter, honest list rather than no analysis at all.
   matchingSkills: z.array(
     z.object({
       skill: z.string(),
       importance: z.enum(["High", "Medium", "Low"]),
+      evidence: z.string().nullable().optional().default(null),
     }),
   ),
   improvements: z.array(jobMatchImprovementSchema).default([]),
@@ -302,6 +326,12 @@ export const jobMatchAnalysisSchema = z.object({
     preferredTotal: 0,
     estimatedScoreWithAllImprovements: 0,
   }),
+  // Split out of the letter body so an export can lay them out to DIN 5008
+  // later. Both stay optional: the body is what the product has always shown,
+  // and a model that omits either must not take the whole analysis down with
+  // it - the lesson from the `category` enum.
+  coverLetterSubject: z.string().nullable().optional().default(null),
+  coverLetterAvailability: z.string().nullable().optional().default(null),
   coverLetterText: z.string(),
 });
 
