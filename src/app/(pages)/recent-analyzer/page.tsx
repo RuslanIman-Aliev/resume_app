@@ -26,7 +26,11 @@ const RecentAnalyzerPage = async ({
   });
 
   const queryClient = getQueryClient();
-  void queryClient.prefetchQuery(
+  // Awaited, not fired and forgotten: an unresolved query leaves the server
+  // rendering the loading state while the client hydrates with data already
+  // in the cache, and React discards the whole subtree over the mismatch
+  // (error #418). Waiting here costs the round trip but ships settled HTML.
+  await queryClient.prefetchQuery(
     trpc.jobApplication.getJobApplication.queryOptions(queryInput),
   );
 

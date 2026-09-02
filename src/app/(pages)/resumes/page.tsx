@@ -23,7 +23,11 @@ const ResumesPage = async ({
   // ResumeCard derives its input from the same URL params, so this must mirror
   // `useUrlPage()` and its `searchParams` reads exactly — a different input
   // produces a different query key and the prefetch is silently wasted.
-  void queryClient.prefetchQuery(
+  // Awaited, not fired and forgotten: an unresolved query leaves the server
+  // rendering the loading state while the client hydrates with data already
+  // in the cache, and React discards the whole subtree over the mismatch
+  // (error #418). Waiting here costs the round trip but ships settled HTML.
+  await queryClient.prefetchQuery(
     trpc.resume.getAll.queryOptions({
       page: Number(firstValue(params.page)) || 1,
       search: firstValue(params.search),

@@ -67,7 +67,11 @@ const AnalyzeResume = async ({ params }: PageProps) => {
   // Prefetch so AnalyzeResumeClient hydrates without a client fetch. A match
   // still being analyzed also resolves successfully (with a null application),
   // so the pending screen renders on first paint and the client only polls.
-  void queryClient.prefetchQuery(
+  // Awaited, not fired and forgotten: an unresolved query leaves the server
+  // rendering the loading state while the client hydrates with data already
+  // in the cache, and React discards the whole subtree over the mismatch
+  // (error #418). Waiting here costs the round trip but ships settled HTML.
+  await queryClient.prefetchQuery(
     trpc.resume.getJobMatchResult.queryOptions({ applicationId: analyzeId }),
   );
 

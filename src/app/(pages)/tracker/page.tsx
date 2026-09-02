@@ -7,10 +7,15 @@ export const metadata: Metadata = {
   description: "Track your applications, interviews, and offers in one place.",
 };
 
-const TrackerPage = () => {
+const TrackerPage = async () => {
   const queryClient = getQueryClient();
-  // Prefetch the board on the server so MainView hydrates without a client fetch.
-  void queryClient.prefetchQuery(trpc.tracker.getAll.queryOptions());
+  // Prefetch the board on the server so MainView hydrates without a client
+  // fetch.
+  // Awaited, not fired and forgotten: an unresolved query leaves the server
+  // rendering the loading state while the client hydrates with data already
+  // in the cache, and React discards the whole subtree over the mismatch
+  // (error #418). Waiting here costs the round trip but ships settled HTML.
+  await queryClient.prefetchQuery(trpc.tracker.getAll.queryOptions());
 
   return (
     <HydrateClient>

@@ -11,29 +11,71 @@ export const clearEditorSearchHighlights = (
   documentEditor?: DocumentEditorLike,
 ) => {
   try {
-    documentEditor?.searchResults?.clear?.();
+    documentEditor?.search?.searchResults?.clear?.();
   } catch {
     // ignore search clear errors
   }
 };
 
-const serializedDocumentHasSuggestion = (
+/**
+ * Reads the document back as one plain string, in document order.
+ *
+ * Searching the serialized SFDT directly does not work: Word starts a new text
+ * run at every formatting change, so a bullet like **"Robuste Generierung:"**
+ * followed by its sentence is two runs, and the sentence never appears as one
+ * substring of the JSON - the runs are separated by the structure between them.
+ * Joining the run texts is what makes `includes` mean "the document says this".
+ *
+ * @returns The document text, or null when it cannot be serialized or parsed.
+ */
+const readDocumentText = (documentEditor: DocumentEditorLike) => {
+  const serialized = documentEditor.serialize?.();
+  if (typeof serialized !== "string" || !serialized.trim()) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch {
+    return null;
+  }
+
+  const runs: string[] = [];
+  const collect = (node: unknown) => {
+    if (Array.isArray(node)) {
+      node.forEach(collect);
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+
+    for (const [key, value] of Object.entries(node)) {
+      // `tlp` is the optimized SFDT dialect the Import service emits; `text` is
+      // the long-name one the editor writes when optimization is off.
+      if ((key === "tlp" || key === "text") && typeof value === "string") {
+        runs.push(value);
+      } else {
+        collect(value);
+      }
+    }
+  };
+  collect(parsed);
+
+  return runs.join("");
+};
+
+const documentHasSuggestion = (
   documentEditor: DocumentEditorLike,
   beforeText: string,
   afterText: string,
 ) => {
   try {
-    const serialized = documentEditor.serialize?.();
-    if (typeof serialized !== "string" || !serialized.trim()) {
+    const text = readDocumentText(documentEditor);
+    if (text === null) {
       return false;
     }
 
-    const containsAfterText = serialized.includes(afterText);
-    const stillContainsBeforeText = beforeText
-      ? serialized.includes(beforeText)
-      : false;
-
-    return containsAfterText && (!beforeText || !stillContainsBeforeText);
+    return text.includes(afterText) && (!beforeText || !text.includes(beforeText));
   } catch {
     return false;
   }
@@ -54,7 +96,12 @@ export const highlightSuggestionInEditor = (
     } else {
       documentEditor.search?.find?.(beforeText);
     }
-    documentEditor.searchResults?.navigateTo?.(1);
+    // `index` is a setter that navigates to that result; there is no
+    // `navigateTo`, and the call that used to be here silently did nothing.
+    const searchResults = documentEditor.search?.searchResults;
+    if (searchResults && (searchResults.length ?? 0) > 0) {
+      searchResults.index = 0;
+    }
     documentEditor.documentHelper?.clearSelectionHighlight?.();
     documentEditor.documentHelper?.renderVisiblePages?.(true);
   } catch {
@@ -63,8 +110,12 @@ export const highlightSuggestionInEditor = (
 };
 
 /**
- * Replaces `beforeText` with `afterText` in the editor, trying replaceAll,
- * replace, then a find + insertText fallback. Returns whether the change stuck.
+ * Replaces `beforeText` with `afterText` in the editor. Returns whether the
+ * change stuck.
+ *
+ * Both steps start with `findAll`, because that is the only way to get a
+ * results object and it matches across text runs - which the suggestion text
+ * routinely spans, since Word breaks a run at every formatting change.
  */
 export const applySuggestionToEditor = (
   documentEditor: DocumentEditorLike | undefined,
@@ -74,11 +125,12 @@ export const applySuggestionToEditor = (
   if (!documentEditor || !beforeText || !afterText) return false;
 
   try {
-    if (typeof documentEditor.search?.replaceAll === "function") {
-      documentEditor.search.replaceAll(beforeText, afterText);
-      if (
-        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
-      ) {
+    documentEditor.search?.findAll?.(beforeText);
+    const searchResults = documentEditor.search?.searchResults;
+
+    if ((searchResults?.length ?? 0) > 0) {
+      searchResults?.replaceAll?.(afterText);
+      if (documentHasSuggestion(documentEditor, beforeText, afterText)) {
         return true;
       }
     }
@@ -87,28 +139,16 @@ export const applySuggestionToEditor = (
   }
 
   try {
-    if (typeof documentEditor.search?.replace === "function") {
-      documentEditor.search.replace(beforeText, afterText);
-      if (
-        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
-      ) {
-        return true;
-      }
-    }
-  } catch {
-    // ignore replace errors
-  }
-
-  try {
     documentEditor.search?.findAll?.(beforeText);
-    const resultsLength = documentEditor.searchResults?.length ?? 0;
-    if (resultsLength > 0) {
-      documentEditor.searchResults?.navigateTo?.(1);
+    const searchResults = documentEditor.search?.searchResults;
+
+    if ((searchResults?.length ?? 0) > 0 && searchResults) {
+      // Selecting the result puts the caret over it, so inserting text
+      // overwrites the match the way typing over a selection would.
+      searchResults.index = 0;
       documentEditor.editor?.insertText?.(afterText);
-      documentEditor.searchResults?.clear?.();
-      if (
-        serializedDocumentHasSuggestion(documentEditor, beforeText, afterText)
-      ) {
+      searchResults.clear?.();
+      if (documentHasSuggestion(documentEditor, beforeText, afterText)) {
         return true;
       }
     }

@@ -21,16 +21,22 @@ export type DocumentEditorLike = {
     renderVisiblePages?: (force?: boolean) => void;
     clearSelectionHighlight?: () => void;
   };
+  /**
+   * Only `find` and `findAll` are search entry points. Replacing goes through
+   * `search.searchResults`: `Search.replaceAll` is private, takes the results
+   * object rather than a search string, and throws when handed two strings.
+   */
   search?: {
     find?: (text: string) => void;
     findAll?: (text: string) => void;
-    replaceAll?: (searchText: string, replaceText: string) => void;
-    replace?: (searchText: string, replaceText: string) => void;
-  };
-  searchResults?: {
-    length?: number;
-    navigateTo?: (index: number) => void;
-    clear?: () => void;
+    searchResults?: {
+      length?: number;
+      /** Selects a result by position; the setter navigates the editor to it. */
+      index?: number;
+      replace?: (textToReplace: string) => void;
+      replaceAll?: (textToReplace: string) => void;
+      clear?: () => void;
+    };
   };
   editor?: {
     insertText?: (text: string) => void;

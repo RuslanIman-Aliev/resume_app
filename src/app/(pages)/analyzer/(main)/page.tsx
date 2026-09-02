@@ -8,10 +8,14 @@ export const metadata: Metadata = {
   description: "Analyze job descriptions and match them with your resume.",
 };
 
-const AnalyzerPage = () => {
+const AnalyzerPage = async () => {
   const queryClient = getQueryClient();
   // Prefetch on the server so AnalyzerTabs hydrates without a client fetch.
-  void queryClient.prefetchQuery(
+  // Awaited, not fired and forgotten: an unresolved query leaves the server
+  // rendering the loading state while the client hydrates with data already
+  // in the cache, and React discards the whole subtree over the mismatch
+  // (error #418). Waiting here costs the round trip but ships settled HTML.
+  await queryClient.prefetchQuery(
     trpc.resume.getResumesAndAnalyses.queryOptions(),
   );
 

@@ -58,12 +58,20 @@ const AiCoachPage = async ({ params }: PageProps) => {
   const queryClient = getQueryClient();
   // Both tabs read the same analysis row, so prefetching here lets the
   // Overview and Improvements panels hydrate without a client fetch.
-  void queryClient.prefetchQuery(
-    trpc.resume.getAnalysisResult.queryOptions({ resumeId: id }),
-  );
-  void queryClient.prefetchQuery(
-    trpc.resume.getImprovements.queryOptions({ resumeId: id }),
-  );
+  // Awaited, not fired and forgotten: an unresolved query leaves the server
+  // rendering the loading state while the client hydrates with data already
+  // in the cache, and React discards the whole subtree over the mismatch
+  // (error #418). Waiting here costs the round trip but ships settled HTML.
+  // Promise.all rather than two awaits: the queries do not depend on each
+  // other, and awaiting them in sequence would add one round trip for free.
+  await Promise.all([
+    queryClient.prefetchQuery(
+      trpc.resume.getAnalysisResult.queryOptions({ resumeId: id }),
+    ),
+    queryClient.prefetchQuery(
+      trpc.resume.getImprovements.queryOptions({ resumeId: id }),
+    ),
+  ]);
 
   return (
     <HydrateClient>

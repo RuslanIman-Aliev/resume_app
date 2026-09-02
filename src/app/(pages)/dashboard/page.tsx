@@ -12,18 +12,26 @@ export const metadata: Metadata = {
     "See your job search overview, recent analyses, and live interview stage.",
 };
 
-const Page = () => {
+const Page = async () => {
   const queryClient = getQueryClient();
   // Prefetch on the server so the cards hydrate without a client fetch.
-  void queryClient.prefetchQuery(trpc.resume.getLatest4Analyses.queryOptions());
-  void queryClient.prefetchQuery(trpc.tracker.getPipelineStats.queryOptions());
-  void queryClient.prefetchQuery(
-    trpc.tracker.get4LatestTrackerJobs.queryOptions(),
-  );
-  void queryClient.prefetchQuery(trpc.tracker.getStatistics.queryOptions());
-  void queryClient.prefetchQuery(
-    trpc.tracker.getInterviewStagePositions.queryOptions(),
-  );
+  // Awaited, not fired and forgotten: an unresolved query leaves the server
+  // rendering the loading state while the client hydrates with data already
+  // in the cache, and React discards the whole subtree over the mismatch
+  // (error #418). Waiting here costs the round trip but ships settled HTML.
+  // Promise.all rather than five awaits: the cards do not depend on each
+  // other, and awaiting them in sequence would stack five round trips.
+  await Promise.all([
+    queryClient.prefetchQuery(trpc.resume.getLatest4Analyses.queryOptions()),
+    queryClient.prefetchQuery(trpc.tracker.getPipelineStats.queryOptions()),
+    queryClient.prefetchQuery(
+      trpc.tracker.get4LatestTrackerJobs.queryOptions(),
+    ),
+    queryClient.prefetchQuery(trpc.tracker.getStatistics.queryOptions()),
+    queryClient.prefetchQuery(
+      trpc.tracker.getInterviewStagePositions.queryOptions(),
+    ),
+  ]);
 
   return (
     <HydrateClient>
