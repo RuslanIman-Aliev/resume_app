@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { logError } from "@/lib/logger";
 import { assertAllowedFileUrl, SafeFetchError } from "@/lib/safe-fetch";
 import { serverEnv } from "@/lib/env.server";
+import { delay } from "@/lib/sfdt/delay";
 
 const DOCUMENT_EDITOR_SERVICE_URL = serverEnv.DOCUMENT_EDITOR_SERVICE_URL;
 
@@ -19,29 +20,42 @@ const normalizeServiceUrl = (value: string) =>
   value.endsWith("/") ? value : `${value}/`;
 
 /**
- * Posts to the Import service, retrying once. A sleeping instance fails or
- * 5xx-es the request that wakes it and answers the next one normally.
+ * Waits between Import attempts. A retry fired immediately hits the same cold
+ * instance that just failed, so each attempt gives it more time to finish
+ * starting; the total stays inside `maxDuration`.
+ */
+const IMPORT_RETRY_DELAYS_MS = [1_000, 4_000, 9_000];
+
+/**
+ * Posts to the Import service, retrying a failed wake-up. A sleeping instance
+ * fails or 5xx-es the requests that wake it and answers a later one normally,
+ * and a conversion that gives up here surfaces as a resume shown as plain text.
  */
 const postToImportService = async (serviceUrl: string, body: FormData) => {
   const endpoint = `${normalizeServiceUrl(serviceUrl)}Import`;
+  const attemptCount = IMPORT_RETRY_DELAYS_MS.length + 1;
 
   let lastError: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < attemptCount; attempt += 1) {
+    const isLastAttempt = attempt === attemptCount - 1;
+
     try {
       const response = await fetch(endpoint, { method: "POST", body });
       if (response.ok || response.status < 500) {
         return response;
       }
       lastError = new Error(`Import service responded ${response.status}`);
-      if (attempt === 1) {
+      if (isLastAttempt) {
         return response;
       }
     } catch (error) {
       lastError = error;
-      if (attempt === 1) {
+      if (isLastAttempt) {
         throw error;
       }
     }
+
+    await delay(IMPORT_RETRY_DELAYS_MS[attempt]);
   }
 
   throw lastError ?? new Error("Import service unreachable");
@@ -110,9 +124,17 @@ export async function POST(request: Request) {
     }
 
     if (!DOCUMENT_EDITOR_SERVICE_URL) {
+      // 501 rather than 500, the same distinction `convertDocxToPdf` makes:
+      // nothing failed, this deployment simply has no conversion service, and
+      // the editor should say so instead of offering a retry that cannot
+      // succeed. The variable name stays in the log, not in the response.
+      logError(
+        "docx-to-sfdt is unconfigured",
+        new Error("DOCUMENT_EDITOR_SERVICE_URL is not set"),
+      );
       return NextResponse.json(
-        { error: "DOCUMENT_EDITOR_SERVICE_URL is not configured" },
-        { status: 500 },
+        { error: "Document conversion is not configured" },
+        { status: 501 },
       );
     }
 

@@ -10,6 +10,7 @@ import {
   tryOpenVariants,
 } from "@/lib/syncfusion/document-editor";
 import "@/lib/syncfusion/setup";
+import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { DocumentEditorContainerComponent } from "@syncfusion/ej2-react-documenteditor";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,6 +20,37 @@ import { toast } from "sonner";
 
 const SYNCFUSION_THEME_URL =
   "https://cdn.syncfusion.com/ej2/33.2.3/material.css";
+
+/**
+ * A problem raised while loading the stored file into the editor.
+ *
+ * `tone` and `retryable` vary independently. A PDF resume is an `info`
+ * notice about the stored file that no retry changes; a deployment with no
+ * conversion service is an `error` that no retry changes either; a
+ * conversion that simply failed this time is an `error` worth retrying.
+ */
+type LoadIssue = {
+  message: string;
+  tone: "info" | "error";
+  retryable: boolean;
+};
+
+const UNSUPPORTED_FORMAT_HINT =
+  "The editor only opens Word documents. Upload this resume as a .docx file to edit it with its original formatting.";
+
+/**
+ * What a 501 from the conversion API means to the person in front of the
+ * editor: the deployment is missing its document conversion service, so no
+ * resume can be opened with its formatting until that is set up.
+ */
+const NOT_CONFIGURED_MESSAGE =
+  "The document conversion service is not configured for this deployment, so no resume can be opened with its original formatting.";
+
+/** Explains a 415 from the conversion API in terms of the stored file. */
+const describeUnsupportedFormat = (contentType: string) =>
+  contentType.includes("pdf")
+    ? `This resume is stored as a PDF. ${UNSUPPORTED_FORMAT_HINT}`
+    : UNSUPPORTED_FORMAT_HINT;
 
 type DocumentEditorLike = {
   isDocumentLoaded?: boolean;
@@ -53,7 +85,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
   const lastLoadedResumeLinkRef = useRef<string | null>(null);
   const [isDocumentLoading, setIsDocumentLoading] = useState(false);
   const [isDocumentReady, setIsDocumentReady] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadIssue, setLoadIssue] = useState<LoadIssue | null>(null);
   // True when the editor holds the plain-text fallback instead of the converted
   // DOCX. Saving from this state would upload a formatting-free document and
   // delete the original file, so the save path refuses it.
@@ -174,7 +206,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     }
 
     lastLoadedResumeLinkRef.current = null;
-    setLoadError(null);
+    setLoadIssue(null);
     setIsDocumentReady(false);
     setIsDocumentLoading(true);
   }, [isDocumentLoading, isSavingDocument]);
@@ -194,7 +226,10 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         | undefined;
       if (!editor) return;
 
-      let lastErrorMessage = "Не удалось открыть документ";
+      let lastErrorMessage = "Could not open the document.";
+      // Set when trying again cannot help, to the tone the notice should
+      // carry. Null means the failure is transient and worth a "Try again".
+      let permanentIssueTone: LoadIssue["tone"] | null = null;
 
       const isEditorLoaded = () => {
         try {
@@ -286,12 +321,15 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           const responseText = await proxyResponse.text();
 
           if (!proxyResponse.ok) {
+            let contentType = "";
+
             try {
               const parsed = JSON.parse(responseText) as {
                 error?: string;
                 contentType?: string;
                 details?: string;
               };
+              contentType = parsed.contentType ?? "";
               const pieces = [parsed.error, parsed.contentType, parsed.details]
                 .filter(Boolean)
                 .join(" ");
@@ -299,6 +337,23 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
             } catch {
               lastErrorMessage = responseText || lastErrorMessage;
             }
+
+            // 415 is the conversion API refusing a file it cannot read as a
+            // Word document - a PDF upload, almost always. Retrying converts
+            // nothing, so the notice explains the file instead of the failure.
+            if (proxyResponse.status === 415) {
+              permanentIssueTone = "info";
+              lastErrorMessage = describeUnsupportedFormat(contentType);
+            }
+
+            // 501 is the deployment missing DOCUMENT_EDITOR_SERVICE_URL.
+            // Every resume fails the same way until it is set, so the notice
+            // names the deployment rather than blaming this document.
+            if (proxyResponse.status === 501) {
+              permanentIssueTone = "error";
+              lastErrorMessage = NOT_CONFIGURED_MESSAGE;
+            }
+
             throw new Error(lastErrorMessage);
           }
 
@@ -323,7 +378,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
                 const errorMessage =
                   typeof parsed.error === "string"
                     ? parsed.error
-                    : "Ответ не является SFDT";
+                    : "The conversion service did not return SFDT.";
                 const details =
                   typeof parsed.details === "string" ? parsed.details : "";
                 lastErrorMessage = [errorMessage, details]
@@ -337,7 +392,9 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           }
 
           if (!openPayload) {
-            throw new Error("Пустой ответ от сервера");
+            throw new Error(
+              "The conversion service returned an empty response.",
+            );
           }
 
           const isLikelyBase64Zip =
@@ -363,7 +420,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
               return false;
             } catch (decodeError) {
               console.warn("Failed to unzip base64 SFDT:", decodeError);
-              lastErrorMessage = "Не удалось распаковать SFDT zip";
+              lastErrorMessage = "Could not unpack the SFDT archive.";
               return false;
             }
           }
@@ -378,7 +435,8 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
               return await openSfdtText(decodedText);
             }
 
-            lastErrorMessage = "Ответ похож на base64, но SFDT не распознан";
+            lastErrorMessage =
+              "The response looked like base64 but held no readable SFDT.";
             return false;
           }
 
@@ -401,9 +459,14 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
               console.log(
                 "[SFDT] SFDT open failed, trying DOCX proxy fallback",
               );
-              const proxyRes = await fetch(
-                `/api/docx-proxy?url=${encodeURIComponent(resumeLink)}`,
-              );
+              // POST, not GET: /api/docx-proxy only exports a POST handler,
+              // so the query-string form of this fallback answered 405 every
+              // time and never actually ran.
+              const proxyRes = await fetch("/api/docx-proxy", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: resumeLink }),
+              });
               if (proxyRes.ok) {
                 const ab = await proxyRes.arrayBuffer();
                 const bytes = new Uint8Array(ab);
@@ -431,14 +494,20 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           return loaded;
         } catch (error) {
           console.warn("open via API failed:", error);
-          lastErrorMessage = "Не удалось открыть документ через конвертацию";
+          // A permanent failure already explained itself; the generic wording
+          // would replace "this resume is a PDF" or "conversion is not
+          // configured" with a vague failure the user cannot act on.
+          if (!permanentIssueTone) {
+            lastErrorMessage =
+              "Could not open the document through the conversion service.";
+          }
           return false;
         }
       };
 
       try {
         setIsDocumentLoading(true);
-        setLoadError(null);
+        setLoadIssue(null);
         setIsFallbackContent(false);
 
         const opened = await tryOpenFromApi();
@@ -538,7 +607,7 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
         lastLoadedResumeLinkRef.current = resumeLink;
         setIsDocumentReady(true);
       } catch (error) {
-        console.error("Ошибка при загрузке документа:", error);
+        console.error("Document load failed:", error);
 
         if (parsedResumeText && editor.editor) {
           const cleanText = parsedResumeText.replace(/<[^>]*>?/gm, "\n").trim();
@@ -549,15 +618,21 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
           }
           editor.editor.insertText(cleanText);
           setIsFallbackContent(true);
-          setLoadError(
-            "Не удалось загрузить исходное форматирование - показан только извлечённый текст. Сохранение отключено, чтобы не перезаписать исходный файл.",
-          );
+          setLoadIssue({
+            tone: permanentIssueTone ?? "error",
+            message: permanentIssueTone
+              ? `${lastErrorMessage} The extracted text is shown instead, and saving is off so the stored file is not replaced by an unformatted copy.`
+              : `Could not load the original formatting, so only the extracted text is shown. Saving is off so the stored file is not replaced by an unformatted copy. (${lastErrorMessage})`,
+            retryable: !permanentIssueTone,
+          });
           lastLoadedResumeLinkRef.current = resumeLink;
           setIsDocumentReady(true);
         } else {
-          setLoadError(
-            `${lastErrorMessage}. Проверьте, что SFDT успешно распакован.`,
-          );
+          setLoadIssue({
+            tone: "error",
+            message: lastErrorMessage,
+            retryable: !permanentIssueTone,
+          });
         }
       } finally {
         setIsDocumentLoading(false);
@@ -618,9 +693,28 @@ export const AnalyzeOriginalResume = ({ resumeId }: { resumeId: string }) => {
     <div className="flex h-full flex-col space-y-3">
       <link rel="stylesheet" href={SYNCFUSION_THEME_URL} />
 
-      {loadError ? (
-        <div className="rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {loadError}
+      {loadIssue ? (
+        <div
+          role="status"
+          className={cn(
+            "flex flex-col gap-2 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between",
+            loadIssue.tone === "error"
+              ? "border-destructive/50 bg-destructive/10 text-destructive"
+              : "border-border/60 bg-muted/40 text-muted-foreground",
+          )}
+        >
+          <span>{loadIssue.message}</span>
+          {loadIssue.retryable ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 self-start sm:self-auto"
+              onClick={handleCancelDocument}
+              disabled={isGlobalLoading || isSavingDocument}
+            >
+              Try again
+            </Button>
+          ) : null}
         </div>
       ) : null}
 

@@ -25,9 +25,15 @@ export async function POST(request: Request) {
     const serviceUrl = DOCUMENT_EDITOR_SERVICE_URL;
 
     if (!serviceUrl) {
+      // 501 for the same reason as /api/docx-to-sfdt: an unconfigured
+      // deployment is not a failed request, and the caller should not retry.
+      logError(
+        "Import proxy is unconfigured",
+        new Error("DOCUMENT_EDITOR_SERVICE_URL is not set"),
+      );
       return NextResponse.json(
-        { error: "DOCUMENT_EDITOR_SERVICE_URL is not configured" },
-        { status: 500 },
+        { error: "Document conversion is not configured" },
+        { status: 501 },
       );
     }
 

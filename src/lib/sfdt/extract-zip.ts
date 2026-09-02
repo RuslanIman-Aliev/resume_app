@@ -67,6 +67,6 @@ export const extractSfdtFromZipBase64 = (value: string): ZipExtractResult => {
 
   return {
     kind: "unknown",
-    reason: "SFDT не найден в архиве",
+    reason: "No SFDT was found in the archive.",
   };
 };
